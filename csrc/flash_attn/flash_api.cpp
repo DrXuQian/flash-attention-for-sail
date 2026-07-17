@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Tri Dao.
  ******************************************************************************/
 
@@ -16,6 +17,7 @@
 #include "hardware_info.h"
 #include "flash.h"
 #include "static_switch.h"
+#include "fmha_profiling_interface.hpp"
 
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
@@ -240,7 +242,7 @@ void set_params_dgrad(Flash_bwd_params &params,
     params.deterministic = deterministic;
 }
 
-void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream, bool force_split_kernel=false) {
+void run_mha_fwd(Flash_fwd_params &params, hggcStream_t stream, bool force_split_kernel=false) {
     FP16_SWITCH(!params.is_bf16, [&] {
         HEADDIM_SWITCH(params.d, [&] {
             BOOL_SWITCH(params.is_causal, Is_causal, [&] {
@@ -302,11 +304,25 @@ std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, 
     const int num_splits, const int num_sm, struct c10::TensorOptions opts) {
 
     // This needs to match with run_mha_fwd_splitkv_dispatch
+#ifdef USE_PPU
+    int block_m, block_n;
+    if (params.seqlenq_ngroups_swapped) {
+        block_m = 16;
+        block_n = 64;
+    } else {
+        block_m = 64;
+        const bool is_even_MN = params.cu_seqlens_q == nullptr && params.cu_seqlens_k == nullptr && params.seqlen_k % 128 == 0 && params.seqlen_q % block_m == 0;
+        block_n = (head_size >=128 || is_even_MN) ? 64 : head_size >= 128 ? 128 : 256;
+    }
+    const int num_n_blocks = (max_seqlen_k + block_n - 1) / block_n;
+    const int num_m_blocks = (max_seqlen_q + block_m - 1) / block_m;
+#else
     const int block_n = head_size <= 64 ? 256 : (head_size <= 128 ? 128 : 64);
     const int num_n_blocks = (max_seqlen_k + block_n - 1) / block_n;
     // Technically kBlockM = 64 only for the splitKV kernels, not the standard kernel.
     // In any case we don't expect seqlen_q to be larger than 64 for inference.
     const int num_m_blocks = (max_seqlen_q + 64 - 1) / 64;
+#endif
     params.num_splits = num_splits;
     at::Tensor softmax_lse_accum;
     at::Tensor out_accum;
@@ -362,7 +378,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
         const bool return_softmax,
         std::optional<at::Generator> gen_) {
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     at::cuda::CUDAGuard device_guard{q.device()};
 
     auto [cc_major, cc_minor] = get_compute_capability(get_current_device());
@@ -494,14 +510,34 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
 
     set_params_alibi(params, alibi_slopes_, batch_size, num_heads);
 
+    // export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        fmha_prof_params.set_flash_attn_params(
+            true/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            params.h/*num_heads*/, params.h_k/*num_heads_k*/,
+            params.d/*head_dim*/, params.d/*head_dim_value*/,
+            params.seqlen_q/*seqlen_q*/, params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            true/*is_fixed_seqs**/,
+            params.alibi_slopes_ptr != nullptr/*alibi*/
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+
     if (seqlen_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         run_mha_fwd(params, stream);
     } else {
         // If seqlen_k == 0, then we have an empty tensor. We need to set the output to 0.
         out.zero_();
         softmax_lse.fill_(std::numeric_limits<float>::infinity());
     }
+
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
 
     if (seqlenq_ngroups_swapped) {
         out = out.transpose(1, 2).reshape({batch_size, 1, num_heads_k * seqlen_q, head_size});
@@ -534,7 +570,7 @@ mha_varlen_fwd(at::Tensor &q,  // total_q x num_heads x head_size, total_q := \s
                const bool return_softmax,
                std::optional<at::Generator> gen_) {
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     at::cuda::CUDAGuard device_guard{q.device()};
 
     auto [cc_major, cc_minor] = get_compute_capability(get_current_device());
@@ -734,14 +770,37 @@ mha_varlen_fwd(at::Tensor &q,  // total_q x num_heads x head_size, total_q := \s
 
     set_params_alibi(params, alibi_slopes_, batch_size, num_heads);
 
+    // export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        bool is_fixed_seqs = (total_q == batch_size * max_seqlen_q
+                            && k.size(0) == batch_size * max_seqlen_k);
+
+        fmha_prof_params.set_flash_attn_params(
+            true/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            params.h/*num_heads*/, params.h_k/*num_heads_k*/,
+            params.d/*head_dim*/, params.d/*head_dim_value*/,
+            params.seqlen_q/*seqlen_q*/, params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            is_fixed_seqs/*is_fixed_seqs**/,
+            params.alibi_slopes_ptr != nullptr/*alibi*/
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+
     if (max_seqlen_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         run_mha_fwd(params, stream, paged_KV);
     } else {
         // If seqlen_k == 0, then we have an empty tensor. We need to set the output to 0.
         out.zero_();
         softmax_lse.fill_(std::numeric_limits<float>::infinity());
     }
+
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
 
     if (seqlenq_ngroups_swapped) {
         int64_t size_before[] = {batch_size, max_seqlen_q, num_heads_k, head_size};
@@ -754,7 +813,7 @@ mha_varlen_fwd(at::Tensor &q,  // total_q x num_heads x head_size, total_q := \s
     return {out, softmax_lse, p, rng_state};
 }
 
-void run_mha_bwd(Flash_bwd_params &params, cudaStream_t stream) {
+void run_mha_bwd(Flash_bwd_params &params, hggcStream_t stream) {
     FP16_SWITCH(!params.is_bf16, [&] {
         HEADDIM_SWITCH(params.d, [&] {
             BOOL_SWITCH(params.is_causal, Is_causal, [&] {
@@ -790,7 +849,7 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multipl
     #endif
     if (is_causal) { window_size_right = 0; }
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     at::cuda::CUDAGuard device_guard{q.device()};
 
     auto [cc_major, cc_minor] = get_compute_capability(get_current_device());
@@ -798,7 +857,7 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multipl
     TORCH_CHECK(is_sm8x_min, "FlashAttention only supports Ampere GPUs or newer.");
 
     bool is_dropout = p_dropout > 0.0;
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
 
     auto q_dtype = q.dtype();
     TORCH_CHECK(q_dtype == torch::kFloat16 || q_dtype == torch::kBFloat16,
@@ -952,6 +1011,24 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multipl
 
     set_params_alibi(params, alibi_slopes_, batch_size, num_heads);
 
+    // export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        fmha_prof_params.set_flash_attn_params(
+            false/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            params.h/*num_heads*/, params.h_k/*num_heads_k*/,
+            params.d/*head_dim*/, params.d/*head_dim_value*/,
+            params.seqlen_q/*seqlen_q*/, params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            true/*is_fixed_seqs**/,
+            params.alibi_slopes_ptr != nullptr/*alibi*/
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+
     if (seqlen_q > 0) {
         launch(params, stream);
     } else {
@@ -960,6 +1037,8 @@ mha_bwd(const at::Tensor &dout,  // batch_size x seqlen_q x num_heads, x multipl
         dv_expanded.zero_();
         softmax_d.zero_();
     }
+
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
 
     // For MQA/GQA we need to sum dK and dV across the groups
     if (num_heads_k != num_heads) {
@@ -1001,7 +1080,7 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
     #endif
     if (is_causal) { window_size_right = 0; }
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     at::cuda::CUDAGuard device_guard{q.device()};
 
     auto [cc_major, cc_minor] = get_compute_capability(get_current_device());
@@ -1009,7 +1088,7 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
     TORCH_CHECK(is_sm8x_min, "FlashAttention only supports Ampere GPUs or newer.");
 
     bool is_dropout = p_dropout > 0.0;
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
 
     auto q_dtype = q.dtype();
     TORCH_CHECK(q_dtype == torch::kFloat16 || q_dtype == torch::kBFloat16,
@@ -1181,6 +1260,27 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
 
     set_params_alibi(params, alibi_slopes_, batch_size, num_heads);
 
+    // export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        bool is_fixed_seqs = (total_q == batch_size * max_seqlen_q
+                           && total_k == batch_size * max_seqlen_k);
+
+        fmha_prof_params.set_flash_attn_params(
+            false/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            params.h/*num_heads*/, params.h_k/*num_heads_k*/,
+            params.d/*head_dim*/, params.d/*head_dim_value*/,
+            params.seqlen_q/*seqlen_q*/, params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            is_fixed_seqs/*is_fixed_seqs**/,
+            params.alibi_slopes_ptr != nullptr/*alibi*/
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+
     if (max_seqlen_q > 0) {
         launch(params, stream);
     } else {
@@ -1189,6 +1289,8 @@ mha_varlen_bwd(const at::Tensor &dout,  // total_q x num_heads, x head_size
         dv_expanded.zero_();
         softmax_d.zero_();
     }
+
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
 
     // For MQA/GQA we need to sum dK and dV across the groups
     if (num_heads_k != num_heads) {
@@ -1222,7 +1324,7 @@ mha_fwd_kvcache(at::Tensor &q,                 // batch_size x seqlen_q x num_he
                 int num_splits
                 ) {
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     at::cuda::CUDAGuard device_guard{q.device()};
 
     auto [cc_major, cc_minor] = get_compute_capability(get_current_device());
@@ -1451,10 +1553,30 @@ mha_fwd_kvcache(at::Tensor &q,                 // batch_size x seqlen_q x num_he
 
     set_params_alibi(params, alibi_slopes_, batch_size, num_heads);
 
-    auto stream = at::cuda::getCurrentCUDAStream().stream();
+    // export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        fmha_prof_params.set_flash_attn_params(
+            true/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            params.h/*num_heads*/, params.h_k/*num_heads_k*/,
+            params.d/*head_dim*/, params.d/*head_dim_value*/,
+            params.seqlen_q/*seqlen_q*/, params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            true/*is_fixed_seqs**/,
+            params.alibi_slopes_ptr != nullptr/*alibi*/
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+
+    hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
     // Only split kernel supports appending to KV cache, or indexing to the cache with cache_batch_idx,
     // or paged KV cache
     run_mha_fwd(params, stream, /*force_split_kernel=*/k_.has_value() || cache_batch_idx_.has_value() || paged_KV);
+
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
 
     if (head_size_og % 8 != 0) {
         out = out.index({"...", torch::indexing::Slice(torch::indexing::None, head_size_og)});

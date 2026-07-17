@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri Dao.
  ******************************************************************************/
 
@@ -12,7 +13,9 @@
 #include <cutlass/numeric_types.h>
 #include <cutlass/numeric_conversion.h>
 
+#ifndef FLASHATTENTION_DISABLE_SM90
 #include "cutlass/arch/grid_dependency_control.h"
+#endif
 
 #include "seqlen.h"
 #include "utils.h"
@@ -51,7 +54,7 @@ public:
     static_assert(MaxThreadsPerBlock % kGmemThreadsPerRow == 0, "MaxThreadsPerBlock must be a multiple of kGmemThreadsPerRow");
     using GmemCopyAtom = std::conditional_t<
         Has_cp_async,
-        cute::Copy_Atom<SM80_CP_ASYNC_CACHEGLOBAL<uint128_t>, ElementPartial>,
+        cute::Copy_Atom<PPU_CP_ASYNC_CACHEGLOBAL<uint128_t>, ElementPartial>,
         cute::Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<128>, ElementPartial>
     >;
     using GmemLayoutAtom = Layout<Shape <Int<MaxThreadsPerBlock / kGmemThreadsPerRow>, Int<kGmemThreadsPerRow>>,
@@ -78,7 +81,7 @@ public:
     static_assert(kMaxSplits % CUTE_STATIC_V(shape<0>(GmemLayoutAtomLSE{})) == 0);
     using GmemCopyAtomLSE = std::conditional_t<
         Has_cp_async,
-        cute::Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<AlignmentTypeLSE>, float>,
+        cute::Copy_Atom<PPU_CP_ASYNC_CACHEALWAYS<AlignmentTypeLSE>, float>,
         cute::Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<AlignmentLSE * sizeof(float) * 8>, float>
     >;
     using GmemTiledCopyLSE = decltype(
@@ -122,7 +125,7 @@ public:
     using ShapeLSE = cute::Shape<int32_t, int32_t, int32_t>;  // (seqlen, head, batch)
     using StrideLSE = cute::Stride<_1, int64_t, int64_t>;  // (seqlen, head, batch)
 
-    struct SharedStorage : cute::aligned_struct<128> {
+    struct CUTE_ALIGNAS(128) SharedStorage {
         cute::array_aligned<float, cute::cosize_v<SmemLayoutLSE>> smem_lse_partial;
         cute::array_aligned<int, kBlockM> smem_max_valid_split;
         cute::array_aligned<ElementPartial, cute::cosize_v<SmemLayoutO>> smem_o_partial;
@@ -204,10 +207,16 @@ public:
         int const m_block = blockIdx.x;
         int const k_block = blockIdx.y;
         int const batch = blockIdx.z;
+#ifdef USE_PPU
+        int const num_splits = params.num_splits_dynamic_ptr ? __ld_smem(&params.num_splits_dynamic_ptr[batch]) : get<1>(params.shape_LSE_partial);
+#else
         int const num_splits = params.num_splits_dynamic_ptr ? params.num_splits_dynamic_ptr[batch] : get<1>(params.shape_LSE_partial);
+#endif
 
         if (params.semaphore_to_reset && threadIdx.x == 0 && blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1 && blockIdx.z == gridDim.z - 1) {
+#ifndef FLASHATTENTION_DISABLE_SM90
             cutlass::arch::wait_on_dependent_grids();
+#endif
             *params.semaphore_to_reset = 0;
         }
         if (num_splits <= 1) { return; }
@@ -235,7 +244,9 @@ public:
         // Repeat the partitioning with identity layouts
         Tensor tLSEcLSE = gmem_thr_copy_LSE.partition_S(cLSE);
 
+#ifndef FLASHATTENTION_DISABLE_SM90
         cutlass::arch::wait_on_dependent_grids();
+#endif
 
         #pragma unroll
         for (int m = 0; m < size<2>(tLSEcLSE); ++m) {
@@ -260,8 +271,13 @@ public:
                     }
                 }
             } else {
+#ifdef USE_PPU
+                // It's important to set the rest of the LSEs, since the following logic uses the -INFINITY to get the max_valid_split, which is critical for performance
+                cute::fill(tLSEsLSE(_, _, m), -INFINITY);
+#else
                 // We don't need to zero out the rest of the LSEs, as we will not write the output to gmem
                 // cute::fill(tLSEsLSE(_, _, m), -INFINITY);
+#endif
             }
         }
         if constexpr (Has_cp_async) { cute::cp_async_fence(); }

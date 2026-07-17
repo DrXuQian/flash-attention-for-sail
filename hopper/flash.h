@@ -1,10 +1,11 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2023, Tri Dao.
  ******************************************************************************/
 
 #pragma once
 
-#include <cuda.h>
+#include <hggc.h>
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +119,11 @@ struct Flash_fwd_params : public Qkv_params {
     int * __restrict__ kv_batch_idx;
 
     // Paged KV cache
+#if !(defined(FA3_HLLM_BUILD) && defined(FA3_HLLM_USE_ADDR))
     int * __restrict__ page_table;
+#else
+    int64_t *__restrict__ page_table;
+#endif
     index_t page_table_batch_stride;
     int page_size;
     int num_pages;
@@ -159,6 +164,25 @@ struct Flash_fwd_params : public Qkv_params {
 
     int arch;
     int num_sm;
+
+#ifdef USE_PPU
+    bool is_varlen_q;
+    bool use_kblockm_16;
+    bool use_kblockm_128;
+    bool use_kblockn_16;
+    // The S extra matrix, (num_heads)
+    void *__restrict__ s_aux_ptr;
+
+#ifdef FA3_HLLM_BUILD
+    // For Holmes-LLM
+    void * workspace_ptr;
+    size_t max_workspace_size;
+    bool is_generation_phase;
+    // The deltas for mrope
+    int * __restrict__ mrope_position_deltas_ptr;
+#endif // FA3_HLLM_BUILD
+
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -210,9 +234,9 @@ struct Flash_bwd_params : public Flash_fwd_params {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <int Arch, typename T, int kHeadDim, int kHeadDimV, bool Split, bool PagedKVNonTMA, bool Has_softcap, bool PackGQA>
-void run_mha_fwd_(Flash_fwd_params &params, cudaStream_t stream);
-void prepare_varlen_num_blocks(Flash_fwd_params &params, cudaStream_t stream, bool packgqa, int blockM, int blockN, bool enable_pdl);
+void run_mha_fwd_(Flash_fwd_params &params, hggcStream_t stream);
+void prepare_varlen_num_blocks(Flash_fwd_params &params, hggcStream_t stream, bool packgqa, int blockM, int blockN, bool enable_pdl);
 template <int Arch, typename T, int kHeadDim, bool Has_softcap>
-void run_mha_bwd_(Flash_bwd_params &params, cudaStream_t stream);
+void run_mha_bwd_(Flash_bwd_params &params, hggcStream_t stream);
 template <typename T, typename Tpartial, int kBlockK>
-void run_mha_fwd_combine_(Flash_fwd_params &params, cudaStream_t stream, bool enable_pdl);
+void run_mha_fwd_combine_(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl);

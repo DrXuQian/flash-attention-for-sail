@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri Dao.
  ******************************************************************************/
 
@@ -16,6 +17,9 @@ namespace flash {
 
 // Host side kernel arguments
 struct TileSchedulerArguments {
+#ifdef USE_PPU
+    bool const varlen_q, extreme_varlen_q;
+#endif
     // num_head is num_head_q if not PackGQA, else num_head_k
     int const num_blocks, num_head, num_batch, num_splits;
     int const qhead_per_khead;
@@ -100,13 +104,22 @@ public:
         bool is_valid_tile = true;
         if constexpr (Varlen) {
             int seqlen = params.seqused
+#ifdef USE_PPU
+                ? __ld_smem(&params.seqused[work_info.bidb])
+                : (params.cu_seqlens ? __ld_smem(&params.cu_seqlens[work_info.bidb + 1]) - __ld_smem(&params.cu_seqlens[work_info.bidb]) : params.seqlen);
+#else
                 ? params.seqused[work_info.bidb]
                 : (params.cu_seqlens ? params.cu_seqlens[work_info.bidb + 1] - params.cu_seqlens[work_info.bidb] : params.seqlen);
+#endif
             if constexpr (PackGQA) { seqlen *= params.qhead_per_khead; }
             is_valid_tile = work_info.block_idx * kBlock < seqlen;
         }
         if constexpr (Varlen && Split) {
+#ifdef USE_PPU
+            int num_splits_dynamic = params.num_splits_dynamic_ptr ? __ld_smem(&params.num_splits_dynamic_ptr[work_info.bidb]) : params.num_splits;
+#else
             int num_splits_dynamic = params.num_splits_dynamic_ptr ? params.num_splits_dynamic_ptr[work_info.bidb] : params.num_splits;
+#endif
             is_valid_tile &= work_info.split_idx < num_splits_dynamic;
             // Use the top 16 bits to store num_splits
             work_info.split_idx |= (num_splits_dynamic << 16);
@@ -131,6 +144,181 @@ public:
     }
 
 };
+
+///////////////////////////////////////////////////////////////////////////////
+
+#ifdef USE_PPU
+template<bool Varlen=false, bool Split=false, bool PackGQA=false, int kBlock=128>
+class DynamicPersistentTileSchedulerSM80 {
+
+public:
+
+    using SharedStorage = int;
+
+protected:
+    SharedStorage* const tile_count_smem;
+
+public:
+    // Device side kernel params
+    struct Params {
+        bool const varlen_q, extreme_varlen_q;
+        int const num_head, num_batch, num_splits;
+        int const qhead_per_khead;
+        int const seqlen;
+        cutlass::FastDivmod m_block_divmod, head_divmod;
+        int const* const cu_seqlens;
+        int const* const seqused;
+        int const* const num_splits_dynamic_ptr;
+        int* const tile_count_semaphore;
+    };
+
+    static Params
+    to_underlying_arguments(TileSchedulerArguments const& args) {
+        assert(args.num_splits < (1 << 16)); // We use the top 16 bits to store num_splits
+        assert(args.tile_count_semaphore != nullptr);
+        return {args.varlen_q, args.extreme_varlen_q,
+                args.num_head, args.num_batch, !Split ? 1 : args.num_splits,
+                args.qhead_per_khead, args.seqlen,
+                cutlass::FastDivmod(args.num_blocks), cutlass::FastDivmod(args.num_head),
+                !Varlen ? nullptr : args.cu_seqlens, !Varlen ? nullptr : args.seqused,
+                !Varlen ? nullptr : args.num_splits_dynamic_ptr,
+                args.tile_count_semaphore};
+    }
+
+    static dim3
+    get_grid_shape(Params const& params, int num_sm) {
+        return {uint32_t(num_sm)};
+    }
+
+    struct WorkTileInfo {
+        int tile_idx_next;
+        int tile_idx, block_idx, split_idx, bidh, bidb;
+
+        template<bool IsExVarlenQ=false>
+        CUTLASS_DEVICE
+        bool
+        is_valid(Params const& params) {
+            int max_num_splits_dynamic = Split ? (params.num_splits_dynamic_ptr ? __ld_smem(&params.num_splits_dynamic_ptr[params.num_batch]) : params.num_splits) : 1;
+            auto divmod_fn = [] (int &remainder, const int divisor, const int dividend) -> int {
+                remainder = dividend % divisor;
+                return dividend / divisor;
+            };
+            if constexpr (IsExVarlenQ) {
+                if (bidb >= params.num_batch) return false;
+                int seqlen = params.seqused ? __ld_smem(&params.seqused[bidb]) : (params.cu_seqlens ? __ld_smem(&params.cu_seqlens[bidb + 1]) - __ld_smem(&params.cu_seqlens[bidb]): params.seqlen);
+                int num_blocks = cute::ceil_div((PackGQA ? params.qhead_per_khead : 1) * seqlen, kBlock);
+                #pragma clang loop licm(disable)
+                while (tile_idx < tile_idx_next) {
+                    int tile_idx_distance = tile_idx_next - tile_idx;
+                    if (tile_idx_distance >= (params.num_head - bidh - 1) * max_num_splits_dynamic * num_blocks + (max_num_splits_dynamic - split_idx - 1) * num_blocks + num_blocks - block_idx) {
+                        tile_idx += ((params.num_head - bidh - 1) * max_num_splits_dynamic * num_blocks + (max_num_splits_dynamic - split_idx - 1) * num_blocks + num_blocks - block_idx);
+                        bidb++;
+                        if (bidb >= params.num_batch) break;
+                        bidh = 0;
+                        split_idx = 0;
+                        block_idx = 0;
+                        seqlen = params.seqused ? __ld_smem(&params.seqused[bidb]) : (params.cu_seqlens ? __ld_smem(&params.cu_seqlens[bidb + 1]) - __ld_smem(&params.cu_seqlens[bidb]): params.seqlen);
+                        num_blocks = cute::ceil_div((PackGQA ? params.qhead_per_khead : 1) * seqlen, kBlock);
+                    } else {
+                        tile_idx += tile_idx_distance;
+                        int bidh_append, block_idx_append, split_idx_append;
+                        params.head_divmod.divmod(bidh_append, divmod_fn(split_idx_append, max_num_splits_dynamic, divmod_fn(block_idx_append, num_blocks, tile_idx_distance)));
+                        int split_idx_carry = divmod_fn(block_idx, num_blocks, block_idx + block_idx_append);
+                        int bidh_carry = divmod_fn(split_idx, max_num_splits_dynamic, split_idx + split_idx_append + split_idx_carry);
+                        bidh += bidh_append + bidh_carry;
+                    }
+                }
+            } else {
+                if constexpr (PackGQA) {
+                    bidb = params.head_divmod.divmod(bidh, divmod_fn(split_idx, max_num_splits_dynamic, params.m_block_divmod.divmod(block_idx, tile_idx_next)));
+                } else {
+                    if (params.qhead_per_khead >= 4 || params.num_head == params.qhead_per_khead) {
+                        // traverse head first to get better load balance, but may incur cache miss penalty.
+                        // so it needs params.qhead_per_khead >= 4, 4 is the common occupancy in prefill instance,
+                        // or num_heads_k == 1
+                        bidb = params.m_block_divmod.divmod(block_idx, params.head_divmod.divmod(bidh, tile_idx_next));
+                    } else {
+                        bidb = params.head_divmod.divmod(bidh, params.m_block_divmod.divmod(block_idx, tile_idx_next));
+                    }
+                    split_idx = 0;   // PackGQA=false does not support Split
+                }
+            }
+            return bidb < params.num_batch;
+        }
+
+        template<bool IsNotExVarlenQ=false>
+        CUTLASS_DEVICE
+        bool
+        is_empty(Params const& params) {
+            bool is_empty_tile = false;
+            if constexpr (Split) {
+                int num_splits_dynamic = params.num_splits_dynamic_ptr ? __ld_smem(&params.num_splits_dynamic_ptr[bidb]) : params.num_splits;
+                is_empty_tile |= (split_idx >= num_splits_dynamic);
+            }
+            if constexpr (IsNotExVarlenQ) {
+                int seqlen = params.seqused ? __ld_smem(&params.seqused[bidb]) : (params.cu_seqlens ? __ld_smem(&params.cu_seqlens[bidb + 1]) - __ld_smem(&params.cu_seqlens[bidb]): params.seqlen);
+                return is_empty_tile || (block_idx * kBlock >= (PackGQA ? params.qhead_per_khead : 1) * seqlen);
+            } else {
+                return is_empty_tile;
+            }
+        }
+
+        CUTLASS_DEVICE
+        cute::tuple<int32_t, int32_t, int32_t, int32_t>
+        get_block_coord(Params const& params) const {
+            int seqlen = params.seqused ? __ld_smem(&params.seqused[bidb]) : (params.cu_seqlens ? __ld_smem(&params.cu_seqlens[bidb + 1]) - __ld_smem(&params.cu_seqlens[bidb]): params.seqlen);
+            int num_blocks = cute::ceil_div((PackGQA ? params.qhead_per_khead : 1) * seqlen, kBlock);
+            int block_idx_reversed = block_idx < num_blocks ? num_blocks - 1 - block_idx : block_idx;   // take the longest worktile (bigger block_idx when causal=true) for the free worker.
+            if constexpr (!Split) {
+                return {block_idx_reversed, bidh, bidb, 0 /*split_idx*/};
+            } else {
+                int num_splits_dynamic = params.num_splits_dynamic_ptr ? __ld_smem(&params.num_splits_dynamic_ptr[bidb]) : params.num_splits;
+                return {block_idx_reversed, bidh, bidb, split_idx | (num_splits_dynamic << 16)};
+            }
+        }
+    };
+
+    CUTLASS_DEVICE
+    DynamicPersistentTileSchedulerSM80(SharedStorage* const smem_scheduler) : tile_count_smem(smem_scheduler) {};
+
+    template<bool IsProducerWarp=false>
+    CUTLASS_DEVICE
+    WorkTileInfo
+    get_initial_work(Params const& params) const {
+        return {int(blockIdx.x), 0, 0, 0, 0, 0};
+    }
+
+    CUTLASS_DEVICE
+    void
+    init_consumer() const {}
+
+    CUTLASS_DEVICE
+    void
+    prefetch_next_work(Params const& params, WorkTileInfo& current_work) const {}
+
+    template<bool IsProducerWarp=false>
+    CUTLASS_DEVICE
+    WorkTileInfo
+    get_next_work(Params const& params, WorkTileInfo const& current_work) const {
+        int const warp_idx = cutlass::canonical_warp_idx_sync();
+        if (warp_idx == 0) {
+            int lane_id = __ppu_read_laneid();
+            int tile_idx = atomicAdd(&params.tile_count_semaphore[lane_id], 1);
+            if (lane_id == 0) {
+                *tile_count_smem = tile_idx;
+            }
+        }
+        __syncthreads();
+        int tile_idx = __ppu_read_firstlane(*tile_count_smem) + int(gridDim.x);
+        return {tile_idx, current_work.tile_idx, current_work.block_idx, current_work.split_idx, current_work.bidh, current_work.bidb};
+    }
+
+};
+template<typename T>
+struct is_instantiation_of_DynamicPersistentTileSchedulerSM80 : std::false_type {};
+template<bool Varlen, bool Split, bool PackGQA, int kBlock>
+struct is_instantiation_of_DynamicPersistentTileSchedulerSM80<DynamicPersistentTileSchedulerSM80<Varlen, Split, PackGQA, kBlock>> : std::true_type {};
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 

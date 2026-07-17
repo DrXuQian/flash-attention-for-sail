@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Tri Dao.
  ******************************************************************************/
 
@@ -55,7 +56,7 @@ public:
 
     // Kernel level shared memory storage
     struct SharedStorage {
-        struct TensorStorage : cute::aligned_struct<128> {
+        struct CUTE_ALIGNAS(128) TensorStorage {
             union {
                 typename CollectiveMainloop::TensorStorage mainloop;
                 typename CollectiveEpilogue::TensorStorage epilogue;
@@ -144,6 +145,7 @@ public:
 
         int warp_idx = cutlass::canonical_warp_idx_sync();
         CUTLASS_PRAGMA_NO_UNROLL
+        #pragma clang loop licm(disable)
         for (auto work_tile_info = warp_idx == 0 ? scheduler.template get_initial_work</*IsProducerWarp=*/true>(params.scheduler) : scheduler.template get_initial_work</*IsProducerWarp=*/false>(params.scheduler);
              work_tile_info.is_valid(params.scheduler);
              work_tile_info = warp_idx == 0 ? scheduler.template get_next_work</*IsProducerWarp=*/true>(params.scheduler, work_tile_info) : scheduler.template get_next_work</*IsProducerWarp=*/false>(params.scheduler, work_tile_info)) {

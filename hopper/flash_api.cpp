@@ -1,21 +1,26 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri Dao.
  ******************************************************************************/
 
+#ifndef FA3_HLLM_BUILD
 #include <Python.h>
+#endif // FA3_HLLM_BUILD
+
 #include <torch/nn/functional/padding.h>
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
-
 #include <cutlass/numeric_types.h>
-
 #include "flash.h"
 #include "static_switch.h"
 #include "tile_size.h"
 #include "heuristics.h"
 #include "cuda_check.h"
+#ifdef USE_PPU
+#include "fmha_profiling_interface.hpp"
+#endif
 
-
+#ifndef FA3_HLLM_BUILD
 extern "C" {
 /* Creates a dummy empty _C module that can be imported from Python.
     The import from Python will load the .so consisting of this file
@@ -34,10 +39,93 @@ PyObject* PyInit__C(void)
     return PyModule_Create(&module_def);
 }
 }
+#endif // FA3_HLLM_BUILD
 
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+
+#ifdef FA3_HLLM_BUILD
+namespace hllm_fa3 {
+constexpr size_t DEFAULT_MAX_WORKSPACE_SIZE = 2147483648; // Default workspace is set as 2GB, since Holmes/Holmes-LLM default workspace is 2GB
+
+int adjust_num_splits(int num_splits_in, Flash_fwd_params &params);
+
+inline size_t getMaxWorkspaceSize(void) {
+    static bool init = false;
+    static size_t max_workspace_size = DEFAULT_MAX_WORKSPACE_SIZE;
+    if (!init) {
+        init = true;
+        const char* max_workspace_size_env = std::getenv("FA_MAX_WORKSPACE_SIZE");
+        if (max_workspace_size_env != nullptr) {
+            max_workspace_size = std::stoull(max_workspace_size_env);
+            printf("Setting FA3's max_workspace_size as %zu\n", max_workspace_size);
+        }
+    }
+
+    return max_workspace_size;
+}
+
+// If num_splits > 0, return really needed size
+// If num_splits == 0, return max allowed needed size for compile(will tune) and runtime phase
+size_t get_workspace_size(int b, int s_q, int s_k, int h, int h_kv, int d, int d_v, bool is_generation_phase=false, int num_splits=0, bool compile_tune_mode=false) {
+    auto round_multiple = [](int x, int m) { return (x + m - 1) / m * m; };
+    const int d_rounded = round_multiple(d, 32);
+
+    size_t fa3_workspace_size = 0;
+    // In order to prevent the estimated workspace from being too large, set the maximum allowed workspace size to 2GB(can be overwritten by env var)
+    size_t max_allowed_workspace_size = getMaxWorkspaceSize();
+
+    // Get real num_splits
+    if (num_splits == 0) {
+        // get accurate workspace_size requires many params which are complicated to get in compile phase, use max_allowed_workspace_size now.
+        return max_allowed_workspace_size;
+    } else {
+        size_t softmax_lse_workspace_size = sizeof(float) * b * h * s_q;
+        size_t softmax_lse_accum_workspace_size = num_splits <= 1 ? 0 : sizeof(float) * num_splits * b * h * s_q;
+        size_t out_accum_workspace_size = num_splits <= 1 ? 0 : sizeof(float) * num_splits * b * h * s_q * d_rounded;
+        fa3_workspace_size = softmax_lse_workspace_size + softmax_lse_accum_workspace_size + out_accum_workspace_size;
+        return fa3_workspace_size;
+    }
+}
+
+int getEnvNumSplits() {
+    static bool init = false;
+    static int num_splits = 0;
+    if (!init) {
+        init = true;
+        const char* num_splits_env = std::getenv("FA_NUM_SPLITS");
+        if (num_splits_env) {
+            num_splits = std::atoi(num_splits_env);
+            if (num_splits <= 0) {
+                printf("Invalid value for FA_NUM_SPLITS. Will use calculated values instead!\n");
+            }
+        }
+    }
+    return num_splits;
+}
+
+int adjust_num_splits(int num_splits_in, Flash_fwd_params const& params) {
+    // For debug only
+    int num_splits_env = getEnvNumSplits();
+    if (num_splits_env > 0) { return num_splits_env; }
+
+    // Check if it will exceed max_workspace_size (only in runtime phase)
+    if (params.workspace_ptr
+        && get_workspace_size(params.b, params.seqlen_q, params.seqlen_k, params.h, params.h_k, params.d, params.d, params.seqlen_q <= 5/*is_generation_phase*/, num_splits_in)
+            > params.max_workspace_size) {
+        return 1;
+    }
+
+    return num_splits_in;
+}
+
+}
+#endif // FA3_HLLM_BUILD
+
+#ifdef FA3_HLLM_BUILD
+namespace hllm_fa3 {
+#endif // FA3_HLLM_BUILD
 
 void set_params_fprop(Flash_fwd_params &params,
                       // sizes
@@ -152,7 +240,13 @@ void set_params_fprop(Flash_fwd_params &params,
     params.attention_chunk = attention_chunk;
 
     params.arch = at::cuda::getCurrentDeviceProperties()->major * 10 + at::cuda::getCurrentDeviceProperties()->minor;
+#ifdef USE_PPU
+    params.num_sm = (std::string(at::cuda::getCurrentDeviceProperties()->name).find("810E") != std::string::npos) ?
+        (20 - sm_margin) :
+        (at::cuda::getCurrentDeviceProperties()->multiProcessorCount - sm_margin);
+#else
     params.num_sm = at::cuda::getCurrentDeviceProperties()->multiProcessorCount - sm_margin;
+#endif
 
     #ifdef FLASHATTENTION_DISABLE_LOCAL
         TORCH_CHECK(!params.is_local, "This flash attention build does not support local attention.");
@@ -245,17 +339,15 @@ void set_params_dgrad(Flash_bwd_params &params,
 }
 
 template <int Arch, int Split, bool PagedKVNonTMA, bool PackGQA, bool Has_softcap>
-void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
+void run_mha_fwd_constexpr(Flash_fwd_params &params, hggcStream_t stream) {
     if (!params.is_e4m3) {
         if (params.is_bf16) {
             #ifndef FLASHATTENTION_DISABLE_HDIM64
             if (params.d <= 64) {
-                if constexpr (Arch == 90) {
-                    if (params.dv > 256) {
-                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    } else if (params.dv > 64) {
-                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    }
+                if (params.dv > 256) {
+                    return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                } else if (params.dv > 64) {
+                    return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
@@ -268,10 +360,8 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
             #endif
             #ifndef FLASHATTENTION_DISABLE_HDIM192
             if (params.d <= 192) {
-                if constexpr (Arch == 90) {
-                    if (params.dv <= 128) {
-                        return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    }
+                if (params.dv <= 128) {
+                    return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
@@ -283,12 +373,10 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
             #ifndef FLASHATTENTION_DISABLE_FP16
             #ifndef FLASHATTENTION_DISABLE_HDIM64
             if (params.d <= 64) {
-                if constexpr (Arch == 90) {
-                    if (params.dv > 256) {
-                        return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    } else if (params.dv > 64) {
-                        return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    }
+                if (params.dv > 256) {
+                    return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+                } else if (params.dv > 64) {
+                    return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
@@ -301,10 +389,8 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
             #endif
             #ifndef FLASHATTENTION_DISABLE_HDIM192
             if (params.d <= 192) {
-                if constexpr (Arch == 90) {
-                    if (params.dv <= 128) {
-                        return run_mha_fwd_<Arch, cutlass::half_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
-                    }
+                if (params.dv <= 128) {
+                    return run_mha_fwd_<Arch, cutlass::half_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
                 return run_mha_fwd_<Arch, cutlass::half_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
@@ -319,15 +405,38 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
     } else {
         #ifndef FLASHATTENTION_DISABLE_FP8
         #ifndef FLASHATTENTION_DISABLE_HDIM64
+        #if USE_PPU
+        if (params.d <= 64) { return run_mha_fwd_<89, cutlass::float_e4m3_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+        #else
         if (params.d <= 64) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
         #endif
+        #endif
         #ifndef FLASHATTENTION_DISABLE_HDIM96
+        #if USE_PPU
+        if (params.d <= 96) {
+            TORCH_CHECK(false, "Head dim 96 does not support FP8 now.");
+            // return run_mha_fwd_<89, cutlass::float_e4m3_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+        }
+        #else
         if (params.d <= 96) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 96, 96, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
         #endif
+        #endif
         #ifndef FLASHATTENTION_DISABLE_HDIM128
+        #if USE_PPU
+        if (params.d <= 128) { return run_mha_fwd_<89, cutlass::float_e4m3_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+        #else
         if (params.d <= 128) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 128, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
         #endif
+        #endif
         #ifndef FLASHATTENTION_DISABLE_HDIM192
+        #if USE_PPU
+        if (params.d <= 192) {
+            if (params.dv <= 128) {
+                return run_mha_fwd_<89, cutlass::float_e4m3_t, 192, 128, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+            }
+            return run_mha_fwd_<89, cutlass::float_e4m3_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
+        }
+        #else
         if (params.d <= 192) {
             if constexpr (Arch == 90) {
                 if (params.dv <= 128) {
@@ -337,8 +446,13 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
             return run_mha_fwd_<90, cutlass::float_e4m3_t, 192, 192, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
         }
         #endif
+        #endif
         #ifndef FLASHATTENTION_DISABLE_HDIM256
+        #if USE_PPU
+        if (params.d <= 256) { return run_mha_fwd_<89, cutlass::float_e4m3_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+        #else
         if (params.d <= 256) { return run_mha_fwd_<90, cutlass::float_e4m3_t, 256, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream); }
+        #endif
         #endif
         #else
         TORCH_CHECK(false, "This flash attention build does not support FP8.");
@@ -346,17 +460,25 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, cudaStream_t stream) {
     }
 }
 
-void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream) {
+void run_mha_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     // HEADDIM_SWITCH(params.d, [&] {
     //     run_mha_fwd_<cutlass::half_t, kHeadSize>(params, stream);
     // });
     TORCH_CHECK(params.num_splits >= 1);
     ARCH_SWITCH(params.arch, Arch, [&] {
         SPLIT_SWITCH(params.num_splits > 1, Split, [&] {
+#ifdef USE_PPU
+            PAGEDKV_SWITCH(params.page_table, PagedKVNonTMA, [&] {   // PagedKVNonTMA means PagedKV for PPU
+#else
             PAGEDKV_SWITCH(params.page_table && !params.pagedkv_tma, PagedKVNonTMA, [&] {
+#endif
                 PACKGQA_SWITCH(params.pack_gqa, PackGQA_, [&] {
+#if defined(USE_PPU) && USE_AIU
+                    static constexpr bool PackGQA = PackGQA_ || (Arch >= 90 && PagedKVNonTMA) || Split;
+#else
                     // Always enable PackGQA for Sm8x or PagedKVNonTMA or Split to reduce compilation
                     static constexpr bool PackGQA = PackGQA_ || Arch < 90 || PagedKVNonTMA || Split;
+#endif
                     SOFTCAP_SWITCH(params.softcap > 0.0, Has_softcap, [&] {
                         run_mha_fwd_constexpr<Arch, Split, PagedKVNonTMA, PackGQA, Has_softcap>(params, stream);
                     });
@@ -366,7 +488,7 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream) {
     });
 }
 
-void run_mha_fwd_combine(Flash_fwd_params &params, cudaStream_t stream, bool enable_pdl=false) {
+void run_mha_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl=false) {
     #ifndef FLASHATTENTION_DISABLE_SPLIT
     // If hdim is 96 or 192, it's faster to round them to 128 or 256 respectively
     // so that kBlockM is smaller and we have more parallelism.
@@ -406,18 +528,39 @@ inline bool get_pagedkv_tma(Flash_fwd_params const& params) {
 }
 
 inline bool get_pack_gqa(Flash_fwd_params const& params) {
+#if defined(USE_PPU) && USE_AIU
+    if ((params.is_local && params.h > params.h_k) || params.num_splits > 1) { return true; }
+#else
     // Always enable PackGQA for Sm8x or PagedKVNonTMA or Split to reduce compilation and binary size.
     // Has little effect on speed.
     if (params.arch < 90 || (params.page_table && !params.pagedkv_tma) || params.num_splits > 1) { return true; }
+#endif
     #ifdef FLASHATTENTION_DISABLE_PACKGQA
     return false;
     #else
     // params.page_table must already be set
     if (params.h == params.h_k) { return false; }
+#ifdef USE_PPU
+    bool varlen = params.cu_seqlens_q || params.cu_seqlens_k || params.seqused_q || params.seqused_k || params.leftpad_k;
+    auto kBlockMN_kernel_args_sm8x_wo_PackGQA = tile_size_fwd_ppu(params.arch, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/,
+        params.page_table, varlen, false /*split*/, params.softcap > 0.f, params.knew_ptr, false /*pack_gqa*/,
+        ((params.is_varlen_q && ((params.d_rounded <= 128 && 1.0 * params.total_q / params.b > 64) || (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && 1.0 * params.total_q / params.b > 704))) ||
+         (!params.is_varlen_q && params.b * params.h * ((params.seqlen_q + 127) / 128) / params.num_sm >= 8 && ((params.d_rounded <= 128 && params.seqlen_q > (params.is_causal ? 704 : 64)) || (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && params.seqlen_q > 704)))) /*kBlockM128*/,
+        params.use_kblockm_16, params.use_kblockn_16);
+    int const kBlockM_wo_PackGQA = std::get<0>(kBlockMN_kernel_args_sm8x_wo_PackGQA);
+    auto kBlockMN_kernel_args_sm8x_w_PackGQA = tile_size_fwd_ppu(params.arch, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/,
+        params.page_table, varlen, false /*split*/, params.softcap > 0.f, params.knew_ptr, true /*pack_gqa*/,
+        ((params.is_varlen_q && ((params.d_rounded <= 128 && 1.0 * params.total_q / params.b > 64) || (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && 1.0 * params.total_q / params.b > 704))) ||
+         (!params.is_varlen_q && params.b * params.h_k * ((params.seqlen_q * params.h / params.h_k + 127) / 128) / params.num_sm >= 8 && ((params.d_rounded <= 128 && params.seqlen_q > (params.is_causal ? 704 : 64)) || (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && params.seqlen_q > 704)))) /*kBlockM128*/,
+        params.use_kblockm_16, params.use_kblockn_16);
+    int const kBlockM_w_PackGQA = std::get<0>(kBlockMN_kernel_args_sm8x_w_PackGQA);
+    return should_pack_gqa((params.cu_seqlens_q || params.seqused_q) && (params.b > 2 || params.total_q / params.b < 0.95 * params.seqlen_q), params.seqlen_q, params.h, params.h_k, kBlockM_wo_PackGQA, kBlockM_w_PackGQA, params.num_sm * 4);   // 4 is the common occupancy in prefill instance
+#else
     // This needs to match the kernel configs
     auto kBlockMN_kernel_args_sm90 = tile_size_fwd_sm90(params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, false /*v_colmajor*/, params.page_table && !params.pagedkv_tma, params.softcap > 0.f);
     int const kBlockM = std::get<0>(kBlockMN_kernel_args_sm90);
     return should_pack_gqa(params.cu_seqlens_q || params.seqused_q, params.seqlen_q, params.h / params.h_k, kBlockM);
+#endif
     #endif
 }
 
@@ -425,6 +568,12 @@ inline int get_num_splits(Flash_fwd_params const& params) {
     #ifdef FLASHATTENTION_DISABLE_SPLIT
     return 1;
     #else
+#ifdef USE_PPU
+    int block_m = std::max(params.seqlen_q * params.h / params.h_k, 64) / 64;
+    float waves = 1.0 * params.b * params.h_k * block_m / params.num_sm;
+    if ((!params.use_kblockm_16) && ((params.seqlen_q > 16) ||
+        ((params.seqlen_q <= 16) && (waves > 1) && (params.seqlen_k < 3660 * waves)))) { return 1; }
+#endif
     // Always enable PackGQA for Split
     // params.page_table must already be set
     // This needs to match the kernel configs
@@ -432,7 +581,12 @@ inline int get_num_splits(Flash_fwd_params const& params) {
     auto kBlockMN_kernel_args_sm90 = tile_size_fwd_sm90(params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, false /*v_colmajor*/, params.page_table && !params.pagedkv_tma, params.softcap > 0.f);
     // Strictly speaking we need to pass in (varlen && params.num_splits > 1) but num_splits
     // has not been set here. It's OK though because we might just underestimate kBlockN a bit
+#ifdef USE_PPU
+    auto kBlockMN_kernel_args_sm8x = tile_size_fwd_ppu(params.arch, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/,
+        params.page_table, varlen, true /*split*/, params.softcap > 0.f, params.knew_ptr, true /*pack_gqa*/, false /*kBlockM128*/, params.use_kblockm_16, params.use_kblockn_16);
+#else
     auto kBlockMN_kernel_args_sm8x = tile_size_fwd_sm8x(params.arch == 86 || params.arch == 89, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, params.page_table, varlen, params.softcap > 0.f, params.knew_ptr);
+#endif
     int const kBlockM = params.arch >= 90 ? std::get<0>(kBlockMN_kernel_args_sm90) : std::get<0>(kBlockMN_kernel_args_sm8x);
     int const kBlockN = params.arch >= 90 ? std::get<1>(kBlockMN_kernel_args_sm90) : std::get<1>(kBlockMN_kernel_args_sm8x);
     int seqlen_q_packgqa = params.seqlen_q * (params.h / params.h_k);
@@ -443,12 +597,32 @@ inline int get_num_splits(Flash_fwd_params const& params) {
     int const num_n_blocks = (seqlen_k_loaded + kBlockN - 1) / kBlockN;
     int const num_m_blocks = (seqlen_q_packgqa + kBlockM - 1) / kBlockM;
     int const size_one_kv_head = params.seqlen_k * (params.d + params.dv) * (params.is_e4m3 ? 1 : 2);
+#ifdef USE_PPU
+    int total_mblocks = params.b * params.h_k * ((params.total_q / params.b * (params.h / params.h_k) + kBlockM - 1) / kBlockM);
+    // We do not split for prefill when using dynamic splits, to get rid of too much costs of dynamic split combine kernel.
+    // So we use the upperbound 16 for params.seqlen_q.
+    int min_mblocks = (params.num_splits_dynamic_ptr ? 1 : params.b) * params.h_k *
+        (((params.num_splits_dynamic_ptr ? std::min(params.seqlen_q, 16) : params.seqlen_q) * (params.h / params.h_k) + kBlockM - 1) / kBlockM);
+    // We only use Split in kBlockM == 16 scenario, hence we can get exact occ for corresponding tiling.
+    int const occ = params.use_kblockn_16 ? (params.d_rounded <= 64 && params.dv_rounded > 256 ? 14 : 16) :
+        (params.d_rounded <= 64 ? (params.dv_rounded <= 64 ? 8 : (params.dv_rounded <= 256 ? 6 : 14)) : (params.d_rounded <= 96 ? 10 : (params.d_rounded <= 128 ? 8 : (params.d_rounded <= 192 ? 5 : 16))));
+#ifndef FA3_HLLM_BUILD
+    int num_splits_average = num_splits_heuristic(total_mblocks, params.num_sm, occ, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);
+    int num_splits_uppper_bound = num_splits_heuristic(min_mblocks, params.num_sm, occ, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);
+    return params.num_splits_dynamic_ptr ? (num_splits_average > 1 ? num_splits_uppper_bound : 1) : num_splits_average;
+#else
+    int cur_num_splits = num_splits_heuristic(total_mblocks, params.num_sm, occ, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);
+    cur_num_splits = hllm_fa3::adjust_num_splits(cur_num_splits, params);
+    return cur_num_splits;
+#endif // FA3_HLLM_BUILD
+#else
     // Always enable PackGQA for Split
     // If varlen, we use dynamic split, so this heuristic just needs to get an upper bound on num_splits.
     // We assume the case where there's 1 long sequence and the rest are short, i.e. pretending
     // that batch = 1.
     int total_mblocks = (params.num_splits_dynamic_ptr ? 1 : params.b) * params.h_k * num_m_blocks;
     return num_splits_heuristic(total_mblocks, params.num_sm, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);
+#endif
     #endif
 }
 
@@ -528,6 +702,9 @@ mha_fwd_get_scheduler_metadata(
         int64_t sm_margin
         ) {
 
+#ifdef USE_PPU
+    return {};
+#endif
     TORCH_CHECK(qkv_dtype == at::ScalarType::Half || qkv_dtype == at::ScalarType::BFloat16 || qkv_dtype == at::ScalarType::Float8_e4m3fn,
                 "FlashAttention only supports fp16, bf16, and fp8_e4m3 data type");
     TORCH_CHECK(num_heads % num_heads_k == 0, "Number of heads in key/value must divide number of heads in query");
@@ -583,7 +760,11 @@ mha_fwd_get_scheduler_metadata(
     params.softcap = has_softcap ? 1.0f : 0.0f;
 
     params.page_size = page_size.has_value() ? page_size.value() : 1;
+#if !(defined(FA3_HLLM_BUILD) && defined(FA3_HLLM_USE_ADDR))
     params.page_table = !page_size.has_value() ? nullptr : reinterpret_cast<int*>(1);
+#else
+    params.page_table = !page_size.has_value() ? nullptr : reinterpret_cast<int64_t*>(1);
+#endif
 
     bool const use_dynamic_split = params.b <= 992;
     params.num_splits_dynamic_ptr = !use_dynamic_split ? nullptr : reinterpret_cast<int*>(1);
@@ -595,7 +776,7 @@ mha_fwd_get_scheduler_metadata(
 
     bool is_varlen = true;
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{(char)seqused_k.get_device()};
 
@@ -619,7 +800,7 @@ mha_fwd_get_scheduler_metadata(
         auto kBlockMN_kernel_args_sm8x = tile_size_fwd_sm8x(params.arch == 86 || params.arch == 89, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, params.page_table, is_varlen && params.num_splits > 1, params.softcap > 0.f, params.knew_ptr);
         int const kBlockM = params.arch >= 90 ? std::get<0>(kBlockMN_kernel_args_sm90) : std::get<0>(kBlockMN_kernel_args_sm8x);
         int const kBlockN = params.arch >= 90 ? std::get<1>(kBlockMN_kernel_args_sm90) : std::get<1>(kBlockMN_kernel_args_sm8x);
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         prepare_varlen_num_blocks(params, stream, params.pack_gqa, kBlockM, kBlockN, false /*enable_pdl*/);
         CHECK_CUDA_KERNEL_LAUNCH();
     }
@@ -651,6 +832,7 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         // TODO: check if we need max_seqlen_k
         std::optional<int64_t> max_seqlen_k_,
         std::optional<at::Tensor> page_table_, // (b_k, max_num_pages_per_seq)
+                                               // (batch_size x beam_width) x 2 x max_num_pages_per_seq when defined FA3_HLLM_BUILD
         std::optional<at::Tensor> kv_batch_idx_, // b. indices to index into the KV cache
         std::optional<at::Tensor> leftpad_k_, // b
         std::optional<at::Tensor> rotary_cos_, // seqlen_ro x (rotary_dim / 2)
@@ -670,18 +852,27 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         int64_t num_splits,
         std::optional<bool> pack_gqa_,
         int64_t sm_margin
+#ifdef FA3_HLLM_BUILD
+        // for hllm
+        , const std::optional<at::Tensor> mrope_position_deltas_ = std::nullopt,  // (b, )
+        void *workspace_ptr = nullptr,
+        size_t max_workspace_size = std::numeric_limits<size_t>::max(),
+        bool is_generation_phase = false
+#endif // FA3_HLLM_BUILD
+        , std::optional<at::Tensor> s_aux_ = {} // (h)
         ) {
-
     auto dprops = at::cuda::getCurrentDeviceProperties();
     bool is_sm8x = dprops->major >= 8;
+    bool is_sm89 = (dprops->major == 8) && (dprops->minor == 9);
     TORCH_CHECK(is_sm8x, "FlashAttention only supports Ampere GPUs or newer.");
 
     auto q_type = q.scalar_type();
     TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16 || q_type == at::ScalarType::Float8_e4m3fn,
                 "FlashAttention only supports fp16, bf16, and fp8_e4m3 data type");
-    if (dprops->major < 9) {
+
+    if ((dprops->major < 9) && (!is_sm89)) {
         TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16,
-                    "FlashAttention on Ampere/Ada cards only supports fp16 and bf16 data type");
+                    "FlashAttention on Ampere cards only supports fp16 and bf16 data type");
     }
     TORCH_CHECK(k.scalar_type() == q_type, "query and key must have the same dtype");
     TORCH_CHECK(v.scalar_type() == q_type, "query and value must have the same dtype");
@@ -690,14 +881,20 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
 
     TORCH_CHECK(q.stride(-1) == 1, "Input tensor must have contiguous last dimension");
     TORCH_CHECK(k.stride(-1) == 1, "Input tensor must have contiguous last dimension");
-    TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
+    if ((!is_sm89) || (q_type != at::ScalarType::Float8_e4m3fn)) {
+        TORCH_CHECK(v.stride(-1) == 1, "Input tensor must have contiguous last dimension");
+    }
 
     at::Tensor page_table;
     const bool paged_KV = page_table_.has_value();
     if (paged_KV) {
         page_table = page_table_.value();
         CHECK_DEVICE(page_table);
+#if !(defined(FA3_HLLM_BUILD) && defined(FA3_HLLM_USE_ADDR))
         TORCH_CHECK(page_table.dtype() == torch::kInt32, "page_table must have dtype torch.int32");
+#else
+        TORCH_CHECK(page_table.dtype() == torch::kInt64, "page_table must have dtype torch.int64");
+#endif
         TORCH_CHECK(page_table.stride(-1) == 1, "page_table must have contiguous last dimension");
     }
 
@@ -727,7 +924,11 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     int num_heads = q.size(-2);
     int const head_size = q.size(-1);
     int const head_size_v = v.size(-1);
+#ifndef FA3_HLLM_BUILD
     int const max_num_pages_per_seq = !paged_KV ? 0 : page_table.size(1);
+#else
+    int const max_num_pages_per_seq = !paged_KV ? 0 : page_table.size(2);
+#endif // FA3_HLLM_BUILD
     int const num_pages = !paged_KV ? 0 : k.size(0);
     int const page_size = !paged_KV ? 1 : k.size(1);
     int const seqlen_k = !is_varlen_k ? (!paged_KV ? k.size(1) : max_num_pages_per_seq * page_size) : max_seqlen_k_.value();
@@ -749,7 +950,6 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
                    (head_size <= 64 && head_size_v <= 512),
                    "If V headdim is different from Q/K dim, we only support Q/K headdim in (128, 192] and V headdim in (96, 128], "
                    "or (Q/K <= 64 and V <= 512).");
-        TORCH_CHECK(dprops->major == 9, "Only Hopper supports different V headdim");
         if (head_size_v > 256) {
             TORCH_CHECK(q_type == at::ScalarType::Half || q_type == at::ScalarType::BFloat16,
                         "HeaddimV > 256 requires fp16 and bf16 data type");
@@ -787,7 +987,11 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     } else {
         CHECK_SHAPE(k, num_pages, page_size, num_heads_k, head_size);
         CHECK_SHAPE(v, num_pages, page_size, num_heads_k, head_size_v);
+#ifndef FA3_HLLM_BUILD
         CHECK_SHAPE(page_table, batch_size_k, max_num_pages_per_seq);
+#else
+        CHECK_SHAPE(page_table, batch_size_k, 2, max_num_pages_per_seq); // 2 stands for k&v
+#endif // FA3_HLLM_BUILD
     }
 
     if (seqused_q_.has_value()){
@@ -845,16 +1049,28 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     int const seqlen_q_rounded = round_multiple(seqlen_q, 128);
     int const seqlen_k_rounded = round_multiple(seqlen_k, 128);
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{(char)q.get_device()};
 
     at::Tensor softmax_lse;
+#ifndef FA3_HLLM_BUILD
     if (!is_varlen_q) {
         softmax_lse = torch::empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
     } else {
         softmax_lse = torch::empty({num_heads, total_q}, opts.dtype(at::kFloat));
     }
+#else
+    if (workspace_ptr) {
+        if (!is_varlen_q) {
+            softmax_lse = at::from_blob(workspace_ptr, {batch_size, num_heads, seqlen_q}, at::dtype(at::kFloat).device(at::kCUDA));
+        } else {
+            softmax_lse = at::from_blob(workspace_ptr, {num_heads, total_q}, at::dtype(at::kFloat).device(at::kCUDA));
+        }
+    } else {
+        TORCH_CHECK(workspace_ptr != nullptr, "workspace_ptr can't be nullptr in fa3 hllm build");
+    }
+#endif // FA3_HLLM_BUILD
 
     Flash_fwd_params params;
     set_params_fprop(params,
@@ -885,11 +1101,24 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         params.leftpad_k = static_cast<int *>(leftpad_k_.value().data_ptr());
     }
     if (paged_KV) {
+#if !(defined(FA3_HLLM_BUILD) && defined(FA3_HLLM_USE_ADDR))
         params.page_table = page_table.data_ptr<int>();
+#else
+        params.page_table = page_table.data_ptr<int64_t>();
+#endif
+
+#ifndef FA3_HLLM_BUILD
         params.page_table_batch_stride = page_table.stride(0);
+#else
+        params.page_table_batch_stride = page_table.stride(1);
+#endif // FA3_HLLM_BUILD
     }
     params.page_size = page_size;
     params.num_pages = num_pages;
+#ifdef FA3_HLLM_BUILD
+    // in generation case, seqlen_k from hllm should minus 1 when use in fa3
+    params.is_generation_phase = is_generation_phase;
+#endif // FA3_HLLM_BUILD
 
     if (k_new_.has_value()) {  // This needs to be set before get_pagedkv_tma
         at::Tensor k_new, v_new;
@@ -939,23 +1168,78 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         }
     }
 
+#ifdef FA3_HLLM_BUILD
+        // Support overwrite max_workspace_size by env var
+        if (max_workspace_size == std::numeric_limits<size_t>::max()) {
+            max_workspace_size = hllm_fa3::getMaxWorkspaceSize();
+        }
+        params.workspace_ptr = workspace_ptr;
+        params.max_workspace_size = max_workspace_size;
+#endif // FA3_HLLM_BUILD
+
+#ifdef USE_PPU
+    bool const use_dynamic_split = is_varlen && params.b <= 992 && params.b > 1 && num_splits <= 0;
+    int const ttl_m = params.seqlen_q * params.h / params.h_k;
+    int const m64_cnt = std::max(1, ttl_m / 64);
+    float waves = std::max(1.0 * params.b * params.h_k * m64_cnt / params.num_sm, 1.0);
+    params.is_varlen_q = (params.total_q / params.b != params.seqlen_q);
+    params.use_kblockm_16 = (params.is_varlen_q && ((params.seqlen_q < 256 && params.total_q / params.b < 32) || (params.seqlen_q >= 256 && params.total_q / params.b * (params.h / params.h_k) < (params.arch == 80 ? 64 : 16)))) ||
+        params.seqlen_q == 1 ||
+        (params.seqlen_q <= 16 && (params.b * params.h_k * m64_cnt <= params.num_sm) && (params.seqlen_k < 17408)) ||
+        (ttl_m <= 16) ||
+        ((ttl_m <= 32) && (params.b * params.h_k <= params.num_sm * 2)) ||
+        ((ttl_m < 64) && (params.b * params.h_k <= params.num_sm));
+    int const kblockn = params.d_rounded <= 64 ? (params.dv_rounded <= 64 ? 128 : (params.dv_rounded <= 256 ? 64 : 16)) : (params.d_rounded <= 192 ? 64 : 16);   // Very important that these match the kernel configs
+    params.use_kblockn_16 = params.use_kblockm_16 && paged_KV && params.page_size < 64 && (!max_seqlen_k_.has_value() || (max_seqlen_k_.has_value() && max_seqlen_k_.value() <  kblockn * 128 /*empirical coefficient*/));
+#else
     // 992 = 32 * 31 is the max supported batch in prepare_varlen_num_blocks kernel
     bool const use_dynamic_split = is_varlen && params.b <= 992;
+#endif
     // Temporarily set num_splits_dynamic_ptr to 1 since get_num_splits checks it
     params.num_splits_dynamic_ptr = !use_dynamic_split ? nullptr : reinterpret_cast<int*>(1);
 
     params.pagedkv_tma = get_pagedkv_tma(params);
     params.num_splits = num_splits <= 0 ? get_num_splits(params) : num_splits;
+
+#ifdef USE_PPU
+    params.use_kblockn_16 = (params.num_splits > 1 && params.use_kblockn_16) || (kblockn == 16);   // kBlockN16 only applies to Split scenario
+#endif
     // Always enable PackGQA for Split, and get_pack_gqa requires params.num_splits to decide
     params.pack_gqa = pack_gqa_.has_value() ? pack_gqa_.value() : get_pack_gqa(params);
 
+#ifdef USE_PPU
+    params.use_kblockm_128 =
+        (params.is_varlen_q &&
+         ((params.d_rounded <= 128 && 1.0 * params.total_q / params.b > 64) ||
+          (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && 1.0 * params.total_q / params.b > 704)
+         )
+        ) ||
+        (!params.is_varlen_q &&
+         params.b * (params.pack_gqa ? params.h_k : params.h) * ((params.seqlen_q * (params.pack_gqa ? params.h / params.h_k : 1) + 127) / 128) / params.num_sm >= 8 &&
+         ((params.d_rounded <= 128 && params.seqlen_q > (params.is_causal ? 704 : 64)) ||
+          (params.arch == 89 && params.d_rounded == 192 && params.h == params.h_k && params.seqlen_q == params.seqlen_k && params.is_causal && params.seqlen_q > 704)
+         )
+        );   // 704 is an empirical threshold.
+#endif
+
     // This needs to be set after get_num_splits
     at::Tensor tile_count_semaphore;  // Contains the semaphore and optionally num_splits_dynamic
+#ifdef USE_PPU
+    // only dynamic persistent scheduler needs tile_count_semaphore
+    bool const scheduler_needs_semaphore = is_varlen || (!is_varlen && params.is_causal);
+#else
     // We don't use the persistent scheduler if Split and not Varlen
     bool const scheduler_needs_semaphore = params.arch >= 90
         ? (((params.is_causal || params.is_local) && (params.num_splits == 1)) || is_varlen)
         : ((params.is_causal && !is_varlen) || (is_varlen && params.num_splits > 1));
+#endif
     if (scheduler_needs_semaphore || use_dynamic_split) {
+#ifdef USE_PPU
+        int metadata_size = int(scheduler_needs_semaphore) * 32 + int(use_dynamic_split) * (params.b + 1);
+        params.skip_scheduler_metadata_computation = false;
+        tile_count_semaphore = torch::empty({metadata_size}, opts.dtype(torch::kInt32));
+        tile_count_semaphore.zero_();
+#else
         int metadata_size = int(scheduler_needs_semaphore) + int(use_dynamic_split) * params.b;
         params.skip_scheduler_metadata_computation = scheduler_metadata_.has_value();
         if (scheduler_metadata_.has_value()) {
@@ -971,8 +1255,13 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         if (scheduler_needs_semaphore && !use_dynamic_split) {
             tile_count_semaphore.zero_();  // If varlen we'll manually do the zero-ing
         }
+#endif
         params.tile_count_semaphore = scheduler_needs_semaphore ? tile_count_semaphore.data_ptr<int>() : nullptr;
+#ifdef USE_PPU
+        params.num_splits_dynamic_ptr = use_dynamic_split ? tile_count_semaphore.data_ptr<int>() + 32 : nullptr;
+#else
         params.num_splits_dynamic_ptr = use_dynamic_split ? tile_count_semaphore.data_ptr<int>() + 1 : nullptr;
+#endif
     }
 
     if (q_v_.has_value()) {
@@ -1030,6 +1319,26 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     } else {
         params.rotary_dim = 0;
     }
+#if defined(USE_PPU) && USE_AIU
+    // Apply rotary to Q conflicts with AIU, resulting in using PackGQA=true routine (using cp.aync), which has impact on tiling (concerning vreg amount).
+    params.pack_gqa = params.pack_gqa || (params.rotary_dim > 0);
+#endif
+
+#ifdef FA3_HLLM_BUILD
+    if (mrope_position_deltas_.has_value()) {
+        TORCH_CHECK(!params.is_rotary_interleaved, "If mrope_position_deltas are provided, it should not be rotary interleaved.");
+        TORCH_CHECK(k_new_.has_value(), "If mrope_position_deltas are provided, new key / value to be appended to KV cache must also be provided");
+        TORCH_CHECK(rotary_cos_.has_value(), "If mrope_position_deltas are provided, rotary cos must also be provided");
+        TORCH_CHECK(rotary_sin_.has_value(), "If mrope_position_deltas are provided, rotary sin must also be provided");
+        auto mrope_position_deltas = mrope_position_deltas_.value();
+        CHECK_DEVICE(mrope_position_deltas);
+        CHECK_SHAPE(mrope_position_deltas, batch_size);
+        CHECK_CONTIGUOUS(mrope_position_deltas);
+        params.mrope_position_deltas_ptr = static_cast<int *>(mrope_position_deltas.data_ptr());
+    } else {
+        params.mrope_position_deltas_ptr = 0;
+    }
+#endif // FA3_HLLM_BUILD
 
     if (kv_batch_idx_.has_value()) {
         auto kv_batch_idx = kv_batch_idx_.value();
@@ -1042,6 +1351,7 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     auto outaccum_type = at::ScalarType::Float;
     if (params.num_splits > 1) {
         TORCH_CHECK(params.num_splits <= 256, "num_splits > 256 not supported");
+#ifndef FA3_HLLM_BUILD
         if (!is_varlen_q) {
             out_accum = torch::empty({params.num_splits, batch_size, num_heads, seqlen_q, head_size_v}, opts.dtype(outaccum_type));
             softmax_lse_accum = torch::empty({params.num_splits, batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
@@ -1051,6 +1361,27 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
             out_accum = torch::empty({params.num_splits, num_heads, total_q, head_size_v}, opts.dtype(outaccum_type));
             softmax_lse_accum = torch::empty({params.num_splits, num_heads, total_q}, opts.dtype(at::kFloat));
         }
+#else
+        if (workspace_ptr) {
+            if (!is_varlen_q) {
+                int offset = 0;
+                offset += sizeof(float) * batch_size * num_heads * seqlen_q; // for softmax_lse
+                softmax_lse_accum = at::from_blob((char*)workspace_ptr + offset, {params.num_splits, batch_size, num_heads, seqlen_q}, at::dtype(at::kFloat).device(at::kCUDA));
+                offset += sizeof(float) * params.num_splits * batch_size * num_heads * seqlen_q;
+                out_accum = at::from_blob((char*)workspace_ptr + offset, {params.num_splits, batch_size, num_heads, seqlen_q, head_size_v}, at::dtype(at::kFloat).device(at::kCUDA));
+
+                params.oaccum_batch_stride = out_accum.stride(1);
+                params.lseaccum_batch_stride = softmax_lse_accum.stride(1);
+            } else {
+                int offset = 0;
+                offset += sizeof(float) * total_q * num_heads; // for softmax_lse
+                softmax_lse_accum = at::from_blob((char*)workspace_ptr + offset, {params.num_splits, num_heads, total_q}, at::dtype(at::kFloat).device(at::kCUDA));
+                offset += sizeof(float) * params.num_splits * num_heads * total_q;
+                out_accum = at::from_blob((char*)workspace_ptr + offset, {params.num_splits, num_heads, total_q, head_size_v}, at::dtype(at::kFloat).device(at::kCUDA));
+            }
+        }
+#endif // FA3_HLLM_BUILD
+
         params.is_fp32 = false;
         params.oaccum_ptr = out_accum.data_ptr();
         params.softmax_lseaccum_ptr = softmax_lse_accum.data_ptr();
@@ -1094,6 +1425,18 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         }
     }
 
+    if(s_aux_.has_value()) {
+        auto s_aux = s_aux_.value();
+        TORCH_CHECK(s_aux.scalar_type() == at::ScalarType::BFloat16,
+            "We only support bf16 dtype for S extra.");
+        CHECK_DEVICE(s_aux);
+        CHECK_SHAPE(s_aux, num_heads);
+        CHECK_CONTIGUOUS(s_aux);
+        params.s_aux_ptr = s_aux.data_ptr();
+    } else {
+        params.s_aux_ptr = nullptr;
+    }
+
     #ifdef FLASHATTENTION_DISABLE_LOCAL
     TORCH_CHECK(!params.is_local, "This flash attention build does not support local attention.");
     #endif
@@ -1113,8 +1456,35 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     TORCH_CHECK(!k_new_.has_value(), "This flash attention build does not support appending KV.");
     #endif
 
+#ifdef USE_PPU
+#ifndef FA3_HLLM_BUILD
+    // coredump in hllm env, not used currently
+    // we can dump UT cases by export PPU_LIB_SHOW_PARAMS=1
+    ppu::fmha::FmhaProfParam fmha_prof_params;
+    if (ppu::fmha::ProfilingInterface::Instance().get_op_info()){
+        bool is_fixed_seqs = (total_q == batch_size * seqlen_q && k.size(0) == batch_size * seqlen_k);
+        fmha_prof_params.set_flash_attn_params(
+            true/*dir*/, params.is_bf16/*data_type*/,
+            params.is_causal/*custom_mask*/, params.b/*batch_size*/,
+            num_heads, /* new_heads_q*/
+            num_heads_k,
+            params.d/*head_dim*/, params.dv/*head_dim_value*/,
+            seqlen_q, /* seqlen_q */
+            params.seqlen_k/*seqlen_k*/,
+            params.p_dropout/*dropout*/, params.scale_softmax/*scale*/,
+            params.window_size_left, /*window_size_left*/
+            params.window_size_right,/*window_size_right*/
+            is_fixed_seqs/*is_fixed_seqs**/,
+            false/*alibi*/,
+            params.softcap, paged_KV, num_pages, page_size,
+            cu_seqlens_q_, cu_seqlens_k_, seqused_k_
+        );
+    }
+    ppu::fmha::ProfilingInterface::Instance().instrument(true, fmha_prof_params);
+#endif // FA3_HLLM_BUILD
+#endif
     if (total_q > 0 && (total_k + params.total_knew) > 0 && num_heads_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         run_mha_fwd(params, stream);
         if (params.num_splits > 1) {
             if (out_type == at::ScalarType::BFloat16) {
@@ -1142,17 +1512,22 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         softmax_lse.fill_(std::numeric_limits<float>::infinity());
     }
 
+#ifdef USE_PPU
+#ifndef FA3_HLLM_BUILD
+    ppu::fmha::ProfilingInterface::Instance().instrument(false, fmha_prof_params);
+#endif // FA3_HLLM_BUILD
+#endif
     // return {out, softmax_lse};
     return {out, softmax_lse, out_accum, softmax_lse_accum};
 }
 
 #ifdef FLASHATTENTION_DISABLE_BACKWARD
-void run_mha_bwd(Flash_bwd_params &params, cudaStream_t stream) {
+void run_mha_bwd(Flash_bwd_params &params, hggcStream_t stream) {
     TORCH_CHECK(false, "Flash-Attention was built with backward disabled");
 }
 #else
 template <int Arch, bool Has_softcap>
-void run_mha_bwd_constexpr(Flash_bwd_params &params, cudaStream_t stream) {
+void run_mha_bwd_constexpr(Flash_bwd_params &params, hggcStream_t stream) {
     if (!params.is_bf16) {
         #ifndef FLASHATTENTION_DISABLE_FP16
         #ifndef FLASHATTENTION_DISABLE_HDIM64
@@ -1192,7 +1567,7 @@ void run_mha_bwd_constexpr(Flash_bwd_params &params, cudaStream_t stream) {
     }
 }
 
-void run_mha_bwd(Flash_bwd_params &params, cudaStream_t stream) {
+void run_mha_bwd(Flash_bwd_params &params, hggcStream_t stream) {
         // FP16_SWITCH(!params.is_bf16, [&] {
         //     HEADDIM_SWITCH(params.d, [&] {
         //         run_mha_bwd_<elem_type, kHeadDim>(params, stream);
@@ -1316,6 +1691,11 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     int const arch = at::cuda::getCurrentDeviceProperties()->major * 10 + at::cuda::getCurrentDeviceProperties()->minor;
     int const head_size_rounded = round_up_headdim(std::max(head_size, head_size_v));
     int const head_size_v_rounded = head_size_rounded;
+#ifdef USE_PPU
+    // Very important that these match the kernel configs
+    int const kBlockM = head_size_rounded <= 64 ? 128 : 64;
+    int const kBlockN = head_size_rounded <= 64 ? 64 : (head_size_rounded <= 96 ? 128 : (head_size_rounded <= 128 ? 96 : 64));
+#else
     // Very important that these match the kernel configs
     bool const is_local = (window_size_left >= 0 || window_size_right >= 0) && !is_causal;
     int const kBlockM_sm90 = head_size_rounded <= 64 ? (is_causal && softcap > 0.0 ? 96 : 128)
@@ -1336,6 +1716,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
            : (head_size_rounded <= 128 ? 96
               : (head_size_rounded <= 192 ? 64 : 64)));
     int const kBlockN = arch >= 90 ? kBlockN_sm90 : (arch == 86 || arch == 89 ? kBlockN_sm86 : kBlockN_sm80);
+#endif
     auto round_multiple = [](int x, int m) { return (x + m - 1) / m * m; };
     int const seqlen_q_rounded = round_multiple(seqlen_q, kBlockM);
     int const seqlen_k_rounded = round_multiple(seqlen_k, kBlockN);
@@ -1415,7 +1796,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
         dv = torch::empty_like(v);
     }
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{(char)q.get_device()};
 
@@ -1499,7 +1880,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     #endif
 
     if (total_q > 0 && total_k > 0 && num_heads_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         run_mha_bwd(params, stream);
     } else if (total_k > 0 && num_heads_k > 0) {
         // If seqlen_q == 0, then we have an empty tensor. We need to set the output to 0.
@@ -1573,7 +1954,7 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
         out = torch::empty({batch_size, seqlen, num_heads, head_size}, opts.dtype(out_type));
     }
 
-    // Otherwise the kernel will be launched from cuda:0 device
+    // Otherwise the kernel will be launched from device 0
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{(char)out_partial.get_device()};
 
@@ -1604,7 +1985,7 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
     params.arch = at::cuda::getCurrentDeviceProperties()->major * 10 + at::cuda::getCurrentDeviceProperties()->minor;
 
     if (seqlen > 0 && batch_size > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        hggcStream_t stream = (hggcStream_t)at::cuda::getCurrentCUDAStream().stream();
         run_mha_fwd_combine(params, stream, false /*enable_pdl*/);
     }
 
@@ -1617,6 +1998,158 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
     return {out, softmax_lse};
 }
 
+#ifdef FA3_HLLM_BUILD
+}  // namespace hllm_fa3
+#endif // FA3_HLLM_BUILD
+
+#ifdef FA3_HOLMES_BUILD
+namespace holmes_fa3 {
+template <typename T>
+void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
+                      const std::vector<int64_t> &q_shape,
+                      const std::vector<int64_t> &q_strides, T *devPtrK,
+                      const std::vector<int64_t> &k_shape,
+                      const std::vector<int64_t> &k_strides, T *devPtrV,
+                      const std::vector<int64_t> &v_shape,
+                      const std::vector<int64_t> &v_strides, T *devPtrO,
+                      const std::vector<int64_t> &out_shape,
+                      const std::vector<int64_t> &out_strides, float scale,
+                      bool is_causal, void *workspace_ptr,
+                      size_t workspace_size) {
+  int device_id = -1;
+  auto err = hggcGetDevice(&device_id);
+  if (err != hggcSuccess) {
+    printf("hggcGetDevice failed: %d, %s", (int)err, hggcGetErrorString(err));
+    return;
+  }
+
+  c10::Device device(c10::DeviceType::CUDA, device_id);
+  c10::DeviceIndex device_index = device.index();
+  // ensure fa3 run on the stream
+  // https://pytorch.org/cppdocs/notes/tensor_cuda_stream.html
+  // CUDAStreamGuard switches to the stream’s device and makes it the current
+  // stream on that device. CUDAStreamGuard will also restore the current device
+  // and stream when it’s destroyed
+  at::cuda::CUDAStreamGuard g(at::cuda::getStreamFromExternal(
+      static_cast<hggcStream_t>(cudaStream), device_index));
+
+  auto data_type = at::kHalf;
+  if constexpr (std::is_same<T, cutlass::bfloat16_t>::value)
+    data_type = at::kBFloat16;
+  at::Tensor q, k, v;
+
+  q = at::from_blob(devPtrQ, q_shape, q_strides,
+                    at::dtype(data_type).device(at::kCUDA));
+  k = at::from_blob(devPtrK, k_shape, k_strides,
+                    at::dtype(data_type).device(at::kCUDA));
+  v = at::from_blob(devPtrV, v_shape, v_strides,
+                    at::dtype(data_type).device(at::kCUDA));
+  std::optional<at::Tensor> out_ = at::from_blob(
+      devPtrO, out_shape, out_strides, at::dtype(data_type).device(at::kCUDA));
+
+  hllm_fa3::mha_fwd(q, k, v,
+                    std::nullopt, // k_new_
+                    std::nullopt, // v_new_
+                    std::nullopt, // q_v_
+                    out_,
+                    std::nullopt,  // cu_seqlens_q_
+                    std::nullopt,  // cu_seqlens_k_
+                    std::nullopt,  // cu_seqlens_k_new_
+                    std::nullopt,  // seqused_q_
+                    std::nullopt,  // seqused_k_
+                    std::nullopt,  // max_seqlen_q_
+                    std::nullopt,  // max_seqlen_k_
+                    std::nullopt,  // page_table_
+                    std::nullopt,  // kv_batch_idx_
+                    std::nullopt,  // leftpad_k_
+                    std::nullopt,  // rotary_cos
+                    std::nullopt,  // rotary_sin_
+                    std::nullopt,  // seqlens_rotary_
+                    std::nullopt,  // q_descale_
+                    std::nullopt,  // k_descale_
+                    std::nullopt,  // v_descale_
+                    (double)scale, // softmax_scale_
+                    is_causal,     // is_causal
+                    -1,            // window_size_left
+                    -1,            // window_size_right
+                    0,             // attention_chunk
+                    0.0,           // softcap
+                    false,         // is_rotary_interleaved
+                    std::nullopt,  // scheduler_metadata_
+                    0,             // num_splits
+                    std::nullopt,  // pack_gqa_
+                    0,             // sm_margin
+                    std::nullopt,  // mrope_position_deltas_
+                    workspace_ptr, workspace_size,
+                    false,       // is_generation_phase
+                    std::nullopt // s_aux_
+  );
+  if (!out_.has_value()) {
+    printf("error: flash_attn_3_holmes returned empty results");
+  }
+  return;
+}
+
+template void mha_fwd_raw_impl(
+    hggcStream_t cudaStream, cutlass::half_t *devPtrQ,
+    const std::vector<int64_t> &q_shape, const std::vector<int64_t> &q_strides,
+    cutlass::half_t *devPtrK, const std::vector<int64_t> &k_shape,
+    const std::vector<int64_t> &k_strides, cutlass::half_t *devPtrV,
+    const std::vector<int64_t> &v_shape, const std::vector<int64_t> &v_strides,
+    cutlass::half_t *devPtrO, const std::vector<int64_t> &out_shape,
+    const std::vector<int64_t> &out_strides, float scale, bool is_causal,
+    void *workspace_ptr, size_t workspace_size);
+
+template void mha_fwd_raw_impl(
+    hggcStream_t cudaStream, cutlass::bfloat16_t *devPtrQ,
+    const std::vector<int64_t> &q_shape, const std::vector<int64_t> &q_strides,
+    cutlass::bfloat16_t *devPtrK, const std::vector<int64_t> &k_shape,
+    const std::vector<int64_t> &k_strides, cutlass::bfloat16_t *devPtrV,
+    const std::vector<int64_t> &v_shape, const std::vector<int64_t> &v_strides,
+    cutlass::bfloat16_t *devPtrO, const std::vector<int64_t> &out_shape,
+    const std::vector<int64_t> &out_strides, float scale, bool is_causal,
+    void *workspace_ptr, size_t workspace_size);
+
+void mha_fwd_raw(void *stream, void *devPtrQ,
+                 const std::vector<int64_t> &q_shape,
+                 const std::vector<int64_t> &q_strides, void *devPtrK,
+                 const std::vector<int64_t> &k_shape,
+                 const std::vector<int64_t> &k_strides, void *devPtrV,
+                 const std::vector<int64_t> &v_shape,
+                 const std::vector<int64_t> &v_strides, void *devPtrO,
+                 const std::vector<int64_t> &out_shape,
+                 const std::vector<int64_t> &out_strides, float scale,
+                 bool is_causal, void *workspace_ptr, uint64_t workspace_size,
+                 int32_t data_type) {
+  hggcStream_t cudaStream = reinterpret_cast<hggcStream_t>(stream);
+  if (data_type == 0) {
+    auto devQ = reinterpret_cast<cutlass::half_t *>(devPtrQ);
+    auto devK = reinterpret_cast<cutlass::half_t *>(devPtrK);
+    auto devV = reinterpret_cast<cutlass::half_t *>(devPtrV);
+    auto devO = reinterpret_cast<cutlass::half_t *>(devPtrO);
+    mha_fwd_raw_impl(cudaStream, devQ, q_shape, q_strides, devK, k_shape,
+                     k_strides, devV, v_shape, v_strides, devO, out_shape,
+                     out_strides, scale, is_causal, workspace_ptr,
+                     workspace_size);
+  } else if (data_type == 1) {
+    auto devQ = reinterpret_cast<cutlass::bfloat16_t *>(devPtrQ);
+    auto devK = reinterpret_cast<cutlass::bfloat16_t *>(devPtrK);
+    auto devV = reinterpret_cast<cutlass::bfloat16_t *>(devPtrV);
+    auto devO = reinterpret_cast<cutlass::bfloat16_t *>(devPtrO);
+    mha_fwd_raw_impl(cudaStream, devQ, q_shape, q_strides, devK, k_shape,
+                     k_strides, devV, v_shape, v_strides, devO, out_shape,
+                     out_strides, scale, is_causal, workspace_ptr,
+                     workspace_size);
+  } else {
+    printf("error: unsupported data type");
+  }
+  return;
+}
+} // namespace holmes_fa3
+#endif
+
+#ifndef FA3_HLLM_BUILD
+// remove python dependency in hllm build
 TORCH_LIBRARY(flash_attn_3, m) {
     m.def("fwd("
         "Tensor q,"
@@ -1652,7 +2185,8 @@ TORCH_LIBRARY(flash_attn_3, m) {
         "Tensor? scheduler_metadata = None,"
         "int num_splits = 0,"
         "bool? pack_gqa = None,"
-        "int sm_margin = 0) -> (Tensor(out!), Tensor, Tensor, Tensor)");
+        "int sm_margin = 0,"
+        "Tensor? s_aux = None) -> (Tensor(out!), Tensor, Tensor, Tensor)");
     m.def("bwd("
         "Tensor dout,"
         "Tensor q,"
@@ -1714,3 +2248,4 @@ TORCH_LIBRARY_IMPL(flash_attn_3, CUDA, m) {
     m.impl("fwd_combine", &mha_combine);
     m.impl("get_scheduler_metadata", &mha_fwd_get_scheduler_metadata);
 }
+#endif // FA3_HLLM_BUILD

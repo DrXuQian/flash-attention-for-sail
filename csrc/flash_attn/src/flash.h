@@ -6,9 +6,13 @@
 
 #include "namespace_config.h"
 
-#include <cuda.h>
-#include <vector>
+#ifdef __HGGCCC__
+#include <hggc_runtime.h>
+#else
+typedef struct HGstream_st* hggcStream_t;
+#endif
 
+#include <vector>
 #include <ATen/cuda/CUDAGeneratorImpl.h> // For at::Generator and at::PhiloxCudaState
 
 namespace FLASH_NAMESPACE {
@@ -186,9 +190,9 @@ struct Flash_bwd_params : public Flash_fwd_params {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<typename T, int Headdim, bool Is_causal> void run_mha_fwd_(Flash_fwd_params &params, cudaStream_t stream);
-template<typename T, int Headdim, bool Is_causal> void run_mha_fwd_splitkv_dispatch(Flash_fwd_params &params, cudaStream_t stream);
+template<typename T, int Headdim, bool Is_causal> void run_mha_fwd_(Flash_fwd_params &params, hggcStream_t stream);
+template<typename T, int Headdim, bool Is_causal> void run_mha_fwd_splitkv_dispatch(Flash_fwd_params &params, hggcStream_t stream);
 
-template<typename T, int Headdim, bool Is_causal> void run_mha_bwd_(Flash_bwd_params &params, cudaStream_t stream);
+template<typename T, int Headdim, bool Is_causal> void run_mha_bwd_(Flash_bwd_params &params, hggcStream_t stream);
 
 }  // namespace FLASH_NAMESPACE

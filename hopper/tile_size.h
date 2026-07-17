@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri Dao.
  ******************************************************************************/
 
@@ -76,3 +77,92 @@ constexpr std::tuple<int, int, int, int, bool> tile_size_fwd_sm8x(
         return {128, 64, 8, 2, false};
     }
 }
+
+#ifdef USE_PPU
+// Return {kBlockM, kBlockN, kNWarps, kStages, Q_in_regs}
+constexpr std::tuple<int, int, int, int, bool> tile_size_fwd_ppu(
+        int arch, int headdim, int headdim_v, bool is_causal, bool is_local, int element_size=2,
+        bool paged_kv=false, bool varlen=false, bool split=false,
+        bool softcap=false, bool append_kv=false, bool pack_gqa = false,
+        bool kBlockM128=false, bool kBlockM16=false, bool kBlockN16=false,
+        bool PagedKVAiu=false) {
+    if (element_size == 2) {
+        bool const vreg_strain = paged_kv || pack_gqa || varlen || is_local;
+        if (kBlockM16) {
+            if (headdim <= 64) {
+                return {16, kBlockN16 ? 16 : (headdim_v <= 64 ? 128 : (headdim_v <= 256 ? 64 : 16)), 1, 1, true};
+            } else if (headdim <= 192) {
+                return {16, kBlockN16 ? 16 : 64, 1, 1, true};
+            } else {
+                return {16, 16, 1, 1, true};
+            }
+        }
+        if (headdim <= 64) {
+            if (headdim_v == 512) {
+                return {64, 16, 4, 1, false};
+            } else if (headdim_v == 256) {
+                return {64, vreg_strain ? 16 : 32, 4, 1, vreg_strain ? false : true};
+            } else {
+                if (arch == 80 && !paged_kv && !varlen) {
+                    return {64, vreg_strain ? 64 : 96, 2, 1, vreg_strain ? false : true};
+                }
+                if (!kBlockM128) {
+                    return {64, 128, 4, 1, vreg_strain ? false : true};
+                } else {
+                    return {128, vreg_strain ? 64 : 96, 4, 1, vreg_strain ? false : true};
+                }
+            }
+        } else if (headdim <= 96) {
+            if (!kBlockM128) {
+                return {64, vreg_strain ? 96 : 128, 4, 1, vreg_strain ? false : true};
+            } else {
+                return {128, vreg_strain ? 32 : 64, 4, 1, vreg_strain ? false : true};
+            }
+        } else if (headdim <= 128) {
+            if (!kBlockM128) {
+                return {64, is_causal || vreg_strain ? 64 : 96, 4, 1, vreg_strain ? false : true};
+            } else {
+                return {128, 64, 4, 1, false};
+            }
+        } else if (headdim <= 192) {
+            if (!kBlockM128 || arch != 89) {
+                return {64, 64, 4, 1, true};
+            } else {
+                return {128, 64, 8, 1, true};
+            }
+        } else {
+            return {64, arch == 89 ? 48 : 32, 4, 1, true};
+        }
+    } else {
+        if (kBlockM16) {
+            if (headdim <= 128) {
+                if (paged_kv && (!PagedKVAiu)) {
+                    return {16, 32, 1, 2, true};
+                } else {
+                    return {64, 64, 4, 2, true};
+                }
+            } else if (headdim <= 192) {
+                if (paged_kv && (!PagedKVAiu)) {
+                    return {16, 32, 1, 2, true};
+                } else {
+                    return {64, 32, 4, 2, true};
+                }
+            } else {
+                if (paged_kv && (!PagedKVAiu)) {
+                    return {32, 32, 2, 2, true};  // head 256, use 2 warps to faster tranpose
+                } else {
+                    return {64, 32, 4, 2, true};
+                }
+            }
+        }
+        if (headdim <= 128) {
+            return {64, 64, 4, 2, true};
+        } else if (headdim <= 192) {
+            return {64, 32, 4, 2, true};
+        } else {
+            // use more threads to faster transpose
+            return {128, 32, 8, 2, true};
+        }
+    }
+}
+#endif

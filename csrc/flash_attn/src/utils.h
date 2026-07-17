@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2023, Tri Dao.
  ******************************************************************************/
 
@@ -8,10 +9,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <cuda_fp16.h>
-
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
-#include <cuda_bf16.h>
+#if defined(USE_CLANG)
+#include <hggc_fp16.h>
+#include <hggc_bf16.h>
+#else
+#include <hggc_fp16.h>
+#if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
+#include <hggc_bf16.h>
+#endif
 #endif
 
 #include <cute/tensor.hpp>
@@ -20,7 +25,9 @@
 #include <cutlass/cutlass.h>
 #include <cutlass/numeric_conversion.h>
 #include <cutlass/numeric_types.h>
-
+#ifdef USE_PPU
+#include "acc_vreg_fraga.h"
+#endif
 #include "namespace_config.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,32 +43,32 @@ template<>
 __forceinline__ __device__ uint32_t relu2<cutlass::half_t>(const uint32_t x) {
     uint32_t res;
     const uint32_t zero = 0u;
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
-    asm volatile("max.f16x2 %0, %1, %2;\n" : "=r"(res) : "r"(x), "r"(zero));
+#if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
+    asm volatile("ppu.max.f16x2 %0, %1, %2;\n" : "=r"(res) : "r"(x), "r"(zero));
 #else
     asm volatile( \
         "{\n" \
         "\t .reg .f16x2 sela;\n" \
-        "\t set.gtu.u32.f16x2 sela, %1, %2;\n" \
-        "\t and.b32 %0, sela, %1;\n" 
+        "\t ppu.cmp.gtu.u32.f16x2 sela, %1, %2;\n" \
+        "\t ppu.and.b32 %0, sela, %1;\n"
         "}\n" : "=r"(res) : "r"(x), "r"(zero));
 #endif
     return res;
 }
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+#if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
 template<>
 __forceinline__ __device__ uint32_t relu2<cutlass::bfloat16_t>(const uint32_t x) {
     uint32_t res;
     const uint32_t zero = 0u;
-    asm volatile("max.bf16x2 %0, %1, %2;\n" : "=r"(res) : "r"(x), "r"(zero));
+    asm volatile("ppu.max.bf16x2 %0, %1, %2;\n" : "=r"(res) : "r"(x), "r"(zero));
     return res;
 }
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+#if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
 
 template<typename T>
 __forceinline__ __device__ uint32_t convert_relu2(const float2 x);
@@ -71,7 +78,7 @@ __forceinline__ __device__ uint32_t convert_relu2<cutlass::half_t>(const float2 
     uint32_t res;
     const uint32_t a = reinterpret_cast<const uint32_t&>(x.x);
     const uint32_t b = reinterpret_cast<const uint32_t&>(x.y);
-    asm volatile("cvt.rn.relu.f16x2.f32 %0, %1, %2;\n" : "=r"(res) : "r"(b), "r"(a));
+    asm volatile("ppu.cvt.rtte.relu.f16x2.f32 %0, %1, %2;\n" : "=r"(res) : "r"(b), "r"(a));
     return res;
 }
 
@@ -80,7 +87,7 @@ __forceinline__ __device__ uint32_t convert_relu2<cutlass::bfloat16_t>(const flo
     uint32_t res;
     const uint32_t a = reinterpret_cast<const uint32_t&>(x.x);
     const uint32_t b = reinterpret_cast<const uint32_t&>(x.y);
-    asm volatile("cvt.rn.relu.bf16x2.f32 %0, %1, %2;\n" : "=r"(res) : "r"(b), "r"(a));
+    asm volatile("ppu.cvt.rtte.relu.bf16x2.f32 %0, %1, %2;\n" : "=r"(res) : "r"(b), "r"(a));
     return res;
 }
 
@@ -123,7 +130,7 @@ struct Allreduce {
 
 template<>
 struct Allreduce<2> {
-template<typename T, typename Operator> 
+template<typename T, typename Operator>
 static __device__ __forceinline__ T run(T x, Operator &op) {
     x = op(x, __shfl_xor_sync(uint32_t(-1), x, 1));
     return x;
@@ -186,10 +193,23 @@ __forceinline__ __device__ void gemm_rs(Tensor0 &acc, Tensor1 &tCrA, Tensor2 &tC
 // Convert acc_layout from (MMA=4, MMA_M, MMA_N) to (nrow=(2, MMA_M), ncol=(2, MMA_N))
 template<typename Layout>
 __forceinline__ __device__ auto convert_layout_acc_rowcol(Layout acc_layout) {
+#ifdef USE_PPU
+    // acc is ppu c layout, size0 is 8, MMA_N size is A100 MMA_N/2
+    static_assert(decltype(size<0>(acc_layout))::value == 8);
+    static_assert(decltype(rank(acc_layout))::value == 3);
+#if __HGGC_ARCH__ == 100
+    auto l = logical_divide(acc_layout, Shape<_4>{});    // ((4, 2), MMA_M, MMA_N)
+    return make_layout(make_layout(get<0, 1>(l), get<1>(l)), make_layout(get<0, 0>(l), get<2>(l)));
+#else
+    auto l = acc_layout;
+    return make_layout(make_layout(get<0, 1>(l), get<1>(l)), make_layout(get<0, 0>(l), make_layout(get<0, 2>(l), get<2>(l))));
+#endif
+#else
     static_assert(decltype(size<0>(acc_layout))::value == 4);
     static_assert(decltype(rank(acc_layout))::value == 3);
     auto l = logical_divide(acc_layout, Shape<_2>{});  // ((2, 2), MMA_M, MMA_N)
     return make_layout(make_layout(get<0, 1>(l), get<1>(l)), make_layout(get<0, 0>(l), get<2>(l)));
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,6 +219,9 @@ __forceinline__ __device__ auto convert_layout_acc_rowcol(Layout acc_layout) {
 template<typename MMA_traits, typename Layout>
 __forceinline__ __device__ auto convert_layout_acc_Aregs(Layout acc_layout) {
     using X = Underscore;
+#ifdef USE_PPU
+    return acc_layout;
+#else
     static_assert(decltype(size<0>(acc_layout))::value == 4);
     static_assert(decltype(rank(acc_layout))::value == 3);
     constexpr int mma_shape_K = get<2>(typename MMA_traits::Shape_MNK{});
@@ -209,6 +232,7 @@ __forceinline__ __device__ auto convert_layout_acc_Aregs(Layout acc_layout) {
         auto l = logical_divide(acc_layout, Shape<X, X, _2>{});  // (4, MMA_M, (2, MMA_N / 2)))
         return make_layout(make_layout(get<0>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
     }
+#endif
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +241,11 @@ __forceinline__ __device__ auto convert_layout_acc_Aregs(Layout acc_layout) {
 template<typename Layout>
 __forceinline__ __device__ auto convert_layout_acc_dropout(Layout acc_layout) {
     using X = Underscore;
+#ifdef USE_PPU
+    static_assert(decltype(size<0>(acc_layout))::value == 8);
+#else
     static_assert(decltype(size<0>(acc_layout))::value == 4);
+#endif
     static_assert(decltype(rank(acc_layout))::value == 3);
     auto l = logical_divide(acc_layout, Shape<X, X, _2>{});  // (4, MMA_M, (2, MMA_N / 2)))
     return make_layout(make_layout(get<0>(l), get<2, 0>(l)), get<1>(l), get<2, 1>(l));
@@ -234,6 +262,21 @@ __forceinline__ __device__ auto convert_type(Tensor<Engine, Layout> const &tenso
     auto frag = convert_op(*reinterpret_cast<const cutlass::Array<From_type, numel> *>(tensor.data()));
     return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#ifdef USE_PPU
+template <typename To_type, typename Engine, typename Layout>
+inline __device__ auto convert_acc(Tensor<Engine, Layout> const &tensor) {
+    using From_type = typename Engine::value_type;
+    constexpr int numel = decltype(size(tensor))::value;
+    NumericArrayConverterPPU<To_type, From_type, numel> convert_op;
+    // convert_op:: accum(tensor.data());
+    // auto frag = convert_op(accum);
+    auto frag = convert_op(*reinterpret_cast<const cutlass::Array<From_type, numel> *>(tensor.data()));
+    return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
+}
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -260,7 +303,7 @@ __forceinline__ __device__ auto convert_type_relu(Tensor<Engine, Layout> const &
     static_assert(std::is_same_v<float, From_type>);
     constexpr int numel = decltype(size(tensor))::value;
     static_assert(numel % 2 == 0);
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 800
+#if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
     // HACK: this requires tensor to be "contiguous"
     Tensor tensor_float2 = recast<float2>(tensor);
     Tensor out_uint32 = make_tensor<uint32_t>(tensor_float2.layout());
@@ -286,19 +329,39 @@ __forceinline__ __device__ auto convert_type_relu(Tensor<Engine, Layout> const &
 template <int N>
 CUTE_HOST_DEVICE
 void cp_async_wait() {
-#if defined(CUTE_ARCH_CP_ASYNC_SM80_ENABLED)
-    asm volatile("cp.async.wait_group %0;\n" :: "n"(N));
+#if defined(CUTE_ARCH_CP_ASYNC_PPU_ENABLED)
+    asm volatile("ppu.cp.async.wait_group %0;\n" :: "n"(N));
 #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
+//PPU: shared memory not support init by zero, need clear if not align.
+#ifdef USE_PPU
+template <bool Is_even_MN=true, bool Is_even_K=true, bool Clear_OOB_MN=true, bool Clear_OOB_K=true,
+#else
 template <bool Is_even_MN=true, bool Is_even_K=true, bool Clear_OOB_MN=false, bool Clear_OOB_K=true,
+#endif
           typename TiledCopy, typename Engine0, typename Layout0, typename Engine1, typename Layout1,
           typename Engine2, typename Layout2, typename Engine3, typename Layout3>
 __forceinline__ __device__ void copy(TiledCopy tiled_copy, Tensor<Engine0, Layout0> const &S,
                             Tensor<Engine1, Layout1> &D, Tensor<Engine2, Layout2> const &identity_MN,
                             Tensor<Engine3, Layout3> const &predicate_K, const int max_MN=0) {
+
+// support AIU on PPU
+#if USE_AIU
+    if constexpr (is_mix_iterator<typename Engine0::iterator>::value) {
+        const int warp_idx = __ppu_read_firstlane(threadIdx.x / 32);
+        if (warp_idx == 0) {
+            if constexpr (!Is_even_MN) {
+                tiled_copy.desc_.dim_h = max_MN;
+            }
+
+            cute::copy(tiled_copy, S, D);
+        }
+        return;
+    }
+#endif
+
     CUTE_STATIC_ASSERT_V(rank(S) == Int<3>{});
     CUTE_STATIC_ASSERT_V(rank(D) == Int<3>{});
     CUTE_STATIC_ASSERT_V(size<0>(S) == size<0>(D));                     // MMA

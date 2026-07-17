@@ -1,3 +1,4 @@
+# Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
 # Copyright (c) 2023, Tri Dao.
 
 from typing import Optional, Union
@@ -15,7 +16,6 @@ flash_attn_3_cuda = torch.ops.flash_attn_3
 
 def maybe_contiguous(x):
     return x.contiguous() if x is not None and x.stride(-1) != 1 else x
-
 
 def _flash_attn_forward(
         q,
@@ -50,7 +50,8 @@ def _flash_attn_forward(
         scheduler_metadata=None,
         num_splits=1,
         pack_gqa=None,
-        sm_margin=0):
+        sm_margin=0,
+        s_aux=None):
     q, k, k_new, v_new = [maybe_contiguous(x) for x in (q, k, k_new, v_new)]
     v = v.contiguous() if v.stride(-1) != 1 and v.stride(-3) != 1 else v
     cu_seqlens_q, cu_seqlens_k, cu_seqlens_k_new = [
@@ -97,6 +98,7 @@ def _flash_attn_forward(
         num_splits,
         pack_gqa,
         sm_margin,
+        s_aux,
     )
     return out, softmax_lse, *rest
 
@@ -167,6 +169,7 @@ class FlashAttnQKVPackedFunc(torch.autograd.Function):
         deterministic=False,
         num_heads_q=None,
         sm_margin=0,
+        return_softmax=False,
     ):
         if softmax_scale is None:
             softmax_scale = qkv.shape[-1] ** (-0.5)
@@ -209,8 +212,7 @@ class FlashAttnQKVPackedFunc(torch.autograd.Function):
         ctx.deterministic = deterministic
         ctx.ndim = qkv.dim()
         ctx.sm_margin = sm_margin
-        # return out, softmax_lse
-        return out
+        return (out, softmax_lse) if return_softmax else out
 
     @staticmethod
     def backward(ctx, dout, *args):
@@ -269,6 +271,8 @@ class FlashAttnFunc(torch.autograd.Function):
         pack_gqa=None,
         deterministic=False,
         sm_margin=0,
+        return_softmax=False,
+        s_aux=None,
     ):
         if softmax_scale is None:
             softmax_scale = (q.shape[-1] + (qv.shape[-1] if qv is not None else 0)) ** (-0.5)
@@ -294,6 +298,7 @@ class FlashAttnFunc(torch.autograd.Function):
             num_splits=num_splits,
             pack_gqa=pack_gqa,
             sm_margin=sm_margin,
+            s_aux=s_aux,
         )
         # ctx.save_for_backward(q, k, v, out_padded, softmax_lse)
         ctx.save_for_backward(q, k, v, out, softmax_lse)
@@ -304,7 +309,7 @@ class FlashAttnFunc(torch.autograd.Function):
         ctx.softcap = softcap
         ctx.deterministic = deterministic
         ctx.sm_margin = sm_margin
-        return out
+        return (out, softmax_lse) if return_softmax else out
 
     @staticmethod
     def backward(ctx, dout, *args):
@@ -334,7 +339,7 @@ class FlashAttnFunc(torch.autograd.Function):
         dq = dq[..., : q.shape[-1]]  # We could have padded the head dimension
         dk = dk[..., : k.shape[-1]]
         dv = dv[..., : v.shape[-1]]
-        return dq, dk, dv, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        return dq, dk, dv, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
 class FlashAttnVarlenFunc(torch.autograd.Function):
@@ -362,6 +367,8 @@ class FlashAttnVarlenFunc(torch.autograd.Function):
         pack_gqa=None,
         deterministic=False,
         sm_margin=0,
+        return_softmax=False,
+        s_aux=None,
     ):
         if softmax_scale is None:
             softmax_scale = (q.shape[-1] + (qv.shape[-1] if qv is not None else 0)) ** (-0.5)
@@ -391,6 +398,7 @@ class FlashAttnVarlenFunc(torch.autograd.Function):
             num_splits=num_splits,
             pack_gqa=pack_gqa,
             sm_margin=sm_margin,
+            s_aux=s_aux,
         )
         # ctx.save_for_backward(q, k, v, out_padded, softmax_lse, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k)
         ctx.save_for_backward(q, k, v, out, softmax_lse, cu_seqlens_q, cu_seqlens_k, seqused_q, seqused_k)
@@ -403,7 +411,7 @@ class FlashAttnVarlenFunc(torch.autograd.Function):
         ctx.softcap = softcap
         ctx.deterministic = deterministic
         ctx.sm_margin = sm_margin
-        return out
+        return (out, softmax_lse) if return_softmax else out
 
     @staticmethod
     def backward(ctx, dout, *args):
@@ -436,7 +444,7 @@ class FlashAttnVarlenFunc(torch.autograd.Function):
         dq = dq[..., : q.shape[-1]]  # We could have padded the head dimension
         dk = dk[..., : k.shape[-1]]
         dv = dv[..., : v.shape[-1]]
-        return dq, dk, dv, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+        return dq, dk, dv, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None
 
 
 def flash_attn_qkvpacked_func(
@@ -450,6 +458,7 @@ def flash_attn_qkvpacked_func(
     deterministic=False,
     num_heads_q=None,
     sm_margin=0,
+    return_attn_probs=False,
 ):
     """dropout_p should be set to 0.0 during evaluation
     If Q, K, V are already stacked into 1 tensor, this function will be faster than
@@ -496,6 +505,7 @@ def flash_attn_qkvpacked_func(
         deterministic,
         num_heads_q,
         sm_margin,
+        return_attn_probs,
     )
 
 
@@ -514,6 +524,8 @@ def flash_attn_func(
     pack_gqa=None,
     deterministic=False,
     sm_margin=0,
+    return_attn_probs=False,
+    s_aux=None,
 ):
     """dropout_p should be set to 0.0 during evaluation
     Supports multi-query and grouped-query attention (MQA/GQA) by passing in KV with fewer heads
@@ -575,6 +587,8 @@ def flash_attn_func(
         pack_gqa,
         deterministic,
         sm_margin,
+        return_attn_probs,
+        s_aux,
     )
 
 
@@ -599,6 +613,8 @@ def flash_attn_varlen_func(
     pack_gqa=None,
     deterministic=False,
     sm_margin=0,
+    return_attn_probs=False,
+    s_aux=None,
 ):
     return FlashAttnVarlenFunc.apply(
         q,
@@ -621,6 +637,8 @@ def flash_attn_varlen_func(
         pack_gqa,
         deterministic,
         sm_margin,
+        return_attn_probs,
+        s_aux,
     )
 
 
@@ -659,6 +677,8 @@ def flash_attn_with_kvcache(
     pack_gqa=None,   # Can be tuned for speed
     sm_margin=0,     # Can be tuned if some SMs are used for communication
     return_softmax_lse=False,
+    max_seqlen_k: Optional[int] = None,
+    s_aux=None,
 ):
     """
     If k and v are not None, k_cache and v_cache will be updated *inplace* with the new values from
@@ -768,7 +788,7 @@ def flash_attn_with_kvcache(
         None,  # seqused_q
         cache_seqlens,
         max_seqlen_q,
-        None,  # max_seqlen_k
+        max_seqlen_k,
         page_table,
         cache_batch_idx,
         cache_leftpad,
@@ -786,6 +806,7 @@ def flash_attn_with_kvcache(
         num_splits=num_splits,
         pack_gqa=pack_gqa,
         sm_margin=sm_margin,
+        s_aux=s_aux,
     )
     # return (out, softmax_lse) if return_softmax_lse else out
     return (out, softmax_lse, *rest) if return_softmax_lse else out
