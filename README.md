@@ -30,6 +30,16 @@ Currently released version supports:
 - FP8: forward pass (FA3 only)
 - Head dimensions up to 256
 
+## PPU Backend Extensions and Optimizations
+
+The PPU version includes targeted optimizations around data movement, TSM layout, Tensor Cell instructions, and scheduling, making FlashAttention-2 / FlashAttention-3 fit the PPU hardware characteristics more closely.
+
+- **AIU + Swizzle data path**: The PPU version routes the movement of tiled Q/K/V data through the AIU and applies a swizzle layout when writing to TSM / shared memory. This allows data in shared storage to directly match the operand read pattern of the subsequent MMA operations, reducing separate data reshuffling and shared memory access conflicts.
+- **PPU Tensor Cell mapping**: Matrix multiply-accumulate is organized as tiled MMA and mapped onto PPU Tensor Cell instructions, with the operand layouts and accumulator layouts required for FP16, BF16, and the FA3 FP8 forward pass filled in.
+- **Tile strategy tuning**: Block shape, warp count, stage count, and Q register residency strategy are tuned for scenarios such as different head dimensions, dropout, causal, PagedKV, varlen, local attention, softcap, append KV, and SplitKV / PackGQA, improving execution efficiency across different input shapes.
+- **PPU scheduling adaptation**: Based on the PPU's CU distribution and tile count, the underlying scheduler supports strategies such as persistent tile, dynamic persistent, and Stream-K / Split-K, improving load balancing for long/short sequences, variable-length batches, and multi-split scenarios.
+- **Compilation options assisting backend orchestration**: The build parameters enable PPU/AIU support and configure HGCC backend optimization options such as register count, matrix address sinking, asynchronous address sinking, and load/store address sinking, helping the compiler better orchestrate memory access, register usage, and the compute pipeline.
+
 ## Build from Source
 
 **Requirements:**
