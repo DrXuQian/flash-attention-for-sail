@@ -317,7 +317,7 @@ def _flash_attn_backward_fake(
     """Fake implementation for bwd shape inference."""
 
     is_varlen_q = cu_seqlens_q is not None
-    is_varlen_k = cu_seqlens_q is not None
+    is_varlen_k = cu_seqlens_k is not None
     is_varlen = is_varlen_q or is_varlen_k or sequed_q is not None or sequed_k is not None
 
     if not is_varlen_q:
