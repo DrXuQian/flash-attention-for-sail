@@ -19,7 +19,7 @@ struct SM90_BULK_REDUCE_ADD
   {
 #if defined(CUTE_ARCH_TMA_SM90_ENABLED)
     uint32_t smem_int_ptr  = cast_smem_ptr_to_uint(smem_ptr);
-    asm volatile("cp.reduce.async.bulk.global.shared::cta.bulk_group.add.f32 [%0], [%1], %2;\n"
+    asm volatile("ppu.cp.reduce.async.bulk.global.shared::cta.bulk_group.add.f32 [%0], [%1], %2;\n"
                      :
                      : "l"(gmem_ptr), "r"(smem_int_ptr), "r"(store_bytes)
                      : "memory");
