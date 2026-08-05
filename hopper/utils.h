@@ -49,7 +49,7 @@ template <typename Kernel>
 struct enable_sm90_or_later : Kernel {
     template <typename... Args>
     CUTLASS_DEVICE void operator()(Args&&... args) {
-#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ >= 900)
+#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ > 150)
         Kernel::operator()(std::forward<Args>(args)...);
 #endif
     }
@@ -59,7 +59,7 @@ template <typename Kernel>
 struct enable_sm80_to_sm89 : Kernel {
     template <typename... Args>
     CUTLASS_DEVICE void operator()(Args&&... args) {
-#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ >= 100) && (__HGGC_ARCH__ <= 890)
+#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ >= 100) && (__HGGC_ARCH__ <= 150)
         Kernel::operator()(std::forward<Args>(args)...);
 #endif
     }

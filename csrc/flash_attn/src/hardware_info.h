@@ -1,4 +1,5 @@
 /******************************************************************************
+ * Copyright (c) 2022-2026, T-HEAD (SHANGHAI) SEMICONDUCTOR CO., LTD.
  * Copyright (c) 2024, Tri Dao.
  ******************************************************************************/
 
@@ -8,9 +9,7 @@
 #include <cstdlib>
 #include <tuple>
 
-#ifdef __HGGCCC__
-#include <hggc_runtime.h>
-#else
+#if !defined(__HGGCCC_RTC__)
 #include "hggc_runtime.h"
 #endif
 

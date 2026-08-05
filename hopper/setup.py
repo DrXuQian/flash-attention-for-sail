@@ -9,8 +9,9 @@ import ast
 import itertools
 from pathlib import Path
 
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages
 from setuptools.command.build_ext import build_ext
+from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 import subprocess
 
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
@@ -19,6 +20,10 @@ import torch
 
 PACKAGE_NAME = "flash_attn_3"
 this_dir = os.path.dirname(os.path.abspath(__file__))
+
+USE_PPU = 'PPU_SDK' in os.environ.keys()
+FORCE_BUILD = os.getenv("FLASH_ATTENTION_FORCE_BUILD", ("TRUE" if USE_PPU else "FALSE")) == "TRUE"
+SKIP_CUDA_BUILD = os.getenv("FLASH_ATTENTION_SKIP_CUDA_BUILD", "FALSE") == "TRUE"
 
 SKIP_KERNEL_BUILD = os.getenv("FLASH_ATTENTION_SKIP_KERNEL_BUILD", "FALSE") == "TRUE"
 
@@ -35,139 +40,52 @@ DISABLE_PACKGQA = os.getenv("FLASH_ATTENTION_DISABLE_PACKGQA", "FALSE") == "TRUE
 DISABLE_FP16 = os.getenv("FLASH_ATTENTION_DISABLE_FP16", "FALSE") == "TRUE"
 DISABLE_FP8 = os.getenv("FLASH_ATTENTION_DISABLE_FP8", "FALSE") == "TRUE"
 DISABLE_VARLEN = os.getenv("FLASH_ATTENTION_DISABLE_VARLEN", "FALSE") == "TRUE"
-DISABLE_CLUSTER = os.getenv("FLASH_ATTENTION_DISABLE_CLUSTER", "TRUE") == "TRUE"
+DISABLE_CLUSTER = os.getenv("FLASH_ATTENTION_DISABLE_CLUSTER", ("TRUE" if USE_PPU else "FALSE")) == "TRUE"
 DISABLE_HDIM64 = os.getenv("FLASH_ATTENTION_DISABLE_HDIM64", "FALSE") == "TRUE"
 DISABLE_HDIM96 = os.getenv("FLASH_ATTENTION_DISABLE_HDIM96", "FALSE") == "TRUE"
 DISABLE_HDIM128 = os.getenv("FLASH_ATTENTION_DISABLE_HDIM128", "FALSE") == "TRUE"
 DISABLE_HDIM192 = os.getenv("FLASH_ATTENTION_DISABLE_HDIM192", "FALSE") == "TRUE"
 DISABLE_HDIM256 = os.getenv("FLASH_ATTENTION_DISABLE_HDIM256", "FALSE") == "TRUE"
-DISABLE_SM8x = os.getenv("FLASH_ATTENTION_DISABLE_SM8x", "FALSE") == "TRUE"
-DISABLE_SM90 = True  # SM90 removed from this PPU-only build
+DISABLE_SM8x = os.getenv("FLASH_ATTENTION_DISABLE_SM8x" if USE_PPU else "FLASH_ATTENTION_DISABLE_SM80", "FALSE") == "TRUE"
+DISABLE_SM90 = os.getenv("FLASH_ATTENTION_DISABLE_SM90", ("TRUE" if USE_PPU else "FALSE")) == "TRUE"
+DISABLE_SM80 = os.getenv("FLASH_ATTENTION_DISABLE_SM80", "FALSE") == "TRUE"
+DISABLE_SM89 = os.getenv("FLASH_ATTENTION_DISABLE_SM89", "FALSE") == "TRUE"
 ENABLE_VCOLMAJOR = os.getenv("FLASH_ATTENTION_ENABLE_VCOLMAJOR", "FALSE") == "TRUE"
-
-
-# ============================================================================
-# PPU HGCC Build Extension
-# ============================================================================
-
-class HGCCBuildExtension(build_ext):
-    """Custom build extension that uses hgcc for PPU."""
-
-    def build_extensions(self):
-        if not os.environ.get("MAX_JOBS"):
-            import psutil
-            max_num_jobs_cores = max(1, os.cpu_count() // 2)
-            free_memory_gb = psutil.virtual_memory().available / (1024 ** 3)
-            max_num_jobs_memory = int(free_memory_gb / 9)
-            max_jobs = max(1, min(max_num_jobs_cores, max_num_jobs_memory))
-            os.environ["MAX_JOBS"] = str(max_jobs)
-
-        for ext in self.extensions:
-            self._build_extension_hgcc(ext)
-
-    def _build_extension_hgcc(self, ext):
-        import ninja  # noqa: F401
-
-        ppu_sdk = os.environ.get("PPU_SDK", "")
-        hgcc = os.path.join(ppu_sdk, "bin", "hgcc")
-        torch_dir = torch.__path__[0]
-
-        sources = [os.path.join(this_dir, s) for s in ext.sources]
-        include_dirs = [os.path.abspath(d) for d in ext.include_dirs]
-
-        output_dir = os.path.join(self.build_temp, "hgcc_objs")
-        os.makedirs(output_dir, exist_ok=True)
-
-        ext_path = self.get_ext_fullpath(ext.name)
-        os.makedirs(os.path.dirname(ext_path), exist_ok=True)
-
-        torch_include = os.path.join(torch_dir, "include")
-        torch_include_csrc = os.path.join(torch_dir, "include", "torch", "csrc", "api", "include")
-        python_include = subprocess.check_output(
-            [sys.executable, "-c", "import sysconfig; print(sysconfig.get_path('include'))"]
-        ).decode().strip()
-
-        ppu_sdk_inc = os.path.join(ppu_sdk, "include")
-        ppu_targets_inc = os.path.join(ppu_sdk, "targets", "x86_64-linux", "include")
-        all_includes = include_dirs + [torch_include, torch_include_csrc, python_include, ppu_sdk_inc, ppu_targets_inc]
-        include_flags = [f"-I{d}" for d in all_includes]
-
-        hgcc_flags = [
-            "-O3", "-std=c++17",
-            "-arch=ppu_10",
-            "-arch=ppu_15",
-            "--forward-unknown-to-host-compiler",
-            "-Xcompiler", "-fPIC",
-            "-DSWITCH_TO_HGGCRT",
-            "-DUSE_CLANG", "-DUSE_HGGC", "-DUSE_PPU", "-DUSE_AIU=1",
-            "-DTORCH_API_INCLUDE_EXTENSION_H",
-            f"-DTORCH_EXTENSION_NAME={ext.name.split('.')[-1]}",
-            "--expt-relaxed-constexpr",
-            "--expt-extended-lambda",
-            "--use_fast_math",
-            "--resource-usage",
-            "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
-            "-DCUTLASS_ENABLE_GDC_FOR_SM90",
-            "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-            "-DNDEBUG",
-            "-mllvm", "-ppu-max-vreg-count=256",
-            "-mllvm", "-ppu-patch-fence-ppu=false",
-            "-mllvm", "-ppu-fix-uninit=true",
-            "-mllvm", "-wno-loop-miss-transform",
-        ] + ext.extra_compile_args.get("hgcc", [])
-
-        cxx_flags = [
-            "-O3", "-std=c++17", "-fPIC",
-            "-DUSE_PPU", "-DUSE_AIU=1",
-            "-DTORCH_API_INCLUDE_EXTENSION_H",
-            f"-DTORCH_EXTENSION_NAME={ext.name.split('.')[-1]}",
-        ] + ext.extra_compile_args.get("cxx", [])
-
-        max_jobs = int(os.environ.get("MAX_JOBS", "4"))
-        ninja_file = os.path.join(output_dir, "build.ninja")
-        obj_files = []
-
-        with open(ninja_file, "w") as f:
-            f.write("ninja_required_version = 1.3\n\n")
-
-            f.write(f"rule hgcc_compile\n")
-            f.write(f"  command = {hgcc} {' '.join(hgcc_flags)} {' '.join(include_flags)} -c $in -o $out\n")
-            f.write(f"  description = HGCC $in\n\n")
-
-            cxx_compiler = "c++"
-            cxx_include_flags = include_flags
-            f.write(f"rule cxx_compile\n")
-            f.write(f"  command = {cxx_compiler} {' '.join(cxx_flags)} {' '.join(cxx_include_flags)} -c $in -o $out\n")
-            f.write(f"  description = CXX $in\n\n")
-
-            torch_lib_dir = os.path.join(torch_dir, "lib")
-            ppu_lib_dir = os.path.join(ppu_sdk, "lib")
-            link_libs = f"-L{torch_lib_dir} -L{ppu_lib_dir} -ltorch -ltorch_cpu -ltorch_cuda -ltorch_python -lc10 -lc10_cuda -lhggc_wrapper -lhg_wrapper"
-            f.write(f"rule link\n")
-            f.write(f"  command = {hgcc} -shared -o $out $in {link_libs}\n")
-            f.write(f"  description = LINK $out\n\n")
-
-            for src in sources:
-                basename = os.path.splitext(os.path.basename(src))[0]
-                obj = os.path.join(output_dir, basename + ".o")
-                obj_files.append(obj)
-
-                if src.endswith(".cu"):
-                    f.write(f"build {obj}: hgcc_compile {src}\n")
-                else:
-                    f.write(f"build {obj}: cxx_compile {src}\n")
-
-            f.write(f"\nbuild {ext_path}: link {' '.join(obj_files)}\n")
-            f.write(f"\ndefault {ext_path}\n")
-
-        print(f"\n[HGCCBuildExtension] Building {ext.name} with {len(sources)} sources, max_jobs={max_jobs}")
-        subprocess.check_call(["ninja", "-f", ninja_file, f"-j{max_jobs}"])
-        print(f"[HGCCBuildExtension] Built {ext_path}")
 
 
 # ============================================================================
 # Source file generation
 # ============================================================================
+
+# PPU: monkey-patch ninja file writer to strip PTX code (code=compute_*) from the
+# ELF, preventing PC-relative offset overflow at link time on large PPU builds.
+if USE_PPU and hasattr(torch.utils.cpp_extension, "_write_ninja_file"):
+    _orig_write_ninja_file = torch.utils.cpp_extension._write_ninja_file
+
+    def _ppu_write_ninja_file(path, cflags=None, post_cflags=None,
+                              cuda_cflags=None, cuda_post_cflags=None,
+                              cuda_dlink_post_cflags=None, sources=None,
+                              objects=None, ldflags=None, library_target=None,
+                              with_cuda=None, **kwargs):
+        """Replace code=compute_* with code=sm_* in all nvcc flags for PPU."""
+        def _fix(flags):
+            if not flags:
+                return flags
+            r = [s.replace("code=compute_", "code=sm_") for s in flags]
+            if DISABLE_SM80:
+                r = [s.replace("sm_80", "sm_89") for s in r]
+            if DISABLE_SM89:
+                r = [s.replace("sm_80", "sm_80a") for s in r]
+            return r
+        return _orig_write_ninja_file(
+            path, cflags=_fix(cflags), post_cflags=_fix(post_cflags),
+            cuda_cflags=_fix(cuda_cflags), cuda_post_cflags=_fix(cuda_post_cflags),
+            cuda_dlink_post_cflags=cuda_dlink_post_cflags,
+            sources=sources, objects=objects, ldflags=ldflags,
+            library_target=library_target, with_cuda=with_cuda, **kwargs)
+
+    torch.utils.cpp_extension._write_ninja_file = _ppu_write_ninja_file
+
 
 ext_modules = []
 
@@ -179,7 +97,11 @@ if not os.path.exists(dir_actlize):
     else:
         os.symlink(repo_actlize, dir_actlize)
 
-if not SKIP_KERNEL_BUILD:
+def nvcc_threads_args():
+    nvcc_threads = os.getenv("NVCC_THREADS") or "2"
+    return ["--threads", nvcc_threads]
+
+if not SKIP_CUDA_BUILD:
     print(f"\n\ntorch.__version__  = {torch.__version__}\n\n")
 
     repo_dir = Path(this_dir).parent
@@ -254,15 +176,43 @@ if not SKIP_KERNEL_BUILD:
 
     os.environ["HGGC_ENABLE_COMPRESS"] = "1"
 
+    hgcc_flags = [
+        "-O3", "-std=c++17",
+        "--ftemplate-backtrace-limit=0",
+        "--use_fast_math",
+        "--resource-usage",
+        "-lineinfo",
+        "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+        "-DCUTLASS_ENABLE_GDC_FOR_SM90",
+        "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
+        "-DNDEBUG",
+        "-mllvm", "-ppu-max-vreg-count=256",
+        "-mllvm", "-ppu-sink-matrix-addr=true",
+        "-mllvm", "-ppu-max-alloca-byte-size=320",
+        "-mllvm", "-ppu-sink-async-addr=true",
+        "-mllvm", "-ppu-sink-load-addr=true",
+        "-mllvm", "-ppu-sink-store-addr=true",
+        "-mllvm", "-ppu-alloca-half-ldst-simplify=true",
+        "-mllvm", "-ppu-volatile-yield=false",
+        "-mllvm", "-sort-copy-before-coalesce=true",
+        "-Xfatbin",
+        "--compress-all",
+    ]
+
+    cc_flag = []
+    cc_flag.append("-arch=ppu_10")
+    cc_flag.append("-arch=ppu_15")
+
     ext_modules.append(
-        Extension(
+        CUDAExtension(
             name=f"{PACKAGE_NAME}._C",
             sources=sources,
             include_dirs=include_dirs,
             extra_compile_args={
-                "hgcc": feature_args,
-                "cxx": ["-DPy_LIMITED_API=0x03090000"] + feature_args,
+                "nvcc": nvcc_threads_args() + hgcc_flags + cc_flag + feature_args,
+                "cxx": ["-O3", "-std=c++17", "-DPy_LIMITED_API=0x03090000"] + feature_args,
             },
+            py_limited_api=True,
         )
     )
 
@@ -300,8 +250,8 @@ setup(
     long_description=open("../README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": HGCCBuildExtension},
-    python_requires=">=3.9",
-    install_requires=["torch", "einops"],
-    setup_requires=["packaging", "psutil", "ninja"],
+    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": BuildExtension},
+    python_requires=">=3.8",
+    install_requires=["torch", "einops", "packaging", "ninja"],
+    options={"bdist_wheel": {"py_limited_api": "cp39"}},
 )
