@@ -116,7 +116,7 @@ constexpr std::tuple<int, int, int, int, bool> tile_size_fwd_ppu(
             if (!kBlockM128) {
                 return {64, vreg_strain ? 96 : 128, 4, 1, vreg_strain ? false : true};
             } else {
-                return {128, vreg_strain ? 32 : 64, 4, 1, vreg_strain ? false : true};
+                return {128, 64, 4, 1, vreg_strain ? false : true};
             }
         } else if (headdim <= 128) {
             if (!kBlockM128) {
