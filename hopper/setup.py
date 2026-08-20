@@ -237,6 +237,57 @@ class CachedWheelsCommand(_bdist_wheel):
         return super().run()
 
 
+class PerSourceBuildExtension(BuildExtension):
+    """
+    BuildExtension that adds -mllvm -ppu-register-margin=2 only for backward
+    headdim 128 CUDA sources. This is done by post-processing the ninja build
+    file to add per-source cuda_post_cflags overrides.
+    """
+
+    def build_extensions(self):
+        import torch.utils.cpp_extension as torch_ext
+
+        original_write_ninja_file = torch_ext._write_ninja_file
+
+        def write_ninja_file_with_register_margin(path, *args, **kwargs):
+            original_write_ninja_file(path, *args, **kwargs)
+            self._patch_ninja_register_margin(path)
+
+        torch_ext._write_ninja_file = write_ninja_file_with_register_margin
+        try:
+            super().build_extensions()
+        finally:
+            torch_ext._write_ninja_file = original_write_ninja_file
+
+    @staticmethod
+    def _patch_ninja_register_margin(path):
+        if not os.path.exists(path):
+            return
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+
+        new_lines = []
+        margin_flags = "-mllvm -ppu-register-margin=2"
+        for line in lines:
+            new_lines.append(line)
+            # Match build statements for cuda_compile rules (e.g. cuda_compile,
+            # cuda_compile_sm80, cuda_compile_sm80_sm90, cuda_compile_sm100).
+            # Ninja line format: "build <obj>: <rule> <src>"
+            # After split(): ["build", "<obj>:", "<rule>", "<src>", ...]
+            if line.startswith("build "):
+                parts = line.split()
+                if len(parts) >= 4 and parts[2].startswith("cuda_compile"):
+                    src = parts[3]
+                    if "flash_bwd_hdim128_" in src and src.endswith(".cu"):
+                        new_lines.append(
+                            f"  cuda_post_cflags = $cuda_post_cflags {margin_flags}"
+                        )
+
+        with open(path, "w") as f:
+            f.write("\n".join(new_lines))
+
+
+
 setup(
     name=PACKAGE_NAME,
     version=get_package_version(),
@@ -250,7 +301,7 @@ setup(
     long_description=open("../README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": BuildExtension},
+    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": PerSourceBuildExtension},
     python_requires=">=3.8",
     install_requires=["torch", "einops", "packaging", "ninja"],
     options={"bdist_wheel": {"py_limited_api": "cp39"}},

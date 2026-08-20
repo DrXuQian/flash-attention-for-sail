@@ -17,9 +17,32 @@
 #include "named_barrier.hpp"
 #include "utils.h"
 
+
 namespace flash {
 
 using namespace cute;
+
+// The mainloop CVT + swizzled smem load path leaves the dK/dV accumulators in a permuted register
+// layout: swap(v1, m1) and swap(v2, n) relative to the baseline acc layout. Maps a fragment flat
+// index (v + m*8 + n*32, with v < 8, m < 4, n < 2) to its baseline position.
+CUTLASS_DEVICE int cvt_swzl_acc_permute_index(int i) {
+    int const v = i & 7;
+    int const m = (i >> 3) & 3;
+    int const n = (i >> 5) & 1;
+    int const dst_v = (v & 1) | (m & 2) | (n << 2);
+    int const dst_m = (m & 1) | (((v >> 1) & 1) << 1);
+    int const dst_n = (v >> 2) & 1;
+    return dst_v + dst_m * 8 + dst_n * 32;
+}
+
+// hdim256 variant: acc layout ((_2,_2,_2),_4,_2) with flat index
+// i = m0 + 2*m1 + 4*m2 + 8*n0 + 16*n1 + 32*k (print indices m = m0+2*m1+4*m2, n = n0+2*n1).
+// Log comparison (256.log vs 256_baseline.log, dKV GEMM) shows the optimized layout is obtained
+// from baseline by swapping the m1 and n1 bits, i.e. exchange bit1 <-> bit4 of the flat index
+// (an involution, so the same formula inverts it).
+CUTLASS_DEVICE int cvt_swzl_acc_permute_index_hdim256(int i) {
+    return (i & ~0x12) | ((i & 0x02) << 3) | ((i & 0x10) >> 3);
+}
 
 template <class TileShape_MNK_, class Element_, class ArchTag_,
           int NumEpilogueThreads_, bool Varlen_, bool dKV_swapAB_, int AtomLayoutKdKV=1>
@@ -51,6 +74,17 @@ struct CollectiveEpilogueBwd {
         make_tiled_copy(Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<128>, Element>{},
                         GmemLayoutAtom{},
                         Layout<Shape<_1, Int<kGmemElemsPerLoad>>>{}));  // Val layout, 8 or 16 vals per store
+
+    // The mainloop CVT + swizzled smem load fast path produces a permuted accumulator layout that
+    // has to be undone here. It is only implemented for kHeadDim == 128 on compute capability >= 89.
+    // Also requires kBlockN >= 128 (the CVT register permutation assumes 64 accum elements/thread).
+    static constexpr int kBlockN = get<1>(TileShape_MNK{});
+#if defined(USE_PPU) && USE_AIU
+    // static constexpr bool Use_CVT_SWZL_LD = false;
+    static constexpr bool Use_CVT_SWZL_LD = ArchTag::kMinComputeCapability >= 89 && (kHeadDim == 128 || kHeadDim == 256) && (kBlockN >= 128);
+#else
+    static constexpr bool Use_CVT_SWZL_LD = false;
+#endif
 
 #ifndef FLASHATTENTION_DISABLE_SM90
     using SmemLayoutAtomdKVTMA = decltype(cutlass::gemm::collective::detail::ss_smem_selector<GMMA::Major::K, Element,
@@ -212,6 +246,30 @@ struct CollectiveEpilogueBwd {
         flash::convert_type_out(tdVrdV, tdVrdV_out);
         Tensor tdKrdK_out = make_tensor_like<Element>(tdKrdK);
         flash::convert_type_out(tdKrdK, tdKrdK_out);
+
+        // Register permutation for CVT path: swap(v1, m1) and swap(v2, n)
+        // Transforms QK.log acc layout to baseline acc layout
+        if constexpr (Use_CVT_SWZL_LD) {
+            // taccdKrdK / taccdVrdV layout after retile: (8, 4, 2) stride (1, 8, 32), flat = v + m*8 + n*32
+            static_assert(CUTE_STATIC_V(size(tdVrdV_out)) == 64,
+                          "The CVT register permutation assumes 64 accumulator elements per thread");
+            auto permute_acc = [](auto& tensor) {
+                Element tmp[64];
+                CUTLASS_PRAGMA_UNROLL
+                for (int i = 0; i < 64; i++) {
+                    int const dst = (kHeadDim == 256) ? cvt_swzl_acc_permute_index_hdim256(i)
+                                                      : cvt_swzl_acc_permute_index(i);
+                    tmp[dst] = tensor(i);
+                }
+                CUTLASS_PRAGMA_UNROLL
+                for (int i = 0; i < 64; i++) {
+                    tensor(i) = tmp[i];
+                }
+            };
+            permute_acc(tdVrdV_out);
+            permute_acc(tdKrdK_out);
+        }
+
         Tensor taccdKrdK = smem_thr_copy_dKV.retile_S(tdKrdK_out);        // ((Atom,AtomNum), MMA_M, MMA_N)
         Tensor taccdVrdV = smem_thr_copy_dKV.retile_S(tdVrdV_out);        // ((Atom,AtomNum), MMA_M, MMA_N)
         // if (blockIdx.x == 0 && threadIdx.x == 128) { print(smem_thr_copy_dKV); print(sdK); printf("\n"); print(sdKt); printf("\n"); }
@@ -267,10 +325,21 @@ struct CollectiveEpilogueBwd {
 
             GmemTiledCopydKV gmem_tiled_copy_dKV;
             auto gmem_thr_copy_dKV = gmem_tiled_copy_dKV.get_thread_slice(thread_idx);
+            // For hdim256 CVT path: the smem data has headdim columns permuted by bit3<->bit6.
+            // Fix by reading from the permuted smem position (partition_S with partner_tid)
+            // so that correct data is delivered to each thread for the standard gmem write.
+            auto gmem_thr_copy_dKV_src = [&]() {
+                if constexpr (Use_CVT_SWZL_LD && kHeadDim == 256) {
+                    int partner_tid = (thread_idx & ~0x09) | ((thread_idx & 0x01) << 3) | ((thread_idx & 0x08) >> 3);
+                    return gmem_tiled_copy_dKV.get_thread_slice(partner_tid);
+                } else {
+                    return gmem_tiled_copy_dKV.get_thread_slice(thread_idx);
+                }
+            }();
             Tensor tdKVgdV = gmem_thr_copy_dKV.partition_D(gdV);
-            Tensor tdKVsdV = gmem_thr_copy_dKV.partition_S(sdV); // (TMA, TMA_M, TMA_K)
+            Tensor tdKVsdV = gmem_thr_copy_dKV_src.partition_S(sdV); // (TMA, TMA_M, TMA_K)
             Tensor tdKVgdK = gmem_thr_copy_dKV.partition_D(gdK);
-            Tensor tdKVsdK = gmem_thr_copy_dKV.partition_S(sdK); // (TMA, TMA_M, TMA_K)
+            Tensor tdKVsdK = gmem_thr_copy_dKV_src.partition_S(sdK); // (TMA, TMA_M, TMA_K)
             Tensor tdKVrdV = make_fragment_like(tdKVgdV);
             Tensor tdKVrdK = make_fragment_like(tdKVgdK);
             Tensor cdKV = cute::make_identity_tensor(select<1, 2>(TileShape_MNK{}));  // (BLK_N,BLK_K) -> (blk_n,blk_k)
@@ -365,6 +434,16 @@ struct CollectiveEpilogueBwdGQA {
 
     static constexpr int kBlockN = get<1>(TileShape_MNK{});
     static constexpr int kHeadDim = get<2>(TileShape_MNK{});
+
+    // Same CVT fast path condition as the mainloop / non-GQA epilogue: the dK/dV accumulators
+    // come back in the permuted CVT register layout and have to be un-permuted before the
+    // (baseline layout) r2g partitioning is used to write dKaccum / dVaccum.
+    // Also requires kBlockN >= 128 (the CVT register permutation assumes 64 accum elements/thread).
+#if defined(USE_PPU) && USE_AIU
+    static constexpr bool Use_CVT_SWZL_LD = ArchTag::kMinComputeCapability >= 89 && (kHeadDim == 128 || kHeadDim == 256) && (kBlockN >= 128);
+#else
+    static constexpr bool Use_CVT_SWZL_LD = false;
+#endif
     static_assert(NumEpilogueThreads % cutlass::NumThreadsPerWarp == 0, "NumEpilogueThreads must be a multiple of NumThreadsPerWarp");
     static constexpr int NumWarpGroups = NumEpilogueThreads / cutlass::NumThreadsPerWarpGroup;
     // Thread layout, 256 or 384 threads per row
@@ -505,11 +584,26 @@ struct CollectiveEpilogueBwdGQA {
             }
         } else {
 #endif
+            // dVaccum has to be written in the same fragment-major order that
+            // FlashAttnBwdPostprocessConvertdQ reads it back in (flat = thread_idx + j * NumEpilogueThreads),
+            // so go through the r2g partitioning instead of computing row-major (row, col) positions.
+            // On the CVT path only the *register* order is fixed up here; the residual headdim
+            // bit3<->bit6 column permutation is left in dVaccum and undone by PostprocessKerneldKV
+            // (Defer_CVT_HeaddimSwap).  Redirecting the atomicAdd to another thread's slice does not
+            // work: this r2g copy is a flat 1D layout over the fragment-major buffer, where thread bits
+            // index the fragment, not the headdim column.
             Tensor tdVrdV_atomic = r2g_thr_copy_dKVaccum.retile_S(tdVrdV);
             Tensor tdVgdV_atomic = r2g_thr_copy_dKVaccum.partition_D(gdVaccum);
             static_assert(CUTE_STATIC_V(size(tdVrdV_atomic)) == CUTE_STATIC_V(size(tdVgdV_atomic)));
+            static_assert(!Use_CVT_SWZL_LD || CUTE_STATIC_V(size(tdVrdV_atomic)) == 64,
+                          "The CVT register permutation assumes 64 accumulator elements per thread");
             #pragma unroll
-            for (int i = 0; i < size(tdVrdV_atomic); ++i) { atomicAdd(&tdVgdV_atomic(i), tdVrdV_atomic(i)); }
+            for (int i = 0; i < size(tdVrdV_atomic); ++i) {
+                int const dst = !Use_CVT_SWZL_LD ? i
+                              : (kHeadDim == 256) ? cvt_swzl_acc_permute_index_hdim256(i)
+                              : cvt_swzl_acc_permute_index(i);
+                atomicAdd(&tdVgdV_atomic(dst), tdVrdV_atomic(i));
+            }
 #ifndef FLASHATTENTION_DISABLE_SM90
         }
 #endif
@@ -540,11 +634,18 @@ struct CollectiveEpilogueBwdGQA {
             }
         } else {
 #endif
+            // Same fragment-major order requirement as dVaccum above; the residual headdim
+            // bit3<->bit6 permutation is likewise undone in PostprocessKerneldKV.
             Tensor tdKrdK_atomic = r2g_thr_copy_dKVaccum.retile_S(tdKrdK);
             Tensor tdKgdK_atomic = r2g_thr_copy_dKVaccum.partition_D(gdKaccum);
             static_assert(CUTE_STATIC_V(size(tdKrdK_atomic)) == CUTE_STATIC_V(size(tdKgdK_atomic)));
             #pragma unroll
-            for (int i = 0; i < size(tdKrdK_atomic); ++i) { atomicAdd(&tdKgdK_atomic(i), tdKrdK_atomic(i)); }
+            for (int i = 0; i < size(tdKrdK_atomic); ++i) {
+                int const dst = !Use_CVT_SWZL_LD ? i
+                              : (kHeadDim == 256) ? cvt_swzl_acc_permute_index_hdim256(i)
+                              : cvt_swzl_acc_permute_index(i);
+                atomicAdd(&tdKgdK_atomic(dst), tdKrdK_atomic(i));
+            }
 #ifndef FLASHATTENTION_DISABLE_SM90
         }
 #endif

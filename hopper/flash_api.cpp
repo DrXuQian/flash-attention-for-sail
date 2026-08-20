@@ -1692,9 +1692,33 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     int const head_size_rounded = round_up_headdim(std::max(head_size, head_size_v));
     int const head_size_v_rounded = head_size_rounded;
 #ifdef USE_PPU
-    // Very important that these match the kernel configs
-    int const kBlockM = head_size_rounded <= 64 ? 128 : 64;
-    int const kBlockN = head_size_rounded <= 64 ? 64 : (head_size_rounded <= 96 ? 128 : (head_size_rounded <= 128 ? 96 : 64));
+    // Very important that these match the kernel configs.  run_mha_bwd_hdim* in
+    // flash_bwd_launch_template.h dispatches exactly one tile per (headdim, Arch) branch,
+    // and the rounded seqlens below size dq_accum / dk_accum / dv_accum / softmax_d /
+    // softmax_lse_log2.  If a value here is smaller than the tile the kernel actually uses,
+    // the kernel writes past the end of one head's slice into the next one: dQ breaks when
+    // kBlockM is stale, dK/dV (GQA only, they are the ones going through the accum buffers)
+    // break when kBlockN is stale.  Rounding to a *larger* value is not a safe fallback
+    // either unless it is a multiple of the real tile, e.g. round_multiple(203, 128) = 256
+    // is smaller than round_multiple(203, 96) = 288.  So mirror the kernel exactly:
+    //   headdim   Arch == 80 (M,N)   Arch >= 89 (M,N)
+    //       64      128,  64           128,  64
+    //       96       64, 128            64, 128
+    //      128       64,  96            48, 128
+    //      192       64,  64           128, 128
+    //      256       64,  64            64, 128
+    bool const is_arch80 = arch == 80;
+    int const kBlockM = head_size_rounded <= 64 ? 128
+        : (head_size_rounded <= 96 ? 64
+           : (head_size_rounded <= 128 ? (is_arch80 ? 64 : 48)
+              : (head_size_rounded <= 192 ? (is_arch80 ? 64 : 128) : 64)));
+    int const kBlockN = head_size_rounded <= 64 ? 64
+        : (head_size_rounded <= 96 ? 128
+           : (head_size_rounded <= 128 ? (is_arch80 ? 96 : 128)
+              : (is_arch80 ? 64 : 128)));  // hdim192 and hdim256 share the same (M,N)
+    // One dispatch per (headdim, arch), so the semaphore block counts use the same tiles.
+    int const kBlockM_min = kBlockM;
+    int const kBlockN_min = kBlockN;
 #else
     // Very important that these match the kernel configs
     bool const is_local = (window_size_left >= 0 || window_size_right >= 0) && !is_causal;
@@ -1801,6 +1825,59 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     at::cuda::CUDAGuard device_guard{(char)q.get_device()};
 
     auto opts = q.options();
+    // PPU/AIU: Pad Q, dO, K, V tensors to prevent OOB gmem reads.
+    // The CVT_LAYOUT path uses 8*64 tile as an atomic AIU operator(whose boundary desc is not set),
+    // When seqlen is not divisible by kBlockM/kBlockN, the last tile reads past
+    // the end of the tensor, causing IMA. Padding ensures OOB reads land in
+    // valid (allocated) memory.
+    // Only enable on sm89 with hdim128/256 (the CVT path is only used there).
+#if defined(USE_PPU) && USE_AIU
+    bool const enable_bwd_seqlen_padding = (arch == 89) && (head_size == 128 || head_size == 256);
+    if (enable_bwd_seqlen_padding && total_q > 0) {
+        if (is_varlen_q) {
+            int const total_q_padded = total_q + kBlockM;
+            at::Tensor q_padded = torch::zeros({total_q_padded, num_heads, head_size}, opts);
+            q_padded.narrow(0, 0, total_q).copy_(q);
+            q = q_padded;
+            at::Tensor dout_padded = torch::zeros({total_q_padded, num_heads, head_size_v}, opts);
+            dout_padded.narrow(0, 0, total_q).copy_(dout);
+            dout = dout_padded;
+            at::Tensor out_padded = torch::zeros({total_q_padded, num_heads, head_size_v}, opts);
+            out_padded.narrow(0, 0, total_q).copy_(out);
+            out = out_padded;
+        } else if (seqlen_q % kBlockM != 0) {
+            int const seqlen_q_padded = seqlen_q + kBlockM;
+            at::Tensor q_padded = torch::zeros({batch_size, seqlen_q_padded, num_heads, head_size}, opts);
+            q_padded.narrow(1, 0, seqlen_q).copy_(q);
+            q = q_padded;
+            at::Tensor dout_padded = torch::zeros({batch_size, seqlen_q_padded, num_heads, head_size_v}, opts);
+            dout_padded.narrow(1, 0, seqlen_q).copy_(dout);
+            dout = dout_padded;
+            at::Tensor out_padded = torch::zeros({batch_size, seqlen_q_padded, num_heads, head_size_v}, opts);
+            out_padded.narrow(1, 0, seqlen_q).copy_(out);
+            out = out_padded;
+        }
+    }
+    if (enable_bwd_seqlen_padding && total_k > 0) {
+        if (is_varlen_k) {
+            int const total_k_padded = total_k + kBlockN;
+            at::Tensor k_padded = torch::zeros({total_k_padded, num_heads_k, head_size}, opts);
+            k_padded.narrow(0, 0, total_k).copy_(k);
+            k = k_padded;
+            at::Tensor v_padded = torch::zeros({total_k_padded, num_heads_k, head_size_v}, opts);
+            v_padded.narrow(0, 0, total_k).copy_(v);
+            v = v_padded;
+        } else if (seqlen_k % kBlockN != 0) {
+            int const seqlen_k_padded = seqlen_k + kBlockN;
+            at::Tensor k_padded = torch::zeros({batch_size, seqlen_k_padded, num_heads_k, head_size}, opts);
+            k_padded.narrow(1, 0, seqlen_k).copy_(k);
+            k = k_padded;
+            at::Tensor v_padded = torch::zeros({batch_size, seqlen_k_padded, num_heads_k, head_size_v}, opts);
+            v_padded.narrow(1, 0, seqlen_k).copy_(v);
+            v = v_padded;
+        }
+    }
+#endif
     // Need softmax_d to have total_q_padded_rounded since we want its address to be aligned by 16/8 bytes for TMA / LDG.64
     at::Tensor softmax_d, softmax_lse_log2;
     if (!is_varlen) {

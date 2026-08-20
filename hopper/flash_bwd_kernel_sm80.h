@@ -18,6 +18,33 @@ namespace flash {
 
 using namespace cute;
 
+// Per-arch shared-memory budget for the SM80-family backward kernel.
+//
+// Padding the per-block dynamic shared-memory request up to a fixed budget caps how many
+// blocks stay resident per SM. On PPU1v5 that reduced occupancy removes the inter-block
+// resource contention (group conflict) observed on hdim 128/256, so it pads up to 128KB.
+// PPU1v0 has not been characterized for this effect, so it requests only what
+// SharedStorage actually occupies.
+//
+// Specialized on ArchTag::kMinComputeCapability; the primary template is left undefined so
+// that an uncharacterized arch fails to compile instead of silently picking a budget.
+template <int MinComputeCapability>
+struct BwdSmemBudget;
+
+// cutlass::arch::PPU0010 (PPU1v0)
+template <>
+struct BwdSmemBudget<80> {
+    static constexpr bool kPadToBudget = false;
+    static constexpr int kBudgetBytes = 0;
+};
+
+// cutlass::arch::PPU0015 (PPU1v5)
+template <>
+struct BwdSmemBudget<89> {
+    static constexpr bool kPadToBudget = true;
+    static constexpr int kBudgetBytes = 128 * 1024;
+};
+
 template <class CollectiveMainloop_, class CollectiveEpilogue_, class TileScheduler_>
 class FlashAttnBwdSm80 {
 
@@ -67,7 +94,15 @@ public:
 
     };
 
-    static constexpr int SharedStorageSize = sizeof(SharedStorage);
+    // Pad the per-block dynamic smem request up to the arch's budget; never shrink below
+    // what SharedStorage actually occupies.
+    static_assert(ArchTag::kMinComputeCapability == 80 || ArchTag::kMinComputeCapability == 89,
+                  "No BwdSmemBudget defined for this ArchTag; expected PPU0010 (cc 80) or PPU0015 (cc 89)");
+    using SmemBudget = BwdSmemBudget<ArchTag::kMinComputeCapability>;
+    static constexpr int SharedStorageSize =
+        SmemBudget::kPadToBudget && int(sizeof(SharedStorage)) < SmemBudget::kBudgetBytes
+            ? SmemBudget::kBudgetBytes
+            : int(sizeof(SharedStorage));
 
     // Device side arguments
     struct Arguments {

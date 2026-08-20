@@ -18,11 +18,150 @@
 #include "softmax.h"
 #include "utils.h"
 
-#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ == 100) && defined(USE_PPU) && USE_AIU
+// ============================================================================
+// Local override of PPU0015_TSM_LD_SWZL_CVT for rapid iteration without
+// modifying the actlize submodule. Placed in namespace cute so that
+// SmemCopyOp / Copy_Atom<> can reference it directly.
+// Only compiled when PPU AIU headers are available.
+// ============================================================================
+#if defined(USE_PPU) && USE_AIU
+namespace cute {
+
+// Forward declaration (primary template)
+template <typename Element, int CUBE_H, int CUBE_W, int BlockH, int BlockW,
+          bool Swap, bool Trans, int InstNum, bool Cvt,
+          int LBO, int SBO, bool SHUFFLING_GAIT = false>
+struct PPU0015_TSM_LD_SWZL_CVT_BWD;
+
+// Trans=false specialization
+template <typename Element, int CUBE_H, int CUBE_W, int BlockH, int BlockW,
+          bool Swap, int InstNum, bool Cvt, int LBO, int SBO, bool SHUFFLING_GAIT>
+struct PPU0015_TSM_LD_SWZL_CVT_BWD<Element, CUBE_H, CUBE_W, BlockH, BlockW,
+                                      Swap, false, InstNum, Cvt, LBO, SBO, SHUFFLING_GAIT> {
+  static_assert(sizeof(Element) == 2 && CUBE_H == 8 && CUBE_W == 64);
+  static_assert(BlockH % CUBE_H == 0 && BlockW % (2*CUBE_W) == 0);
+  static_assert(Cvt);
+  static constexpr int swzl_mode = 0;
+  CUTE_HOST_DEVICE static void
+  copy(void *frag_ptr, void *smem_base, int coord_w, int coord_h, int cube_in_stage = 0, int stage = 0)
+  {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 890
+    Element *stage_base = reinterpret_cast<Element*>(smem_base);
+    const int lbo = SHUFFLING_GAIT ? (cube_in_stage & 1 ? LBO-1 : LBO+1) : LBO;
+    {
+      stage_base += CUBE_H * CUBE_W * InstNum * stage;
+      stage_base += (cube_in_stage >> 1) * (CUBE_H * CUBE_W * (InstNum >> 1));
+      stage_base += (cube_in_stage & 1) << 3;
+      stage_base += coord_h * BlockW + coord_w;
+    }
+    int tsm_add = reinterpret_cast<uintptr_t>(stage_base) / 16;
+    int *vreg = reinterpret_cast<int *>(frag_ptr);
+    PPU0015_TSM_LD_SWZL_IMPL<Element, false, false>()(vreg, tsm_add, lbo, SBO, swzl_mode);
+#else
+    CUTE_INVALID_CONTROL_PATH("Support for TSM_LD_SWZL has not been enabled");
+#endif
+  }
+};
+
+// Trans=true specialization
+template <typename Element, int CUBE_H, int CUBE_W, int BlockH, int BlockW,
+          bool Swap, int InstNum, bool Cvt, int LBO, int SBO, bool SHUFFLING_GAIT>
+struct PPU0015_TSM_LD_SWZL_CVT_BWD<Element, CUBE_H, CUBE_W, BlockH, BlockW,
+                                      Swap, true, InstNum, Cvt, LBO, SBO, SHUFFLING_GAIT> {
+  static_assert(sizeof(Element) == 2 && CUBE_H == 8 && CUBE_W == 64);
+  static_assert(BlockH % CUBE_H == 0);
+  static constexpr int swzl_mode = 0;
+  CUTE_HOST_DEVICE static void
+  copy(void *frag_ptr, void *smem_base, int coord_h, int coord_w, int cube_in_stage = 0, int stage = 0)
+  {
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 890
+    Element *stage_base = reinterpret_cast<Element*>(smem_base);
+    const int sbo = SHUFFLING_GAIT ? (coord_h >= 64 ? SBO - (CUBE_H * BlockW * (int)sizeof(Element) >> 4) : SBO + (CUBE_H * BlockW * (int)sizeof(Element) >> 4)) : SBO;
+    if constexpr (Cvt) {
+      {
+        if constexpr (BlockH == 128) {
+          stage_base += CUBE_H * CUBE_W * (stage * InstNum);
+          stage_base += (cube_in_stage >> 1) * (CUBE_H * CUBE_W * (InstNum >> 1));
+          stage_base += (cube_in_stage & 1) << 3;
+          stage_base += ((coord_h & 63) + ((coord_h >> 3) & 8)) * BlockW + coord_w;
+        } else {
+          stage_base += CUBE_H * CUBE_W * InstNum * stage;
+          stage_base += (cube_in_stage >> 1) * (CUBE_H * CUBE_W * (InstNum >> 1));
+          stage_base += (cube_in_stage & 1) << 3;
+          stage_base += coord_h * BlockW + coord_w;
+        }
+      }
+    } else {
+      stage_base += CUBE_H * CUBE_W * (cube_in_stage + stage * InstNum);
+      stage_base += coord_h * BlockW + coord_w;
+    }
+    int tsm_add = reinterpret_cast<uintptr_t>(stage_base) / 16;
+    int *vreg = reinterpret_cast<int *>(frag_ptr);
+    PPU0015_TSM_LD_SWZL_IMPL<Element, true, false>()(vreg, tsm_add, LBO, sbo, swzl_mode);
+#else
+    CUTE_INVALID_CONTROL_PATH("Support for TSM_LD_SWZL has not been enabled");
+#endif
+  }
+};
+
+// Copy_Traits specialization for PPU0015_TSM_LD_SWZL_CVT_BWD
+template <typename Element, int CUBE_H, int CUBE_W, int BlockH, int BlockW,
+          bool Swap, bool Trans, int InstNum, bool last_blk_cvt,
+          int LBO, int SBO, bool SHUFFLING_GAIT>
+struct Copy_Traits<PPU0015_TSM_LD_SWZL_CVT_BWD<Element, CUBE_H, CUBE_W, BlockH, BlockW,
+                                                  Swap, Trans, InstNum, last_blk_cvt, LBO, SBO, SHUFFLING_GAIT>>
+{
+  using ThrID = Layout<_32>;
+  using SrcLayout = Layout<Shape < _32,_128>,
+                           Stride<_128,  _1>>;
+  using DstLayout = Layout<Shape <_32,Shape <_32,   _4>>,
+                           Stride<_32,Stride< _1,_1024>>>;
+  using RefLayout = DstLayout;
+
+  void *smem_base_;
+  template <class Coord, int... Is>
+  CUTE_HOST_DEVICE constexpr
+  void
+  copy_unpack_(void *dst_ptr, void* src_ptr,
+               Coord const& src_coord, seq<Is...>) const
+  {
+    PPU0015_TSM_LD_SWZL_CVT_BWD<Element, CUBE_H, CUBE_W, BlockH, BlockW,
+                                   Swap, Trans, InstNum, last_blk_cvt, LBO, SBO, SHUFFLING_GAIT>::copy(dst_ptr, src_ptr, get<Is>(src_coord)...);
+  }
+  template <class TS, class SLayout,
+          class TD, class DLayout>
+  CUTE_HOST_DEVICE friend constexpr
+  void
+  copy_unpack(Copy_Traits        const& traits,
+              Tensor<TS,SLayout> const& src,
+              Tensor<TD,DLayout>      & dst)
+  {
+    if constexpr (is_mix_iterator<typename TS::iterator>::value) {
+      traits.copy_unpack_(cute::raw_pointer_cast(dst.data()), src.data().ptr_.get(), src.data().coord_, tuple_seq<decltype(src.data().coord_)>{});
+    } else {
+      traits.copy_unpack_(cute::raw_pointer_cast(dst.data()), traits.smem_base_, src.data().coord_, tuple_seq<decltype(src.data().coord_)>{});
+    }
+  }
+};
+
+} // namespace cute (local overrides)
+#endif // defined(USE_PPU) && USE_AIU
+// ============================================================================
+
+
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == 800) && defined(USE_PPU) && USE_AIU
 #define PPU1v0_R2S_SLICE_LAYOUT 1
 #else
 #define PPU1v0_R2S_SLICE_LAYOUT 0
 #endif
+
+#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ == 890) && defined(USE_PPU) && USE_AIU
+#define PPU1v5_R2S_SLICE_LAYOUT 1
+#else
+#define PPU1v5_R2S_SLICE_LAYOUT 0
+#endif
+
+
 namespace flash {
 
 using namespace cute;
@@ -63,6 +202,29 @@ struct CollectiveMainloopBwdSm80 {
     static_assert(ArchTag::kMinComputeCapability >= 80);
 
     static constexpr bool Has_cp_async = ArchTag::kMinComputeCapability >= 80;
+
+    // The CVT + swizzled smem load fast path (8x64 AIU gmem tiles fed to PPU0015_TSM_LD_SWZL_CVT)
+    // is only implemented for kHeadDim == 128 on compute capability >= 89.
+#if defined(USE_PPU) && USE_AIU
+    // The CVT + swizzled path requires kBlockN >= 128 because:
+    //  1. PdS copy atoms (Trans=false) need BlockW >= 2*CUBE_W = 128
+    //  2. Epilogue register permutation assumes 64 accumulator elements/thread (= kBlockN*kHeadDim/NumThreads with kBlockN=128)
+    static constexpr bool Use_CVT_SWZL_LD = ArchTag::kMinComputeCapability >= 89 && (kHeadDim == 128 || kHeadDim == 256) && (kBlockN >= 128);
+#else
+    static constexpr bool Use_CVT_SWZL_LD = false;
+#endif
+
+    // ArchTag-aware gating for the R2S slice-layout fast paths.
+    // The file-scope PPU1v0_R2S_SLICE_LAYOUT / PPU1v5_R2S_SLICE_LAYOUT macros only inspect
+    // __CUDA_ARCH__, which cannot see the enclosing template's ArchTag. On the PPU a single
+    // sm_80 compile pass emits code for BOTH ppu001 (__CUDA_ARCH__==800) and ppu0015
+    // (__CUDA_ARCH__==890) targets, so in the ppu001 pass PPU1v0_R2S_SLICE_LAYOUT==1 would
+    // otherwise leak into the Arch=89 template (kBlockM=48) and trip tile_to_shape/shape_div
+    // static_asserts. ANDing each macro with ArchTag::kMinComputeCapability keeps every template
+    // on its intended path. These reduce to the original macro values in the SM89-only build.
+    static constexpr bool kUse_PPU1v0_SliceLayout = (PPU1v0_R2S_SLICE_LAYOUT != 0) && (ArchTag::kMinComputeCapability == 80);
+    static constexpr bool kUse_PPU1v5_SliceLayout = (PPU1v5_R2S_SLICE_LAYOUT != 0) && (ArchTag::kMinComputeCapability == 89);
+    static constexpr bool kUse_R2S_SliceLayout    = kUse_PPU1v0_SliceLayout || kUse_PPU1v5_SliceLayout;
 
     static constexpr int NumMmaThreads = NumMmaWarps * cutlass::NumThreadsPerWarp;
     static constexpr int NumProducerThreads = NumMmaThreads;  // For compatibility with TileScheduler
@@ -148,20 +310,18 @@ struct CollectiveMainloopBwdSm80 {
     static constexpr int kBytePerRow = kHeadDim * sizeof(Element);
     static constexpr int kBlockKGmem = (kBytePerRow % 128 == 0 ? 128 : (kBytePerRow % 64 == 0 ? 64 : 32)) / sizeof(Element);
     static constexpr int nBytePerRow = kBlockN * sizeof(Element);// 192
-#if PPU1v0_R2S_SLICE_LAYOUT
+    // Channel-slice geometry for the PPU1v0 R2S slice layout. These are arch-agnostic ints
+    // (always defined) but only consumed on the kUse_PPU1v0_SliceLayout path.
     static constexpr int PPUChannelSliceSize = 16;
     static constexpr int PPUChannelSliceCount = 2;
     static constexpr int PPUChannelSlice2Size = PPUChannelSliceSize * PPUChannelSliceCount;
-    static constexpr int kBlockNGmem = PPUChannelSlice2Size;
-#else
-    static constexpr int kBlockNGmem = (nBytePerRow % 128 == 0 ? 128 : (nBytePerRow % 64 == 0 ? 64 : 32)) / sizeof(Element);
-#endif
+    static constexpr int kBlockNGmem = kUse_PPU1v0_SliceLayout
+        ? PPUChannelSlice2Size
+        : (nBytePerRow % 128 == 0 ? 128 : (nBytePerRow % 64 == 0 ? 64 : 32)) / int(sizeof(Element));
     static constexpr int mBytePerRow = kBlockM * sizeof(Element);
-#if PPU1v0_R2S_SLICE_LAYOUT
-    static constexpr int kBlockMGmem = PPUChannelSlice2Size;
-#else
-    static constexpr int kBlockMGmem = (mBytePerRow % 128 == 0 ? 128 : (mBytePerRow % 64 == 0 ? 64 : 32)) / sizeof(Element);
-#endif
+    static constexpr int kBlockMGmem = kUse_PPU1v0_SliceLayout
+        ? PPUChannelSlice2Size
+        : (mBytePerRow % 128 == 0 ? 128 : (mBytePerRow % 64 == 0 ? 64 : 32)) / int(sizeof(Element));
 
     static constexpr int kSwizzle = kBlockKGmem == 128 ? 4 : (kBlockKGmem == 64 ? 3 : (kBlockKGmem == 32 ? 2 : 1));
     static constexpr int kSwizzleBase = sizeof(Element) == 4 ? 2 : (sizeof(Element) == 2 ? 3 : 4);
@@ -181,9 +341,15 @@ struct CollectiveMainloopBwdSm80 {
     using SmemLayoutQ =
         decltype(tile_to_shape(SmemLayoutAtomQdO{},
                  make_shape(shape<0>(TileShape_MNK{}), shape<2>(TileShape_MNK{}), Int<kStages>{})));
+    using SmemLayoutQ_AIU_COPY =
+        decltype(tile_to_shape(SmemLayoutAtomQdO{},
+                 make_shape(shape<0>(TileShape_MNK{}), shape<2>(TileShape_MNK{}), Int<kStages>{}), LayoutRight{}));
     using SmemLayoutdO =
         decltype(tile_to_shape(SmemLayoutAtomQdO{},
                  make_shape(shape<0>(TileShape_MNK{}), shape<2>(TileShape_MNK{}), Int<kStages_dO>{})));
+    using SmemLayoutdO_AIU_COPY =
+        decltype(tile_to_shape(SmemLayoutAtomQdO{},
+                 make_shape(shape<0>(TileShape_MNK{}), shape<2>(TileShape_MNK{}), Int<kStages_dO>{}), LayoutRight{}));
 
 #if defined(USE_PPU) && USE_AIU
     using SmemLayoutAtomKV = Layout<Shape<_8, Int<kBlockKGmem>>, Stride<Int<kBlockKGmem>, _1>>;
@@ -194,59 +360,88 @@ struct CollectiveMainloopBwdSm80 {
                     Layout<Shape<_8, Int<kBlockKGmem>>,
                            Stride<Int<kBlockKGmem>, _1>>{}));
 #endif
-    using SmemLayoutK = decltype(tile_to_shape(SmemLayoutAtomKV{}, select<1, 2>(TileShape_MNK{})));
 
+    using SmemLayoutK = decltype(tile_to_shape(SmemLayoutAtomKV{}, select<1, 2>(TileShape_MNK{})));
+    using SmemLayoutK_AIU_COPY = decltype(tile_to_shape(SmemLayoutAtomKV{}, select<1, 2>(TileShape_MNK{}), LayoutRight{}));
     using SmemLayoutV = decltype(tile_to_shape(SmemLayoutAtomKV{}, select<1, 2>(TileShape_MNK{})));
+    using SmemLayoutV_AIU_COPY = decltype(tile_to_shape(SmemLayoutAtomKV{}, select<1, 2>(TileShape_MNK{}), LayoutRight{}));
 
     // TD [2023-03-19]: Idk why kPBlockN = 16 and kSwizzlePdS=3 is the fastest.
     static constexpr int kPBlockN = kBlockN % 64 == 0 ? 64 : (kBlockN % 32 == 0 ? 32 : 16);
     static_assert(kPBlockN == 16 || kPBlockN == 32 || kPBlockN == 64);
     // static constexpr int kSwizzlePdS = kPBlockN == 16 ? 1 : (kPBlockN == 32 ? 2 : 3);
 
-#if PPU1v0_R2S_SLICE_LAYOUT
-    using SmemLayoutAtomPdS_R2Slice = decltype(
-        tile_to_shape(
-        composition(Swizzle<1, kSwizzleBase, kSwizzleBase>{},
-                    Layout<Shape<Int<PPUChannelSliceSize>, Int<PPUChannelSliceSize>>,
-                           Stride<Int<1>, Int<PPUChannelSliceSize>>>{}),
-        Layout<Shape<Int<PPUChannelSliceSize>, Int<kBlockN>>>{}
-    ));
+#if defined(USE_PPU) && USE_AIU
+    // Intermediate atoms for PdS R2Slice layout dispatch
+    static constexpr int Swizzle_Slice = kBlockNGmem == 64 ? 3 : (kBlockNGmem == 32 ? 2 : 1);
+    using SmemLayoutAtomPdS_CVT = Layout<Shape<_8, Int<kBlockNGmem>>, Stride<Int<kBlockNGmem>, _1>>;
+    using SmemLayoutAtomPdS_Slice = Layout<Shape<Int<kBlockM>, Int<kBlockNGmem>>, Stride<Int<kBlockNGmem>, Int<1>>>;
 
-    // Store Layout of ppu aiu slice format
-    using SmemLayoutPdS_R2Slice = decltype(tile_to_shape(
-        SmemLayoutAtomPdS_R2Slice{},
-        make_layout(make_shape(Int<kBlockM>{}, Int<kBlockN>{}),
-                    make_stride(Int<kBlockN>{}, _1{})
-        )
-    ));
+    using SmemLayoutPdS_R2Slice = std::conditional_t<
+        Use_CVT_SWZL_LD,
+        decltype(tile_to_shape(
+            composition(Swizzle<Swizzle_Slice, kSwizzleBase, kSwizzleBase>{},
+                        SmemLayoutAtomPdS_CVT{}),
+            make_shape(Int<kBlockM>{}, Int<kBlockN>{}), LayoutRight{})),
+        std::conditional_t<
+            (ArchTag::kMinComputeCapability >= 89),
+            decltype(tile_to_shape(
+                composition(Swizzle<Swizzle_Slice, kSwizzleBase, kSwizzleBase>{},
+                            SmemLayoutAtomPdS_Slice{}),
+                Layout<Shape<Int<kBlockM>, Int<kBlockN>>>{})),
+            // PPU1v0 atom: 16×16 swizzled, tiled to 16×kBlockN
+            decltype(tile_to_shape(
+                tile_to_shape(
+                    composition(Swizzle<1, kSwizzleBase, kSwizzleBase>{},
+                                Layout<Shape<Int<16>, Int<16>>, Stride<Int<1>, Int<16>>>{}),
+                    Layout<Shape<Int<16>, Int<kBlockN>>>{}),
+                make_layout(make_shape(Int<kBlockM>{}, Int<kBlockN>{}), make_stride(Int<kBlockN>{}, _1{}))))>
+    >;
     using SmemLayoutPdSt_R2Slice = decltype(composition(
         SmemLayoutPdS_R2Slice{},
         make_layout(make_shape(Int<kBlockN>{}, Int<kBlockM>{}),
-                               make_stride(Int<kBlockM>{}, _1{})))
-    );
+                    make_stride(Int<kBlockM>{}, Int<1>{}))));
 #endif
     static constexpr int kSwizzlePdS = 3;
     using SmemLayoutAtomPdS = decltype(
         composition(Swizzle<kSwizzlePdS, kSwizzleBase, kSwizzleBase>{},
                     Layout<Shape<Int<kBlockM>, Int<kPBlockN>>,
                            Stride<Int<kPBlockN>, _1>>{}));
-#if PPU1v0_R2S_SLICE_LAYOUT
-    using SmemLayoutPdSt = decltype(tile_to_shape(
-        Layout<Shape<Int<kBlockN>, Int<PPUChannelSlice2Size>>, Stride<Int<PPUChannelSlice2Size>, _1>>{},
-        make_shape(Int<kBlockN>{}, Int<kBlockM>{})));
-    using SmemLayoutPdS =
-        decltype(cute::composition(SmemLayoutPdSt{},
-                                   make_layout(make_shape(Int<kBlockM>{}, Int<kBlockN>{}),
-                                               make_stride(Int<kBlockN>{}, _1{}))));
-#else
-    using SmemLayoutPdS = decltype(tile_to_shape(
-        SmemLayoutAtomPdS{},
-        make_shape(Int<kBlockM>{}, Int<kBlockN>{})));
-    using SmemLayoutPdSt =
-        decltype(cute::composition(SmemLayoutPdS{},
-                                   make_layout(make_shape(Int<kBlockN>{}, Int<kBlockM>{}),
-                                               make_stride(Int<kBlockM>{}, _1{}))));
-#endif
+    // ArchTag-aware selection of SmemLayoutPdS/SmemLayoutPdSt.
+    // The v0 (PPU1v0) branch tiles with a (kBlockN, PPUChannelSlice2Size) block; on kBlockM=48
+    // (Arch=89 hdim128) that block does not divide the target shape, so the branch must not
+    // be instantiated for Arch!=80. Using `if constexpr` in a template context ensures the
+    // discarded branch is not instantiated when kUse_PPU1v0_SliceLayout is false.
+    static constexpr auto compute_SmemLayoutPdS() {
+        if constexpr (kUse_PPU1v0_SliceLayout) {
+            auto PdSt = tile_to_shape(
+                Layout<Shape<Int<kBlockN>, Int<PPUChannelSlice2Size>>, Stride<Int<PPUChannelSlice2Size>, _1>>{},
+                make_shape(Int<kBlockN>{}, Int<kBlockM>{}));
+            return cute::composition(PdSt,
+                make_layout(make_shape(Int<kBlockM>{}, Int<kBlockN>{}),
+                            make_stride(Int<kBlockN>{}, _1{})));
+        } else {
+            return tile_to_shape(
+                SmemLayoutAtomPdS{},
+                make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
+        }
+    }
+    static constexpr auto compute_SmemLayoutPdSt() {
+        if constexpr (kUse_PPU1v0_SliceLayout) {
+            return tile_to_shape(
+                Layout<Shape<Int<kBlockN>, Int<PPUChannelSlice2Size>>, Stride<Int<PPUChannelSlice2Size>, _1>>{},
+                make_shape(Int<kBlockN>{}, Int<kBlockM>{}));
+        } else {
+            auto PdS = tile_to_shape(
+                SmemLayoutAtomPdS{},
+                make_shape(Int<kBlockM>{}, Int<kBlockN>{}));
+            return cute::composition(PdS,
+                make_layout(make_shape(Int<kBlockN>{}, Int<kBlockM>{}),
+                            make_stride(Int<kBlockM>{}, _1{})));
+        }
+    }
+    using SmemLayoutPdS  = decltype(compute_SmemLayoutPdS());
+    using SmemLayoutPdSt = decltype(compute_SmemLayoutPdSt());
 
     // We set stride to be multiple of 64 so that if ShuffleLSE, even if threads read from sLSE but out of bounds,
     // it's still a valid smem address.
@@ -276,10 +471,25 @@ struct CollectiveMainloopBwdSm80 {
                                                          Layout<Shape < _1>>{}));  // Val layout, 1 vals per store
 
     using SmemCopyAtom = Copy_Atom<PPU_U32x4_LDSM_N, Element>;
-#if PPU1v0_R2S_SLICE_LAYOUT
-    // we purpose to pre-transpose P in share memory and load in non-transpose fashion
-    using SmemCopyAtomPdSt_AIU = Copy_Atom<PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockMGmem, false, false, kBlockM / kBlockMGmem>, Element>;
-    using SmemCopyAtomdS_AIU = Copy_Atom<PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockMGmem, false, true, kBlockM / kBlockMGmem>, Element>;
+#if defined(USE_PPU) && USE_AIU
+    // Use a safe BlockN (>= 128) for CVT_LOCAL template instantiation to avoid its internal
+    // static_assert(BlockW % 128 == 0) firing, even when the CVT branch is never selected.
+    static constexpr int kBlockN_PdS = (kBlockN >= 128) ? kBlockN : 128;
+    // PdSt: pre-transpose P in shared memory and load in non-transpose fashion
+    using SmemCopyAtomPdSt_AIU = Copy_Atom<std::conditional_t<
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockM, kBlockN_PdS, dKV_swapAB, true, kBlockM / 8 * kBlockN_PdS / 64, true, 128, 64>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockNGmem, dKV_swapAB, true, kBlockN / kBlockNGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockMGmem, false, false, kBlockM / kBlockMGmem>>>, Element>;
+    using SmemCopyAtomdS_AIU = Copy_Atom<std::conditional_t<
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockM, kBlockN_PdS, dQ_swapAB, false, kBlockM / 8 * kBlockN_PdS / 64, true, 64, 128, true>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockNGmem, dQ_swapAB, false, kBlockN / kBlockNGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockMGmem, false, true, kBlockM / kBlockMGmem>>>, Element>;
 #endif
     using SmemCopyAtomTransposed = Copy_Atom<PPU_U16x8_LDSM_T, Element>;
     // For the case where the N dimension of MmaSdP is divisible by 8 but not by 16
@@ -287,22 +497,36 @@ struct CollectiveMainloopBwdSm80 {
     // For the case where the N dimension of MmadQ is divisible by 8 but not by 16
     using SmemCopyAtomTransposedHalf = Copy_Atom<PPU_U16x4_LDSM_T, Element>;
 #if defined(USE_PPU) && USE_AIU
+    // The CVT copy ops always address a headdim tile padded to 128 elements.
+    static constexpr int kHeadDimPadding = 128;
     using SmemCopyOpQ = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, SdP_swapAB, false, kHeadDim / kBlockKGmem>,
-        PPU0010_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, false, false, kHeadDim / kBlockKGmem>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockM, kHeadDimPadding, SdP_swapAB, false, kBlockM / 8 * kHeadDim / 64, true, 128, 64>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, SdP_swapAB, false, kHeadDim / kBlockKGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, false, false, kHeadDim / kBlockKGmem>>>;
     using SmemCopyOpQt = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, !dKV_swapAB, true, kHeadDim / kBlockKGmem>,
-        PPU0010_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, false, true, kHeadDim / kBlockKGmem>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockM, kHeadDimPadding, !dKV_swapAB, true, kBlockM / 8 * kHeadDim / 64, true, 128, 64>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, !dKV_swapAB, true, kHeadDim / kBlockKGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockM, kBlockKGmem, false, true, kHeadDim / kBlockKGmem>>>;
     using SmemCopyOpK = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, !SdP_swapAB, false, kHeadDim / kBlockKGmem>,
-        PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, false, false, kHeadDim / kBlockKGmem>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockN, kHeadDimPadding, !SdP_swapAB, false, kBlockN / 8 * kHeadDim / 64, true, 128, 64>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, !SdP_swapAB, false, kHeadDim / kBlockKGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, false, false, kHeadDim / kBlockKGmem>>>;
     using SmemCopyOpKVt = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, !dQ_swapAB, true, kHeadDim / kBlockKGmem>,
-        PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, false, true, kHeadDim / kBlockKGmem>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_TSM_LD_SWZL_CVT_BWD<Element, 8, 64, kBlockN, kHeadDimPadding, !dQ_swapAB, true,  kBlockN / 8 * kHeadDim / 64, true, 64, 1024, true>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, !dQ_swapAB, true, kHeadDim / kBlockKGmem>,
+            PPU0010_TSM_LD_SWZL<Element, kBlockN, kBlockKGmem, false, true, kHeadDim / kBlockKGmem>>>;
     using SmemCopyAtomQ = Copy_Atom<SmemCopyOpQ, Element>;
     using SmemCopyAtomQt = Copy_Atom<SmemCopyOpQt, Element>;
     using SmemCopyAtomK = Copy_Atom<SmemCopyOpK, Element>;
@@ -338,24 +562,37 @@ struct CollectiveMainloopBwdSm80 {
 #if defined(USE_PPU) && USE_AIU
     static constexpr int bits_per_aiu_Q = kBlockM * kBlockKGmem * sizeof(Element) * 8;
     static constexpr int bits_per_aiu_KV = kBlockN * kBlockKGmem * sizeof(Element) * 8;
+    static constexpr int bits_per_aiu_Q_Cvt = 8 * kBlockKGmem * sizeof(Element) * 8;
+    static constexpr int bits_per_aiu_KV_Cvt = 8 * kBlockKGmem * sizeof(Element) * 8;
     using Gmem_copy_struct_Q = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_AIU_LOAD<cute::C<bits_per_aiu_Q>, Element, false, kBlockM, kBlockKGmem>,
-        PPU0010_AIU_LOAD<cute::C<bits_per_aiu_Q>, Element, false>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_AIU_LOAD<cute::C<bits_per_aiu_Q_Cvt>, Element, false, 8, kBlockKGmem>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_AIU_LOAD<cute::C<bits_per_aiu_Q>, Element, false, kBlockM, kBlockKGmem>,
+            PPU0010_AIU_LOAD<cute::C<bits_per_aiu_Q>, Element, false>>>;
     using Gmem_copy_struct_KV = std::conditional_t<
-        ArchTag::kMinComputeCapability >= 89,
-        PPU0015_AIU_LOAD<cute::C<bits_per_aiu_KV>, Element, false, kBlockN, kBlockKGmem>,
-        PPU0010_AIU_LOAD<cute::C<bits_per_aiu_KV>, Element, false>>;
+        Use_CVT_SWZL_LD,
+        PPU0015_AIU_LOAD<cute::C<bits_per_aiu_KV_Cvt>, Element, false, 8, kBlockKGmem>,
+        std::conditional_t<
+            ArchTag::kMinComputeCapability >= 89,
+            PPU0015_AIU_LOAD<cute::C<bits_per_aiu_KV>, Element, false, kBlockN, kBlockKGmem>,
+            PPU0010_AIU_LOAD<cute::C<bits_per_aiu_KV>, Element, false>>>;
+    // CVT path loads 8 x kBlockKGmem gmem tiles, the other paths load a full kBlockM/kBlockN block.
     using GmemTiledCopyQ = decltype(
         make_tiled_copy(Copy_Atom<Gmem_copy_struct_Q, Element>{},
                         Layout<Shape <_1,_1>,
                                Stride<_1,_1>>{},
-                        Layout<Shape <Int<kBlockM>, Int<kBlockKGmem>>>{}));
+                        std::conditional_t<Use_CVT_SWZL_LD,
+                            Layout<Shape <Int<8>, Int<kBlockKGmem>>>,
+                            Layout<Shape <Int<kBlockM>, Int<kBlockKGmem>>>>{}));
     using GmemTiledCopyKV = decltype(
         make_tiled_copy(Copy_Atom<Gmem_copy_struct_KV, Element>{},
                         Layout<Shape <_1,_1>,
                                Stride<_1,_1>>{},
-                        Layout<Shape <Int<kBlockN>, Int<kBlockKGmem>>>{}));
+                        std::conditional_t<Use_CVT_SWZL_LD,
+                            Layout<Shape <Int<8>, Int<kBlockKGmem>>>,
+                            Layout<Shape <Int<kBlockN>, Int<kBlockKGmem>>>>{}));
 #else
     using GmemTiledCopyQ = GmemTiledCopyQKV;
     using GmemTiledCopyKV = GmemTiledCopyQKV;
@@ -399,10 +636,10 @@ struct CollectiveMainloopBwdSm80 {
             cute::array_aligned<Element, cute::cosize_v<SmemLayoutQ>> smem_q;
         };
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutdO>> smem_do;
-        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>, 128> smem_lse;
-        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>, 128> smem_dpsum;
-        SmemP_t smem_p;
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutPdS>> smem_ds;
+        SmemP_t smem_p;
+        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>> smem_lse;
+        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>> smem_dpsum;
     };
 
     struct CUTE_ALIGNAS(128) TensorStorageSeparateQV {
@@ -410,10 +647,10 @@ struct CollectiveMainloopBwdSm80 {
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutV>> smem_v;
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutQ>> smem_q;
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutdO>> smem_do;
-        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>, 128> smem_lse;
-        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>, 128> smem_dpsum;
-        SmemP_t smem_p;
         cute::array_aligned<Element, cute::cosize_v<SmemLayoutPdS>> smem_ds;
+        SmemP_t smem_p;
+        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>> smem_lse;
+        cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutLSE>> smem_dpsum;
     };
 
     using TensorStorage = std::conditional_t<Share_QV_Smem, TensorStorageSharedQV, TensorStorageSeparateQV>;
@@ -547,6 +784,15 @@ struct CollectiveMainloopBwdSm80 {
         Tensor sQ = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_q.data()), SmemLayoutQ{});
         Tensor sdO = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_do.data()), SmemLayoutdO{});
         Tensor sK = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_k.data()), SmemLayoutK{});
+        // R2S copy view: AIU_LOAD writes 8x64 tiles in row-major (LayoutRight) order.
+        // The compute path still uses sQ/sdO/sK/sV (LayoutLeft) for partition_S.
+        // PPU copy atoms compute smem addresses internally, so both views share the
+        // same physical buffer as long as swzl_mode is consistent.
+        // Only referenced on the Use_CVT_SWZL_LD path.
+        Tensor sQ_AIU_COPY_CVT = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_q.data()), SmemLayoutQ_AIU_COPY{});
+        Tensor sdO_AIU_COPY_CVT = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_do.data()), SmemLayoutdO_AIU_COPY{});
+        Tensor sK_AIU_COPY_CVT = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_k.data()), SmemLayoutK_AIU_COPY{});
+        Tensor sV_AIU_COPY_CVT = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_v.data()), SmemLayoutV_AIU_COPY{});
         Tensor sV = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_v.data()), SmemLayoutV{});
         Tensor sQt = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_q.data()), SmemLayoutQt{});
         Tensor sdOt = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_do.data()), SmemLayoutdOt{});
@@ -555,7 +801,10 @@ struct CollectiveMainloopBwdSm80 {
         Tensor sPt = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_p.data()), SmemLayoutPdSt{});
         Tensor sdS = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_ds.data()), SmemLayoutPdS{});
 
-#if PPU1v0_R2S_SLICE_LAYOUT
+#if defined(USE_PPU) && USE_AIU
+        // Always declare slice-layout smem views in PPU builds; the layout types are
+        // ArchTag-aware (use std::conditional_t internally) and valid for all archs.
+        // They are consumed only when kUse_R2S_SliceLayout is true.
         Tensor sdS_slice = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_ds.data()), SmemLayoutPdS_R2Slice{});
         Tensor sdSt_slice = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_ds.data()), SmemLayoutPdSt_R2Slice{});
         Tensor sP_slice = make_tensor(make_smem_ptr(shared_storage.tensors.mainloop.smem_p.data()), SmemLayoutPdS_R2Slice{});
@@ -630,10 +879,20 @@ struct CollectiveMainloopBwdSm80 {
 
 #if defined(USE_PPU) && USE_AIU
         if constexpr (ArchTag::kMinComputeCapability >= 89) {
-            gmem_tiled_copy_Q.desc_.init(nullptr, seqlen_info.seqlen_q, get<1>(params.shape_Q), get<0>(params.stride_Q));
-            gmem_tiled_copy_K.desc_.init(nullptr, seqlen_info.seqlen_k, get<1>(params.shape_Q), get<0>(params.stride_K));
-            gmem_tiled_copy_V.desc_.init(nullptr, seqlen_info.seqlen_k, get<1>(params.shape_V), get<0>(params.stride_V));
-            gmem_tiled_copy_dO.desc_.init(nullptr, seqlen_info.seqlen_q, get<1>(params.shape_V), get<0>(params.stride_dO));
+            if constexpr (Use_CVT_SWZL_LD) {
+                // CVT path: 8x64 tile desc for direct AIU copy loops.
+                // gmem block offset is handled by the direct AIU copy loop.
+                static constexpr int kBlockNPerAiuLoad = 8;
+                gmem_tiled_copy_Q.desc_.init(nullptr, kBlockNPerAiuLoad, kBlockKGmem, get<0>(params.stride_Q));
+                gmem_tiled_copy_K.desc_.init(nullptr, kBlockNPerAiuLoad, kBlockNGmem, get<0>(params.stride_K));
+                gmem_tiled_copy_V.desc_.init(nullptr, kBlockNPerAiuLoad, kBlockNGmem, get<0>(params.stride_V));
+                gmem_tiled_copy_dO.desc_.init(nullptr, kBlockNPerAiuLoad, kBlockKGmem, get<0>(params.stride_dO));
+            } else {
+                gmem_tiled_copy_Q.desc_.init(nullptr, seqlen_info.seqlen_q, get<1>(params.shape_Q), get<0>(params.stride_Q));
+                gmem_tiled_copy_K.desc_.init(nullptr, seqlen_info.seqlen_k, get<1>(params.shape_Q), get<0>(params.stride_K));
+                gmem_tiled_copy_V.desc_.init(nullptr, seqlen_info.seqlen_k, get<1>(params.shape_V), get<0>(params.stride_V));
+                gmem_tiled_copy_dO.desc_.init(nullptr, seqlen_info.seqlen_q, get<1>(params.shape_V), get<0>(params.stride_dO));
+            }
         } else {
             int aiu_offset_q = get<1>(params.shape_Q) == kHeadDim ? 0 : (get<0>(params.stride_Q) - get<1>(params.shape_Q));
             int aiu_offset_k = get<1>(params.shape_Q) == kHeadDim ? 0 : (get<0>(params.stride_K) - get<1>(params.shape_Q));
@@ -646,12 +905,14 @@ struct CollectiveMainloopBwdSm80 {
         }
         const int warp_idx = __ppu_read_firstlane(threadIdx.x / 32);
         const int tid_thread_slice = warp_idx * 32;
-#if PPU1v0_R2S_SLICE_LAYOUT
+        // r2S thread index for the slice layout. Only the PPU1v0 (Arch=80) slice path performs
+        // the warp-pair shuffle; the PPU1v5 (Arch=89) path and all non-slice paths use thread_idx.
         auto r2S_thread_idx_PdS = thread_idx;
-        if(warp_idx % 2){ // keep slice0 layout
-            r2S_thread_idx_PdS = __shfl_sync(0xffffffff, r2S_thread_idx_PdS, (r2S_thread_idx_PdS & 31) ^ PPUChannelSliceCount); // simulate slice1 layout: exchage t0~3 with t4~7, t8~11 with t12~15, t16~19 with t20~23, t24~27 with t28~t31
+        if constexpr (kUse_PPU1v0_SliceLayout) {
+            if (warp_idx % 2) { // keep slice0 layout
+                r2S_thread_idx_PdS = __shfl_sync(0xffffffff, r2S_thread_idx_PdS, (r2S_thread_idx_PdS & 31) ^ PPUChannelSliceCount); // simulate slice1 layout: exchage t0~3 with t4~7, t8~11 with t12~15, t16~19 with t20~23, t24~27 with t28~t31
+            }
         }
-#endif
 #else
         const int tid_thread_slice = thread_idx;
 #endif
@@ -676,10 +937,32 @@ struct CollectiveMainloopBwdSm80 {
         Tensor tdPsV = smem_thr_copy_KV.partition_S(make_mix_tensor_like(sV));
 
         auto r2s_tiled_copy_PdS = make_tiled_copy_C(R2SCopyAtomPdS{}, tiled_mma_SdP);
-#if PPU1v0_R2S_SLICE_LAYOUT
-        auto r2s_thr_copy_PdS = r2s_tiled_copy_PdS.get_thread_slice(r2S_thread_idx_PdS);
-        Tensor tdSsdS = r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sdS_slice, sdSt_slice));      // ((Atom,AtomNum),PIPE_M,PIPE_N)
-        Tensor tPsP = r2s_thr_copy_PdS.partition_D((cute::conditional_return<!SdP_swapAB>(sP_slice, sPt_slice)));      // ((Atom,AtomNum),PIPE_M,PIPE_N)
+#if defined(USE_PPU) && USE_AIU
+        // ArchTag-gated slice layout selection. Wrapped in a USE_PPU guard because the *_slice
+        // smem views are only declared in PPU builds; `if constexpr` picks the right branch per
+        // enclosing template's ArchTag so ppu001-pass compilation of Arch=89 templates does not
+        // instantiate the slice-layout branch.
+        auto r2s_thr_copy_PdS = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return r2s_tiled_copy_PdS.get_thread_slice(r2S_thread_idx_PdS);
+            } else {
+                return r2s_tiled_copy_PdS.get_thread_slice(thread_idx);
+            }
+        }();
+        Tensor tdSsdS = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sdS_slice, sdSt_slice));  // ((Atom,AtomNum),PIPE_M,PIPE_N)
+            } else {
+                return r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sdS, sdSt));              // ((Atom,AtomNum),PIPE_M,PIPE_N)
+            }
+        }();
+        Tensor tPsP = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sP_slice, sPt_slice));    // ((Atom,AtomNum),PIPE_M,PIPE_N)
+            } else {
+                return r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sP, sPt));                // ((Atom,AtomNum),PIPE_M,PIPE_N)
+            }
+        }();
 #else
         auto r2s_thr_copy_PdS = r2s_tiled_copy_PdS.get_thread_slice(thread_idx);
         Tensor tdSsdS = r2s_thr_copy_PdS.partition_D(cute::conditional_return<!SdP_swapAB>(sdS, sdSt));      // ((Atom,AtomNum),PIPE_M,PIPE_N)
@@ -687,13 +970,31 @@ struct CollectiveMainloopBwdSm80 {
 #endif
         // if (blockIdx.x == 0 && threadIdx.x == 128) { print(r2s_thr_copy_PdS); print(sP); printf("\n"); print(sPt); printf("\n"); print(tPsP); printf("\n"); print(tdSsdS); printf("\n"); }
 
-#if PPU1v0_R2S_SLICE_LAYOUT
+#if defined(USE_PPU) && USE_AIU
         // TODO: Adapt SmemCopyAtomTransposedHalf
-        auto smem_copy_atom_dKV_B = cute::conditional_return<MmadKVEvenN>(SmemCopyAtomPdSt_AIU{}, SmemCopyAtomTransposedHalf{});
-        auto smem_tiled_copy_PdSt = cute::conditional_return<!dKV_swapAB>(make_tiled_copy_A(SmemCopyAtomPdSt_AIU{}, tiled_mma_dKV), make_tiled_copy_B(smem_copy_atom_dKV_B, tiled_mma_dKV));
-        auto smem_thr_copy_PdSt = smem_tiled_copy_PdSt.get_thread_slice(tid_thread_slice);
-        Tensor tdVsPt = smem_thr_copy_PdSt.partition_S(make_mix_tensor_like(sPt));
-        Tensor tdKsdSt = smem_thr_copy_PdSt.partition_S(make_mix_tensor_like(sdSt));
+        auto smem_copy_atom_dKV_B = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return cute::conditional_return<MmadKVEvenN>(SmemCopyAtomPdSt_AIU{}, SmemCopyAtomTransposedHalf{});
+            } else {
+                return cute::conditional_return<MmadKVEvenN>(SmemCopyAtomTransposed{}, SmemCopyAtomTransposedHalf{});
+            }
+        }();
+        auto smem_tiled_copy_PdSt = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return cute::conditional_return<!dKV_swapAB>(make_tiled_copy_A(SmemCopyAtomPdSt_AIU{}, tiled_mma_dKV), make_tiled_copy_B(smem_copy_atom_dKV_B, tiled_mma_dKV));
+            } else {
+                return cute::conditional_return<!dKV_swapAB>(make_tiled_copy_A(SmemCopyAtomTransposed{}, tiled_mma_dKV), make_tiled_copy_B(smem_copy_atom_dKV_B, tiled_mma_dKV));
+            }
+        }();
+        auto smem_thr_copy_PdSt = smem_tiled_copy_PdSt.get_thread_slice(kUse_R2S_SliceLayout ? tid_thread_slice : thread_idx);
+        Tensor tdVsPt = [&] {
+            if constexpr (kUse_R2S_SliceLayout) { return smem_thr_copy_PdSt.partition_S(make_mix_tensor_like(sPt)); }
+            else { return smem_thr_copy_PdSt.partition_S(sPt); }
+        }();
+        Tensor tdKsdSt = [&] {
+            if constexpr (kUse_R2S_SliceLayout) { return smem_thr_copy_PdSt.partition_S(make_mix_tensor_like(sdSt)); }
+            else { return smem_thr_copy_PdSt.partition_S(sdSt); }
+        }();
 #else
         auto smem_copy_atom_dKV_B = cute::conditional_return<MmadKVEvenN>(SmemCopyAtomTransposed{}, SmemCopyAtomTransposedHalf{});
         auto smem_tiled_copy_PdSt = cute::conditional_return<!dKV_swapAB>(make_tiled_copy_A(SmemCopyAtomTransposed{}, tiled_mma_dKV), make_tiled_copy_B(smem_copy_atom_dKV_B, tiled_mma_dKV));
@@ -711,12 +1012,23 @@ struct CollectiveMainloopBwdSm80 {
         Tensor tdVsdOt = smem_thr_copy_QdOt.partition_S(make_mix_tensor_like(sdOt));
         Tensor tdKsQt = smem_thr_copy_QdOt.partition_S(make_mix_tensor_like(sQt));
 
-#if PPU1v0_R2S_SLICE_LAYOUT
-        auto smem_tiled_copy_dS = cute::conditional_return<!dQ_swapAB>(
-            make_tiled_copy_A(SmemCopyAtomdS_AIU{}, tiled_mma_dQ),
-            make_tiled_copy_B(cute::conditional_return<MmadQEvenN>(SmemCopyAtom{}, SmemCopyAtomHalf{}), tiled_mma_dQ));
-        auto smem_thr_copy_dS = smem_tiled_copy_dS.get_thread_slice(tid_thread_slice);
-        Tensor tdQsdS = smem_thr_copy_dS.partition_S(make_mix_tensor_like(sdS));
+#if defined(USE_PPU) && USE_AIU
+        auto smem_tiled_copy_dS = [&] {
+            if constexpr (kUse_R2S_SliceLayout) {
+                return cute::conditional_return<!dQ_swapAB>(
+                    make_tiled_copy_A(SmemCopyAtomdS_AIU{}, tiled_mma_dQ),
+                    make_tiled_copy_B(cute::conditional_return<MmadQEvenN>(SmemCopyAtom{}, SmemCopyAtomHalf{}), tiled_mma_dQ));
+            } else {
+                return cute::conditional_return<!dQ_swapAB>(
+                    make_tiled_copy_A(SmemCopyAtom{}, tiled_mma_dQ),
+                    make_tiled_copy_B(cute::conditional_return<MmadQEvenN>(SmemCopyAtom{}, SmemCopyAtomHalf{}), tiled_mma_dQ));
+            }
+        }();
+        auto smem_thr_copy_dS = smem_tiled_copy_dS.get_thread_slice(kUse_R2S_SliceLayout ? tid_thread_slice : thread_idx);
+        Tensor tdQsdS = [&] {
+            if constexpr (kUse_R2S_SliceLayout) { return smem_thr_copy_dS.partition_S(make_mix_tensor_like(sdS)); }
+            else { return smem_thr_copy_dS.partition_S(sdS); }
+        }();
 #else
         auto smem_tiled_copy_dS = cute::conditional_return<!dQ_swapAB>(
             make_tiled_copy_A(SmemCopyAtom{}, tiled_mma_dQ),
@@ -792,8 +1104,14 @@ struct CollectiveMainloopBwdSm80 {
         );
 
         {
+            Tensor tKsK = [&]() -> auto {
+                if constexpr (Use_CVT_SWZL_LD) {
+                    return gmem_thr_copy_K.partition_D(sK_AIU_COPY_CVT);
+                } else {
+                    return gmem_thr_copy_K.partition_D(sK);
+                }
+            }();
             Tensor tKgK = gmem_thr_copy_K.partition_S(gK);  // (KCPY, KCPY_N, KCPY_K, nblocksN)
-            Tensor tKsK = gmem_thr_copy_K.partition_D(sK);
             Tensor tVgV = gmem_thr_copy_V.partition_S(gV);  // (VCPY, VCPY_N, VCPY_K, nblocksN)
             Tensor tVsV = gmem_thr_copy_V.partition_D(sV);
             // Predicates
@@ -819,8 +1137,40 @@ struct CollectiveMainloopBwdSm80 {
             //     gmem_tiled_copy_QKV, tVgV, tVsV, t0KVcKV, tKVpKV, seqlenk_row_limit);
             int const seqlenk_row_limit = seqlen_k - n_block * kBlockN - get<0>(tKVcKV(_0{}, _0{}, _0{}));
 #if defined(USE_PPU) && USE_AIU
-            flash::copy</*Is_even_MN=*/true>(
-                gmem_tiled_copy_V, tVgV, tVsV, t0KVcKV, tVpV);
+            if constexpr (Use_CVT_SWZL_LD) {
+                // Direct 8x64 tile-granularity AIU copy for V.
+                // Hierarchical tiling: 8x64 -> 8x128 (horizontal x2) -> blockN x128 (vertical)
+                //                      -> blockN x headdim (horizontal)
+                // offset(n,k) = (k/2)*kHalfSize + n*kTile8x128 + (k%2)*kAtomSize
+                const Element* block_v_ptr = mV.data().get()
+                    + (seqlen_info.offset_k + n_block * kBlockN) * get<0>(params.stride_V);
+                static constexpr int kAiuTileH = 8;
+                static constexpr int kAiuTileW = 64;                                     // AIU atom width
+                static constexpr int kNumKTilesTotal = kHeadDim / kAiuTileW;             // 4 for hdim256, 2 for hdim128
+                static constexpr int kNumNTiles = kBlockN / kAiuTileH;                   // 128/8=16
+                static constexpr int kTotalTiles = kNumNTiles * kNumKTilesTotal;          // 64 or 32
+                static constexpr int kAtomSize = kAiuTileH * kAiuTileW;                  // 8x64 = 512
+                static constexpr int kTile8x128 = kAiuTileH * 2 * kAiuTileW;             // 8x128 = 1024
+                static constexpr int kHalfSize = kBlockN * 2 * kAiuTileW;                // blockN x 128
+                #pragma unroll
+                for (int tile_linear = warp_idx; tile_linear < kTotalTiles; tile_linear += NumMmaWarps) {
+                    int const n = tile_linear / kNumKTilesTotal;
+                    int const k = tile_linear % kNumKTilesTotal;
+                    const Element* tile_gmem = block_v_ptr
+                        + n * kAiuTileH * get<0>(params.stride_V)
+                        + k * kBlockKGmem;
+                    auto tile_smem = sV_AIU_COPY_CVT.data()
+                        + (k / 2) * kHalfSize + n * kTile8x128 + (k % 2) * kAtomSize;
+                    Gmem_copy_struct_KV::copy(
+                        cute::raw_pointer_cast(tile_smem),
+                        tile_gmem,
+                        gmem_tiled_copy_V.desc_,
+                        0, 0);
+                }
+            } else {
+                flash::copy</*Is_even_MN=*/true>(
+                    gmem_tiled_copy_V, tVgV, tVsV, t0KVcKV, tVpV);
+            }
 #else
             #pragma unroll
             for (int m = 0; m < size<1>(tVsV); ++m) {
@@ -838,8 +1188,40 @@ struct CollectiveMainloopBwdSm80 {
             // flash::copy</*Is_even_MN=*/false, /*Is_even_K=*/false, /*Clear_OOB_MN=*/true, /*Clear_OOB_K=*/true>(
             //     gmem_tiled_copy_QKV, tKgK, tKsK, t0KVcKV, tKVpKV, seqlenk_row_limit);
 #if defined(USE_PPU) && USE_AIU
-            flash::copy</*Is_even_MN=*/true>(
-                gmem_tiled_copy_K, tKgK, tKsK, t0KVcKV, tKpK);
+            if constexpr (Use_CVT_SWZL_LD) {
+                // Direct 8x64 tile-granularity AIU copy for K.
+                // Hierarchical tiling: 8x64 -> 8x128 (horizontal x2) -> blockN x128 (vertical)
+                //                      -> blockN x headdim (horizontal)
+                // offset(n,k) = (k/2)*kHalfSize + n*kTile8x128 + (k%2)*kAtomSize
+                const Element* block_k_ptr = mK.data().get()
+                    + (seqlen_info.offset_k + n_block * kBlockN) * get<0>(params.stride_K);
+                static constexpr int kAiuTileH = 8;
+                static constexpr int kAiuTileW = 64;                                     // AIU atom width
+                static constexpr int kNumKTilesTotal = kHeadDim / kAiuTileW;             // 4 for hdim256, 2 for hdim128
+                static constexpr int kNumNTiles = kBlockN / kAiuTileH;                   // 128/8=16
+                static constexpr int kTotalTiles = kNumNTiles * kNumKTilesTotal;          // 64 or 32
+                static constexpr int kAtomSize = kAiuTileH * kAiuTileW;                  // 8x64 = 512
+                static constexpr int kTile8x128 = kAiuTileH * 2 * kAiuTileW;             // 8x128 = 1024
+                static constexpr int kHalfSize = kBlockN * 2 * kAiuTileW;                // blockN x 128
+                #pragma unroll
+                for (int tile_linear = warp_idx; tile_linear < kTotalTiles; tile_linear += NumMmaWarps) {
+                    int const n = tile_linear / kNumKTilesTotal;
+                    int const k = tile_linear % kNumKTilesTotal;
+                    const Element* tile_gmem = block_k_ptr
+                        + n * kAiuTileH * get<0>(params.stride_K)
+                        + k * kBlockKGmem;
+                    auto tile_smem = sK_AIU_COPY_CVT.data()
+                        + (k / 2) * kHalfSize + n * kTile8x128 + (k % 2) * kAtomSize;
+                    Gmem_copy_struct_KV::copy(
+                        cute::raw_pointer_cast(tile_smem),
+                        tile_gmem,
+                        gmem_tiled_copy_K.desc_,
+                        0, 0);
+                }
+            } else {
+                flash::copy</*Is_even_MN=*/true>(
+                    gmem_tiled_copy_K, tKgK, tKsK, t0KVcKV, tKpK);
+            }
 #else
             #pragma unroll
             for (int m = 0; m < size<1>(tKsK); ++m) {
@@ -882,8 +1264,66 @@ struct CollectiveMainloopBwdSm80 {
             //     gmem_tiled_copy_QKV, tQgQ(_, _, _, m_block), tQsQ_cur, t0QcQ, tQpQ, seqlenq_row_limit);
             int const seqlenq_row_limit = seqlen_info.seqlen_q - m_block * kBlockM - get<0>(tQcQ(_0{}, _0{}, _0{}));
 #if defined(USE_PPU) && USE_AIU
-            flash::copy</*Is_even_MN=*/true>(
-                gmem_tiled_copy_Q, tQgQ_cur, tQsQ_cur, t0QcQ, tQpQ);
+            if constexpr (Use_CVT_SWZL_LD) {
+                // Direct 8x64 tile-granularity AIU copy for Q.
+                // Hierarchical tiling: 8x64 -> 16x64 (vertical x2) -> 16x128 (horizontal x2)
+                //                      -> blockM x128 (vertical) -> blockM x headdim (horizontal)
+                // offset(m,k) = (k/2)*kHalfSize + (m/2)*kTile16x128 + (k%2)*kTile16x64 + (m%2)*kAtomSize
+                static_assert(kBlockKGmem == 64, "AIU hierarchical layout assumes 8x64 atom");
+                const Element* block_q_ptr = mQ.data().get()
+                    + (seqlen_info.offset_q + m_block * kBlockM) * get<0>(params.stride_Q);
+                static constexpr int kAiuTileH = 8;
+                static constexpr int kAiuTileW = 64;                                     // AIU atom width
+                static constexpr int kNumKTilesTotal = kHeadDim / kAiuTileW;             // 4 for hdim256, 2 for hdim128
+                static constexpr int kNumMTiles = kBlockM / kAiuTileH;                   // 64/8=8
+                static constexpr int kTotalTiles = kNumMTiles * kNumKTilesTotal;          // 32 or 16
+                static constexpr int kAtomSize = kAiuTileH * kAiuTileW;                  // 8x64 = 512
+                static constexpr int kTile16x64 = 2 * kAtomSize;                         // 16x64 = 1024
+                static constexpr int kTile16x128 = 2 * kTile16x64;                       // 16x128 = 2048
+                static constexpr int kHalfSize = kBlockM * 2 * kAiuTileW;                // blockM x 128
+                static constexpr int kLog2NumKTiles = __builtin_ctz(kNumKTilesTotal);
+                static constexpr int kLog2BlockKGmem = __builtin_ctz(kBlockKGmem);
+                static constexpr int kLog2AtomSize = __builtin_ctz(kAtomSize);
+                static constexpr int kLog2Tile16x64 = __builtin_ctz(kTile16x64);
+                static constexpr int kLog2Tile16x128 = __builtin_ctz(kTile16x128);
+                // NumMmaWarps is always a multiple of kNumKTilesTotal, so k is loop-invariant
+                // and m increments by kMStride (always even) => m&1 is also loop-invariant.
+                static constexpr int kMStride = NumMmaWarps >> kLog2NumKTiles;
+                static_assert(kMStride % 2 == 0, "kMStride must be even for m&1 loop-invariance");
+                static constexpr int kSmemMHalfDelta = (kMStride >> 1) << kLog2Tile16x128;
+
+                auto const gmem_m_stride_Q = kAiuTileH * get<0>(params.stride_Q);
+
+                // Precompute loop-invariant offsets; scope k/m_init to free registers
+                auto smem_loop_base = sQ_AIU_COPY_CVT.data() + smem_pipe_write * kBlockM * kHeadDim;
+                int smem_m_half_offset;
+                const Element* tile_gmem;
+                {
+                    int const k = warp_idx & (kNumKTilesTotal - 1);
+                    int const m_init = warp_idx >> kLog2NumKTiles;
+                    smem_loop_base = smem_loop_base + ((k >> 1) * kHalfSize + ((k & 1) << kLog2Tile16x64) + ((m_init & 1) << kLog2AtomSize));
+                    smem_m_half_offset = (m_init >> 1) << kLog2Tile16x128;
+                    tile_gmem = block_q_ptr
+                        + (k << kLog2BlockKGmem)
+                        + static_cast<int64_t>(m_init) * gmem_m_stride_Q;
+                }
+
+                // Loop body: only 1 smem add + copy + 2 constant increments
+                #pragma unroll
+                for (int tile_linear = warp_idx; tile_linear < kTotalTiles; tile_linear += NumMmaWarps) {
+                    auto tile_smem = smem_loop_base + smem_m_half_offset;
+                    Gmem_copy_struct_Q::copy(
+                        cute::raw_pointer_cast(tile_smem),
+                        tile_gmem,
+                        gmem_tiled_copy_Q.desc_,
+                        0, 0);
+                    tile_gmem += static_cast<int64_t>(kMStride) * gmem_m_stride_Q;
+                    smem_m_half_offset += kSmemMHalfDelta;
+                }
+            } else {
+                flash::copy</*Is_even_MN=*/true>(
+                    gmem_tiled_copy_Q, tQgQ_cur, tQsQ_cur, t0QcQ, tQpQ);
+            }
 #else
             #pragma unroll
             for (int m = 0; m < size<1>(tQsQ); ++m) {
@@ -920,8 +1360,65 @@ struct CollectiveMainloopBwdSm80 {
             //     gmem_tiled_copy_QKV, tdOgdO(_, _, _, m_block), tdOsdO_cur, t0QcQ, tQpQ, seqlenq_row_limit);
             int const seqlenq_row_limit = seqlen_info.seqlen_q - m_block * kBlockM - get<0>(tQcQ(_0{}, _0{}, _0{}));
 #if defined(USE_PPU) && USE_AIU
-            flash::copy</*Is_even_MN=*/true>(
-                gmem_tiled_copy_dO, tdOgdO_cur, tdOsdO_cur, t0QcQ, tQpQ);
+            if constexpr (Use_CVT_SWZL_LD) {
+                // Direct 8x64 tile-granularity AIU copy for dO.
+                // Hierarchical tiling: 8x64 -> 16x64 (vertical x2) -> 16x128 (horizontal x2)
+                //                      -> blockM x128 (vertical) -> blockM x headdim (horizontal)
+                // offset(m,k) = (k/2)*kHalfSize + (m/2)*kTile16x128 + (k%2)*kTile16x64 + (m%2)*kAtomSize
+                const Element* block_do_ptr = mdO.data().get()
+                    + (seqlen_info.offset_q + m_block * kBlockM) * get<0>(params.stride_dO);
+                static constexpr int kAiuTileH = 8;
+                static constexpr int kAiuTileW = 64;                                     // AIU atom width
+                static constexpr int kNumKTilesTotal = kHeadDim / kAiuTileW;             // 4 for hdim256, 2 for hdim128
+                static constexpr int kNumMTiles = kBlockM / kAiuTileH;                   // 64/8=8
+                static constexpr int kTotalTiles = kNumMTiles * kNumKTilesTotal;          // 32 or 16
+                static constexpr int kAtomSize = kAiuTileH * kAiuTileW;                  // 8x64 = 512
+                static constexpr int kTile16x64 = 2 * kAtomSize;                         // 16x64 = 1024
+                static constexpr int kTile16x128 = 2 * kTile16x64;                       // 16x128 = 2048
+                static constexpr int kHalfSize = kBlockM * 2 * kAiuTileW;                // blockM x 128
+                static constexpr int kLog2NumKTiles = __builtin_ctz(kNumKTilesTotal);
+                static constexpr int kLog2BlockKGmem = __builtin_ctz(kBlockKGmem);
+                static constexpr int kLog2AtomSize = __builtin_ctz(kAtomSize);
+                static constexpr int kLog2Tile16x64 = __builtin_ctz(kTile16x64);
+                static constexpr int kLog2Tile16x128 = __builtin_ctz(kTile16x128);
+                // NumMmaWarps is always a multiple of kNumKTilesTotal, so k is loop-invariant
+                // and m increments by kMStride (always even) => m&1 is also loop-invariant.
+                static constexpr int kMStride = NumMmaWarps >> kLog2NumKTiles;
+                static_assert(kMStride % 2 == 0, "kMStride must be even for m&1 loop-invariance");
+                static constexpr int kSmemMHalfDelta = (kMStride >> 1) << kLog2Tile16x128;
+
+                auto const gmem_m_stride_dO = kAiuTileH * get<0>(params.stride_dO);
+
+                // Precompute loop-invariant offsets; scope k/m_init to free registers
+                auto smem_loop_base = sdO_AIU_COPY_CVT.data() + smem_pipe_write * kBlockM * kHeadDim;
+                int smem_m_half_offset;
+                const Element* tile_gmem;
+                {
+                    int const k = warp_idx & (kNumKTilesTotal - 1);
+                    int const m_init = warp_idx >> kLog2NumKTiles;
+                    smem_loop_base = smem_loop_base + ((k >> 1) * kHalfSize + ((k & 1) << kLog2Tile16x64) + ((m_init & 1) << kLog2AtomSize));
+                    smem_m_half_offset = (m_init >> 1) << kLog2Tile16x128;
+                    tile_gmem = block_do_ptr
+                        + (k << kLog2BlockKGmem)
+                        + static_cast<int64_t>(m_init) * gmem_m_stride_dO;
+                }
+
+                // Loop body: only 1 smem add + copy + 2 constant increments
+                #pragma unroll
+                for (int tile_linear = warp_idx; tile_linear < kTotalTiles; tile_linear += NumMmaWarps) {
+                    auto tile_smem = smem_loop_base + smem_m_half_offset;
+                    Gmem_copy_struct_Q::copy(
+                        cute::raw_pointer_cast(tile_smem),
+                        tile_gmem,
+                        gmem_tiled_copy_dO.desc_,
+                        0, 0);
+                    tile_gmem += static_cast<int64_t>(kMStride) * gmem_m_stride_dO;
+                    smem_m_half_offset += kSmemMHalfDelta;
+                }
+            } else {
+                flash::copy</*Is_even_MN=*/true>(
+                    gmem_tiled_copy_dO, tdOgdO_cur, tdOsdO_cur, t0QcQ, tQpQ);
+            }
 #else
             #pragma unroll
             for (int m = 0; m < size<1>(tdOsdO); ++m) {
@@ -1130,10 +1627,52 @@ struct CollectiveMainloopBwdSm80 {
                 // if (cute::thread0()) { print_tensor(tdQrdQ); }
                 // We can reuse r2s_thr_copy_dQaccum for this partitioning
                 Tensor tdQrdQ_atomic = r2s_thr_copy_dQaccum.retile_S(tdQrdQ);
-                Tensor tdQgdQaccum_atomic = tdQgdQaccum(_, _, m_block);
-                static_assert(CUTE_STATIC_V(size(tdQrdQ_atomic)) == CUTE_STATIC_V(size(tdQgdQaccum_atomic)));
-                #pragma unroll
-                for (int i = 0; i < size(tdQrdQ_atomic); ++i) { atomicAdd(&tdQgdQaccum_atomic(i), tdQrdQ_atomic(i)); }
+                static_assert(CUTE_STATIC_V(size(tdQrdQ_atomic)) == CUTE_STATIC_V(size(tdQgdQaccum(_, _, 0))));
+                if constexpr (Use_CVT_SWZL_LD) {
+                    // SHUFFLING_GAIT causes bit3<->bit6 headdim swap in K's SMEM load.
+                    // MMA acc[0..3] (first half after retile_S) belongs to one 48x8 tile,
+                    // acc[4..7] (second half) belongs to the partner warp's 48x8 tile.
+                    // Use two thread_slices to write each half to its correct destination.
+                    // Partner warp: XOR with 4 (warp 0<->4, 1<->5, 2<->6, 3<->7)
+                    constexpr int partner_warp_mask = kHeadDim == 256 ? 256 : 128;
+                    int partner_tid = thread_idx ^ partner_warp_mask;  // same lane, partner warp = warp^4
+
+                    auto r2s_thr_copy_partner = r2s_tiled_copy_dQaccum.get_thread_slice(partner_tid);
+                    Tensor tdQgdQaccum_partner = r2s_thr_copy_partner.partition_D(gdQaccum);
+
+                    Tensor tdQgdQaccum_atomic_own = tdQgdQaccum(_, _, m_block);
+                    Tensor tdQgdQaccum_atomic_partner = tdQgdQaccum_partner(_, _, m_block);
+
+                    constexpr int kTotal = CUTE_STATIC_V(size(decltype(tdQrdQ_atomic){}));
+
+                    if ((thread_idx & partner_warp_mask) == 0) {
+                        // Low N-warps (n<4): acc[0..3] (i%8<4) -> own, acc[4..7] (i%8>=4) -> partner
+                        #pragma unroll
+                        for (int i = 0; i < kTotal; ++i) {
+                            if ((i % 8) < 4) {
+                                atomicAdd(&tdQgdQaccum_atomic_own(i), tdQrdQ_atomic(i));
+                            } else {
+                                atomicAdd(&tdQgdQaccum_atomic_partner(i - 4), tdQrdQ_atomic(i));
+                            }
+                        }
+                    } else {
+                        // High N-warps (n>=4): acc[0..3] (i%8<4) -> partner, acc[4..7] (i%8>=4) -> own
+                        #pragma unroll
+                        for (int i = 0; i < kTotal; ++i) {
+                            if ((i % 8) < 4) {
+                                atomicAdd(&tdQgdQaccum_atomic_partner(i + 4), tdQrdQ_atomic(i));
+                            } else {
+                                atomicAdd(&tdQgdQaccum_atomic_own(i), tdQrdQ_atomic(i));
+                            }
+                        }
+                    }
+                } else {
+                    Tensor tdQgdQaccum_atomic = tdQgdQaccum(_, _, m_block);
+                    #pragma unroll
+                    for (int i = 0; i < size(tdQrdQ_atomic); ++i) {
+                        atomicAdd(&tdQgdQaccum_atomic(i), tdQrdQ_atomic(i));
+                    }
+                }
             };
             // If kStages == 1, we want to do Mma_dK first so we can start loading Q for the next iteration
             if constexpr (kStages > 1) { do_mma_dQ(load_dO_next); }

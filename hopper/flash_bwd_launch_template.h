@@ -288,7 +288,10 @@ void run_flash_bwd(Flash_bwd_params &params, hggcStream_t stream) {
         using PostprocessKerneldKV = flash::FlashAttnBwdPostprocessConvertdQ<TileShape_NK, Element, ElementAccum, ArchTag,
             AttnKernel::CollectiveEpilogue::NumEpilogueThreads,
             typename AttnKernel::CollectiveMainloop::TiledMmadKV,
-            AttnKernel::CollectiveMainloop::dKV_swapAB
+            AttnKernel::CollectiveMainloop::dKV_swapAB,
+            // The GQA epilogue leaves the headdim bit3<->bit6 CVT permutation in dKaccum/dVaccum for
+            // hdim256; undo it here, on the read side.
+            AttnKernel::CollectiveEpilogue::Use_CVT_SWZL_LD && kHeadDim == 256
             >;
         typename PostprocessKerneldKV::Arguments postprocess_dK_args {
             static_cast<ElementAccum const*>(params.dk_accum_ptr),
@@ -349,7 +352,11 @@ template<int Arch, typename T, bool Has_softcap>
 void run_mha_bwd_hdim64(Flash_bwd_params &params, hggcStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
 #ifdef USE_PPU
-        run_mha_bwd_dispatch<Arch, T, 128, 64, 64, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 4, 4, 4, false>(params, stream);
+        if constexpr (Arch == 80) {
+            run_mha_bwd_dispatch<Arch, T, 128, 64, 64, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 4, 4, 4, false>(params, stream);
+        } else {
+            run_mha_bwd_dispatch<Arch, T, 128, 64, 64, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 4, 4, 4, false>(params, stream);
+        }
 #else
         if constexpr (Arch >= 90) {
             if constexpr (Is_causal && Has_softcap) {
@@ -375,7 +382,11 @@ template<int Arch, typename T, bool Has_softcap>
 void run_mha_bwd_hdim96(Flash_bwd_params &params, hggcStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
 #ifdef USE_PPU
-        run_mha_bwd_dispatch<Arch, T, 64, 128, 96, Is_causal, Is_local, Has_softcap, 2, 2, false, false, false, 2, 2, 4, 4, false>(params, stream);   // (96 / (8 / 2)) % 16 != 0, MmadQEvenN = false
+        if constexpr (Arch == 80) {
+            run_mha_bwd_dispatch<Arch, T, 64, 128, 96, Is_causal, Is_local, Has_softcap, 2, 2, false, false, false, 2, 2, 4, 4, false>(params, stream);   // (96 / (8 / 2)) % 16 != 0, MmadQEvenN = false
+        } else {
+            run_mha_bwd_dispatch<Arch, T, 64, 128, 96, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 2, 4, 4, false>(params, stream);
+        }
 #else
         if constexpr (Arch >= 90) {
             run_mha_bwd_dispatch<Arch, T, 64, 128, 96, Is_causal, Is_local, Has_softcap, 2, 2, true, false, false, 2, 1, 2, 1, true>(params, stream);
@@ -392,7 +403,11 @@ template<int Arch, typename T, bool Has_softcap>
 void run_mha_bwd_hdim128(Flash_bwd_params &params, hggcStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
 #ifdef USE_PPU
-        run_mha_bwd_dispatch<Arch, T, 64, 96, 128, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 4, 2, 2, false>(params, stream);
+        if constexpr (Arch == 80) {
+            run_mha_bwd_dispatch<Arch, T, 64, 96, 128, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 4, 2, 2, false>(params, stream);
+        } else {
+            run_mha_bwd_dispatch<Arch, T, 48, 128, 128, Is_causal, Is_local, Has_softcap, 1, 2, false, false, false, 2, 1, 2, 1, false>(params, stream);
+        }
 #else
         if constexpr (Arch >= 90) {
             if constexpr (Is_causal || Is_local || Has_softcap) {
@@ -413,7 +428,11 @@ template<int Arch, typename T, bool Has_softcap>
 void run_mha_bwd_hdim192(Flash_bwd_params &params, hggcStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
 #ifdef USE_PPU
-        run_mha_bwd_dispatch<Arch, T, 64, 64, 192, Is_causal, Is_local, Has_softcap, 1, 2, false, true, false, 2, 4, 2, 2, false>(params, stream);   // (80 / (8 / 4)) % 16 != 0, MmaSdPEvenN = false
+        if constexpr (Arch == 80) {
+            run_mha_bwd_dispatch<Arch, T, 64, 64, 192, Is_causal, Is_local, Has_softcap, 1, 2, false, true, false, 2, 4, 2, 2, false>(params, stream);   // (80 / (8 / 4)) % 16 != 0, MmaSdPEvenN = false
+        } else {
+            run_mha_bwd_dispatch<Arch, T, 128, 128, 192, Is_causal, Is_local, Has_softcap, 1, 1, false, true, false, 4, 2, 4, 4, true>(params, stream);
+        }
 #else
         if constexpr (Arch >= 90) {
             run_mha_bwd_dispatch<Arch, T, 64, 96, 192, Is_causal, Is_local, Has_softcap, 1, 1, false, true, false, 3, 1, 1, 1, false>(params, stream);
@@ -430,7 +449,11 @@ template<int Arch, typename T, bool Has_softcap>
 void run_mha_bwd_hdim256(Flash_bwd_params &params, hggcStream_t stream) {
     CAUSAL_LOCAL_SWITCH(params.is_causal, params.is_local, Is_causal, Is_local, [&] {
 #ifdef USE_PPU
-        run_mha_bwd_dispatch<Arch, T, 64, 64, 256, Is_causal, Is_local, Has_softcap, 1, 1, false, false, false, 2, 4, 2, 2, false>(params, stream);
+        if constexpr (Arch == 80) {
+            run_mha_bwd_dispatch<Arch, T, 64, 64, 256, Is_causal, Is_local, Has_softcap, 1, 1, false, false, false, 2, 4, 2, 2, false>(params, stream);
+        } else {
+            run_mha_bwd_dispatch<Arch, T, 64, 128, 256, Is_causal, Is_local, Has_softcap, 1, 1, false, false, false, 4, 2, 2, 2, false>(params, stream);
+        }
 #else
         if constexpr (Arch >= 90) {
             run_mha_bwd_dispatch<Arch, T, 64, 80, 256, Is_causal, Is_local, Has_softcap, 1, 1, false, true, true, 2, 1, 1, 1, false>(params, stream);

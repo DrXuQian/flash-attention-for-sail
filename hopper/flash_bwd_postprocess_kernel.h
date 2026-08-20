@@ -20,7 +20,14 @@ namespace flash {
 
 using namespace cute;
 
-template <class TileShape_MK_, class Element, class ElementAccum, class ArchTag_, int kNThreads, class TiledMma, bool dQ_swapAB>
+// Defer_CVT_HeaddimSwap: the mainloop CVT + swizzled smem load path leaves the dK/dV accumulators
+// with their headdim columns permuted by bit3<->bit6.  The GQA epilogue writes them to
+// dKaccum/dVaccum in that permuted state (it has no smem to stage through, and remapping the
+// atomicAdd destination across threads is not reliable on PPU), so the un-permutation happens here,
+// on the read side, exactly like CollectiveEpilogueBwd does for the non-GQA path.  Only ever set for
+// the dK/dV instantiation; dQaccum is already fully compensated inside the mainloop.
+template <class TileShape_MK_, class Element, class ElementAccum, class ArchTag_, int kNThreads, class TiledMma, bool dQ_swapAB,
+          bool Defer_CVT_HeaddimSwap = false>
 class FlashAttnBwdPostprocessConvertdQ {
 
 public:
@@ -98,6 +105,13 @@ public:
         make_tiled_copy(Copy_Atom<AutoVectorizingCopyWithAssumedAlignment<128>, Element>{},
                         GmemLayoutAtom{},
                         Layout<Shape<_1, Int<kGmemElemsPerLoad>>>{}));  // Val layout, 8 or 16 vals per load
+
+    // The bit3<->bit6 headdim swap maps onto thread_idx bit0<->bit3 only for this exact thread
+    // layout: each thread covers kGmemElemsPerLoad=8 contiguous headdim elements (so headdim bit3 is
+    // the low bit of the column-thread index) and there are 32 column-threads per row (so headdim
+    // bit6 is bit3 of the column-thread index).
+    static_assert(!Defer_CVT_HeaddimSwap || (kGmemElemsPerLoad == 8 && kGmemThreadsPerRow == 32),
+                  "Defer_CVT_HeaddimSwap assumes 8 elements per thread and 32 threads per row");
 
     struct CUTE_ALIGNAS(128) SharedStorage {
         cute::array_aligned<ElementAccum, cute::cosize_v<SmemLayoutdQaccum>> smem_dqacc;
@@ -247,7 +261,18 @@ public:
         Tensor gdQ = local_tile(domain_offset(make_coord(seqlen_info.offset, _0{}), mdQ), TileShape_MK{}, make_coord(m_block, _0{}));  // (M, K)
         GmemTiledCopy gmem_tiled_copy_dQ;
         auto gmem_thr_copy_dQ = gmem_tiled_copy_dQ.get_thread_slice(thread_idx);
-        Tensor tdQsdQ = gmem_thr_copy_dQ.partition_S(sdQ);    // ((Atom,AtomNum),ATOM_M,ATOM_N)
+        // Read from the bit3<->bit6 permuted smem column so that each thread ends up holding the data
+        // its own (unpermuted) gmem destination expects.  Only the source slice is redirected; the
+        // destination and the predicate coordinates stay on this thread's own slice.
+        auto gmem_thr_copy_dQ_src = [&] {
+            if constexpr (Defer_CVT_HeaddimSwap) {
+                int partner_tid = (thread_idx & ~0x09) | ((thread_idx & 0x01) << 3) | ((thread_idx & 0x08) >> 3);
+                return gmem_tiled_copy_dQ.get_thread_slice(partner_tid);
+            } else {
+                return gmem_tiled_copy_dQ.get_thread_slice(thread_idx);
+            }
+        }();
+        Tensor tdQsdQ = gmem_thr_copy_dQ_src.partition_S(sdQ);    // ((Atom,AtomNum),ATOM_M,ATOM_N)
         Tensor tdQgdQ = gmem_thr_copy_dQ.partition_D(gdQ);
 
         Tensor tdQrdQ = make_fragment_like(tdQsdQ);
