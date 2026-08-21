@@ -2027,9 +2027,9 @@ void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
   c10::DeviceIndex device_index = device.index();
   // ensure fa3 run on the stream
   // https://pytorch.org/cppdocs/notes/tensor_cuda_stream.html
-  // CUDAStreamGuard switches to the stream’s device and makes it the current
+  // CUDAStreamGuard switches to the stream's device and makes it the current
   // stream on that device. CUDAStreamGuard will also restore the current device
-  // and stream when it’s destroyed
+  // and stream when it's destroyed
   at::cuda::CUDAStreamGuard g(at::cuda::getStreamFromExternal(
       static_cast<hggcStream_t>(cudaStream), device_index));
 
