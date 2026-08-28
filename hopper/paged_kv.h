@@ -178,9 +178,9 @@ struct PagedKVManager {
         , leftpad_k(leftpad_k)
         , ptr_page_table(ptr_page_table_)
 #if defined(__HGGC_ARCH__) &&  __HGGC_ARCH__ >= 100 && defined(USE_PPU) && USE_AIU
-        , gmem_thr_copy_k_aiu(gmem_tiled_copy_k_aiu.get_thread_slice(thread_idx))
-        , gmem_thr_copy_v_aiu(gmem_tiled_copy_v_aiu.get_thread_slice(thread_idx))
         , warp_idx(__ppu_read_firstlane(thread_idx / 32))
+        , gmem_thr_copy_k_aiu(gmem_tiled_copy_k_aiu.get_thread_slice(warp_idx * 32))
+        , gmem_thr_copy_v_aiu(gmem_tiled_copy_v_aiu.get_thread_slice(warp_idx * 32))
 #endif
         , gmem_thr_copy_kv(gmem_tiled_copy_kv.get_thread_slice(thread_idx))
         , bidb_kv_idx(bidb_kv_idx)
@@ -437,7 +437,12 @@ struct PagedKVManager {
             #pragma unroll
             for (int m = 0; m < kPageEntryPerWarp; m++) {
                 int row_idx = warp_idx + m * kNWarps;
-                if (row_idx * kBlockNPagedPerAiuLoad >= kBlockN) { break; }
+                int row_page = row_idx * kBlockNPagedPerAiuLoad;
+                if (row_page >= kBlockN) { break; }
+                if constexpr (Seqlenk_mask) {
+                    if (n_block * kBlockN + row_page >= seqlen_k) { break; }
+                }
+                // it's safe for load_K to read without predicate, thus no need to set AIU boundary.
                 Element* k_ptr;
                 if constexpr (kPageEntryPerWarp > 1) {
                     k_ptr = reinterpret_cast<Element*>(__shfl_sync(0xffffffff, reinterpret_cast<uint64_t>(tPrKPtrAiu), m));
@@ -493,10 +498,39 @@ struct PagedKVManager {
         if constexpr (PagedKVAiu) {
             if constexpr (KV_Same_Iter) { compute_V_ptr_aiu(); }
             Tensor tVsV = gmem_thr_copy_v_aiu.partition_D(sV);
+            if constexpr (!Seqlenk_mask) {
+                gmem_tiled_copy_v_aiu.desc_.dim_h = kBlockNPagedPerAiuLoad;
+            } else {
+                // Zero only the fully-trailing groups (rows past the group-aligned bound) through the cp.async-style partitioning
+                static constexpr bool EvenN_cp = kBlockN % CUTE_STATIC_V(shape<0>(GmemLayoutAtomKVCpAsync{})) == 0;
+                auto gmem_thr0_copy_kv = gmem_tiled_copy_kv.get_thread_slice(_0{});
+                Tensor tVsV_cp = gmem_thr_copy_kv.partition_D(sV);
+                Tensor cV = cute::make_identity_tensor(Shape<Int<kBlockN>, Int<kHeadDimV>>{});
+                Tensor tVcV = gmem_thr_copy_kv.partition_S(cV);
+                Tensor t0VcV = gmem_thr0_copy_kv.partition_S(cV);
+                int const clear_row_limit = cute::ceil_div(seqlen_k - n_block * kBlockN, kBlockNPagedPerAiuLoad) * kBlockNPagedPerAiuLoad - get<0>(tVcV(_0{}, _0{}, _0{}));
+                #pragma unroll
+                for (int m = 0; m < size<1>(tVsV_cp); ++m) {
+                    if (EvenN_cp || m < size<1>(tVsV_cp) - 1 || get<0>(tVcV(_0{}, m, _0{})) < kBlockN) {
+                        if (get<0>(t0VcV(_0{}, m, _0{})) >= clear_row_limit) {
+                            #pragma unroll
+                            for (int k = 0; k < size<2>(tVsV_cp); ++k) {
+                                cute::clear(tVsV_cp(_, m, k));
+                            }
+                        }
+                    }
+                }
+            }
             #pragma unroll
             for (int m = 0; m < kPageEntryPerWarp; m++) {
                 int row_idx = warp_idx + m * kNWarps;
-                if (row_idx * kBlockNPagedPerAiuLoad >= kBlockN) { break; }
+                int row_page = row_idx * kBlockNPagedPerAiuLoad;
+                if (row_page >= kBlockN) { break; }
+                if constexpr (Seqlenk_mask) {
+                    int row = n_block * kBlockN + row_page;
+                    if (row >= seqlen_k) { break; }   // trailing rows already zeroed above
+                    gmem_tiled_copy_v_aiu.desc_.dim_h = std::min(kBlockNPagedPerAiuLoad, seqlen_k - row);
+                }
                 Element* v_ptr;
                 if constexpr (kPageEntryPerWarp > 1) {
                     v_ptr = reinterpret_cast<Element*>(__shfl_sync(0xffffffff, reinterpret_cast<uint64_t>(tPrVPtrAiu), m));
