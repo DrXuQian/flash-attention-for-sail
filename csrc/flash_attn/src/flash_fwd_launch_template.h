@@ -5,12 +5,21 @@
 
 #pragma once
 #include "namespace_config.h"
-#include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
-#include <ATen/cuda/CUDAContext.h>
+#if !defined(FLASHATTN_PPU_DEVICE_COMPILE)
+#include <c10/cuda/CUDAException.h>
+#endif
 #include "static_switch.h"
 #include "hardware_info.h"
 #include "flash.h"
 #include "flash_fwd_kernel.h"
+
+#if defined(FLASHATTN_PPU_DEVICE_COMPILE)
+#define FLASHATTN_RUNTIME_CHECK(call) CHECK_CUDA(call)
+#define FLASHATTN_KERNEL_LAUNCH_CHECK() CHECK_CUDA(hggcGetLastError())
+#else
+#define FLASHATTN_RUNTIME_CHECK(call) C10_CUDA_CHECK(call)
+#define FLASHATTN_KERNEL_LAUNCH_CHECK() C10_CUDA_KERNEL_LAUNCH_CHECK()
+#endif
 
 namespace FLASH_NAMESPACE {
 
@@ -90,7 +99,7 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
                             //     &ctas_per_sm, kernel, Kernel_traits::kNThreads, smem_size);
                             // printf("smem_size = %d, CTAs per SM = %d\n", int(smem_size), ctas_per_sm);
                             kernel<<<grid, Kernel_traits::kNThreads, smem_size, stream>>>(params);
-                            C10_CUDA_KERNEL_LAUNCH_CHECK();
+                            FLASHATTN_KERNEL_LAUNCH_CHECK();
                         });
                     });
                 });
@@ -126,7 +135,7 @@ void run_flash_splitkv_fwd(Flash_fwd_params &params, hggcStream_t stream) {
                                         kernel, hggcFuncAttributeMaxDynamicSharedMemorySize, smem_size);
                                 }
                                 kernel<<<grid, Kernel_traits::kNThreads, smem_size, stream>>>(params);
-                                C10_CUDA_KERNEL_LAUNCH_CHECK();
+                                FLASHATTN_KERNEL_LAUNCH_CHECK();
                             });
                         });
                     });
@@ -157,7 +166,7 @@ void run_flash_splitkv_fwd(Flash_fwd_params &params, hggcStream_t stream) {
             } else if (params.num_splits <= 128) {
                 flash_fwd_splitkv_combine_kernel<Kernel_traits, kBlockM, 7, IsEvenKConst><<<grid_combine, kNThreads, 0, stream>>>(params);
             }
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
+            FLASHATTN_KERNEL_LAUNCH_CHECK();
         });
     }
 }
@@ -329,7 +338,7 @@ void run_mha_fwd_hdim256(Flash_fwd_params &params, hggcStream_t stream) {
     status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     // printf("max_smem_per_sm = %d, max_smem_per_block = %d\n", max_smem_per_sm, max_smem_per_block);
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {

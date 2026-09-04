@@ -6,7 +6,7 @@
 #pragma once
 
 #include "namespace_config.h"
-#include "philox_unpack.cuh" // For at::cuda::philox::unpack
+#include "ppu_torch_compat.h"
 
 #include <cute/tensor.hpp>
 

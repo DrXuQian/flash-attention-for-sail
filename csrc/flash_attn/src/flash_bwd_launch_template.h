@@ -6,13 +6,23 @@
 #pragma once
 
 #include "namespace_config.h"
-#include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
+#if !defined(FLASHATTN_PPU_DEVICE_COMPILE)
+#include <c10/cuda/CUDAException.h>
+#endif
 
 #include "static_switch.h"
 #include "hardware_info.h"
 #include "flash.h"
 #include "flash_bwd_preprocess_kernel.h"
 #include "flash_bwd_kernel.h"
+
+#if defined(FLASHATTN_PPU_DEVICE_COMPILE)
+#define FLASHATTN_RUNTIME_CHECK(call) CHECK_CUDA(call)
+#define FLASHATTN_KERNEL_LAUNCH_CHECK() CHECK_CUDA(hggcGetLastError())
+#else
+#define FLASHATTN_RUNTIME_CHECK(call) C10_CUDA_CHECK(call)
+#define FLASHATTN_KERNEL_LAUNCH_CHECK() C10_CUDA_KERNEL_LAUNCH_CHECK()
+#endif
 
 namespace FLASH_NAMESPACE {
 
@@ -87,7 +97,7 @@ void run_flash_bwd_seqk_parallel(Flash_bwd_params &params, hggcStream_t stream) 
     } else {
         flash_bwd_dot_do_o_kernel<false, Kernel_traits><<<grid_m, Kernel_traits::kNThreads, 0, stream>>>(params);
     }
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    FLASHATTN_KERNEL_LAUNCH_CHECK();
 
     // We want to specialize to is_even_MN and not just is_even_M, since in the case where N is not
     // a multiple of kBlockN, we'll need to apply mask in the loop.
@@ -110,7 +120,7 @@ void run_flash_bwd_seqk_parallel(Flash_bwd_params &params, hggcStream_t stream) 
                                 kernel, hggcFuncAttributeMaxDynamicSharedMemorySize, smem_size_dq_dk_dv);
                         }
                         kernel<<<grid_n, Kernel_traits::kNThreads, smem_size_dq_dk_dv, stream>>>(params);
-                        C10_CUDA_KERNEL_LAUNCH_CHECK();
+                        FLASHATTN_KERNEL_LAUNCH_CHECK();
                     });
                 });
             });
@@ -123,7 +133,7 @@ void run_flash_bwd_seqk_parallel(Flash_bwd_params &params, hggcStream_t stream) 
             kernel_dq, hggcFuncAttributeMaxDynamicSharedMemorySize, Kernel_traits::kSmemdQSize);
     }
     kernel_dq<<<grid_m, Kernel_traits::kNThreads, Kernel_traits::kSmemdQSize, stream>>>(params, !params.deterministic ? 1 : gridDimx);
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    FLASHATTN_KERNEL_LAUNCH_CHECK();
 }
 
 template<typename Kernel_traits, bool Is_dropout, bool Is_causal>
@@ -142,7 +152,7 @@ void run_mha_bwd_hdim32(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
         if (max_smem_per_block >= 2 * ((3 * 128 + 2 * 128) * Headdim + 2 * 128 * 128)) { // 104 KB
@@ -170,7 +180,7 @@ void run_mha_bwd_hdim64(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     // printf("max_smem_per_block = %d\n", max_smem_per_block);
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
@@ -219,7 +229,7 @@ void run_mha_bwd_hdim96(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     // printf("max_smem_per_block = %d\n", max_smem_per_block);
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
@@ -245,7 +255,7 @@ void run_mha_bwd_hdim128(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     // printf("max_smem_per_block = %d\n", max_smem_per_block);
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
@@ -292,7 +302,7 @@ void run_mha_bwd_hdim192(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
         if (max_smem_per_block >= 136 * 1024) {
@@ -316,7 +326,7 @@ void run_mha_bwd_hdim256(Flash_bwd_params &params, hggcStream_t stream) {
     hggcError_t status_ = hggcDeviceGetAttribute(
         &max_smem_per_block, hggcDevAttrMaxSharedMemoryPerBlockOptin, device);
     if (status_ != hggcSuccess) {
-      C10_CUDA_CHECK(status_);
+      FLASHATTN_RUNTIME_CHECK(status_);
     }
     DROPOUT_SWITCH(params.p_dropout < 1.f, Is_dropout, [&] {
         if (max_smem_per_block >= 176 * 1024) {  // H100
