@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "archive": "flash_attn_2_cuda.cpython-312-x86_64-linux-gnu.so.zst",
+  "archive_sha256": "062ef45a12c67c1fce71b813738aa021af00170113485acb033fefeaed77274c",
+  "archive_size": 59386115,
+  "artifact": "flash_attn_2_cuda.cpython-312-x86_64-linux-gnu.so",
+  "artifact_sha256": "e11e0f17c94b99634f8fd6cd6ba1e74b28fcd69c387be5a414e21d79c4d0e80d",
+  "artifact_size": 452812352,
+  "build": {
+    "source_git_commit": "97591257f9585388837b33a68453430bdf450703",
+    "actlize_git_commit": "386386941e27d5afe94415c1aa4e453a8466b753",
+    "ppu_architectures": [
+      "ppu_10",
+      "ppu_15"
+    ],
+    "ppu_sdk_release": "2.1.1-a5c56e",
+    "hgcc_build": "Jul 25 2026 09:15:42",
+    "python_cache_tag": "cpython-312",
+    "torch_public_version": "2.8.0",
+    "torch_build_version": "2.8.0+cu128",
+    "cxx11_abi": true
+  },
+  "device_evidence": {
+    "device_elfs_per_architecture": 72,
+    "kernels_per_architecture": 4892,
+    "max_vector_registers": {
+      "ppu_10": 256,
+      "ppu_15": 256
+    },
+    "max_stack_bytes": {
+      "ppu_10": 3088,
+      "ppu_15": 3280
+    },
+    "scope": "Measured locally from the exact linked artifact with hgobjdump; no device code was executed."
+  },
+  "link_evidence": {
+    "python_init_symbol": "PyInit_flash_attn_2_cuda",
+    "undefined_flash_dispatch_symbols": 0
+  },
+  "required_ppu_runtime_libraries": [
+    "libhggc_wrapper.so",
+    "libhggcrt1.so",
+    "libhggc.so",
+    "libhg_wrapper.so",
+    "libcudart.so.13"
+  ],
+  "source_sha256": {
+    "setup.py": "a94e44f6017b9bb71e3138e2856211bce010b059a72211d30aad20331e8197dc",
+    "csrc/flash_attn/flash_api.cpp": "7b1fd2aa971c6120904d1bf83cf16f7206910fa25775e6dc8bea32c0f6cbf799",
+    "csrc/flash_attn/src/ppu_torch_compat.h": "b22225ac2759ccf93b9698d47c8b457715b3aaf510db1c7112bd0271b2c2bf50",
+    "csrc/flash_attn/src/flash.h": "c9470cff76c3601d31a0ab795f50c1b226836e463e1ec5581744c4b82a29860c",
+    "csrc/flash_attn/src/flash_fwd_kernel.h": "8fad5137d90e0ac3b8b0d2de8bd600d887c37d196a8c6235e75fe38eead92dd3",
+    "csrc/flash_attn/src/flash_fwd_launch_template.h": "be0351f93a790d39911d4d86071d6f20d3ef2f921766ee165ccf8e6f747965ff",
+    "csrc/flash_attn/src/flash_bwd_launch_template.h": "aab3eca6adabba2ec6c04a3efec1db4108ced82de2e13704576077aaa174dfd7"
+  }
+}
