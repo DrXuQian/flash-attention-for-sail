@@ -19,6 +19,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PREBUILT_ROOT = REPO_ROOT / "prebuilt" / "ppu_10-ppu_15"
 
 
+class PrebuiltUnavailable(RuntimeError):
+    """The current runtime has no checked-in binary; a source build is valid."""
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -55,7 +59,9 @@ def main() -> int:
     manifest_path = prebuilt_dir / "manifest.json"
     if not manifest_path.is_file():
         available = sorted(path.parent.name for path in PREBUILT_ROOT.glob("*/manifest.json"))
-        raise RuntimeError(f"no prebuilt for {key}; available manifests={available}")
+        raise PrebuiltUnavailable(
+            f"no prebuilt for {key}; available manifests={available}"
+        )
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     build = manifest["build"]
@@ -90,6 +96,9 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except PrebuiltUnavailable as error:
+        print(f"[PPU FlashAttention prebuilt] UNAVAILABLE: {error}", file=sys.stderr)
+        raise SystemExit(3)
     except Exception as error:
         print(f"[PPU FlashAttention prebuilt] FAIL: {error}", file=sys.stderr)
         raise SystemExit(1)

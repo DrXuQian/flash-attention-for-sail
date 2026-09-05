@@ -36,6 +36,7 @@ def main() -> int:
     args = parse_args()
 
     import torch
+    import flash_attn_2_cuda
     from flash_attn import flash_attn_func
 
     if not torch.cuda.is_available():
@@ -63,7 +64,8 @@ def main() -> int:
         "[PPU FA device] "
         f"name={torch.cuda.get_device_name(0)!r} torch={torch.__version__} "
         f"runtime={torch.version.cuda!r} free_bytes={free_bytes} "
-        f"total_bytes={total_bytes} one_tensor_bytes={tensor_bytes}"
+        f"total_bytes={total_bytes} one_tensor_bytes={tensor_bytes} "
+        f"extension={flash_attn_2_cuda.__file__}"
     )
 
     q = torch.randn(shape, device="cuda", dtype=torch.bfloat16)
