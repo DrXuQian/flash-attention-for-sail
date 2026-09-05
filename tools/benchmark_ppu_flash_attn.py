@@ -11,6 +11,7 @@ import statistics
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--backend", choices=("fa2", "fa3"), default="fa2")
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--seqlen", type=int, default=73774)
     parser.add_argument("--heads", type=int, default=56)
@@ -36,8 +37,25 @@ def main() -> int:
     args = parse_args()
 
     import torch
-    import flash_attn_2_cuda
-    from flash_attn import flash_attn_func
+
+    if args.backend == "fa2":
+        import flash_attn_2_cuda as extension
+        from flash_attn import flash_attn_func as backend_flash_attn_func
+
+        def run_attention(q, k, v):
+            return backend_flash_attn_func(
+                q, k, v, dropout_p=0.0, causal=args.causal
+            )
+    else:
+        import flash_attn_3._C as extension
+        from hopper.flash_attn_interface import (
+            flash_attn_func as backend_flash_attn_func,
+        )
+
+        def run_attention(q, k, v):
+            return backend_flash_attn_func(
+                q, k, v, causal=args.causal, num_splits=1, pack_gqa=False
+            )
 
     if not torch.cuda.is_available():
         raise RuntimeError("PPU CUDA-compatible device is not visible")
@@ -55,7 +73,7 @@ def main() -> int:
 
     print(
         "[PPU FA config] "
-        f"shape=B{args.batch},Sq{args.seqlen},Sk{args.seqlen},"
+        f"backend={args.backend} shape=B{args.batch},Sq{args.seqlen},Sk{args.seqlen},"
         f"Hq{args.heads},Hkv{args.heads},D{args.head_dim} "
         f"dtype=bf16 causal={int(args.causal)} custom_mask=0 dropout=0 "
         f"warmup={args.warmup} samples={args.samples}"
@@ -65,7 +83,7 @@ def main() -> int:
         f"name={torch.cuda.get_device_name(0)!r} torch={torch.__version__} "
         f"runtime={torch.version.cuda!r} free_bytes={free_bytes} "
         f"total_bytes={total_bytes} one_tensor_bytes={tensor_bytes} "
-        f"extension={flash_attn_2_cuda.__file__}"
+        f"extension={extension.__file__}"
     )
 
     q = torch.randn(shape, device="cuda", dtype=torch.bfloat16)
@@ -74,7 +92,7 @@ def main() -> int:
 
     with torch.inference_mode():
         for _ in range(args.warmup):
-            out = flash_attn_func(q, k, v, dropout_p=0.0, causal=args.causal)
+            out = run_attention(q, k, v)
         torch.cuda.synchronize()
 
         times_ms: list[float] = []
@@ -83,7 +101,7 @@ def main() -> int:
             start = torch.cuda.Event(enable_timing=True)
             end = torch.cuda.Event(enable_timing=True)
             start.record()
-            out = flash_attn_func(q, k, v, dropout_p=0.0, causal=args.causal)
+            out = run_attention(q, k, v)
             end.record()
             end.synchronize()
             times_ms.append(float(start.elapsed_time(end)))
