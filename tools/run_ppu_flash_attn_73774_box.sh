@@ -10,18 +10,22 @@ out_dir=${OUT:-/workspace/flash-attn-ppu-fa73774-${source_sha}-${timestamp}}
 runtime_dir="$out_dir/runtime"
 build_dir="$out_dir/build"
 python_bin=${PYTHON:-python}
-ppu_sdk=${PPU_SDK:-/usr/local/PPU_SDK}
+pinned_ppu_sdk=/workspace/ppu-sdk-2.1.1-a5c56e/PPU_SDK
+ppu_sdk=${PPU_SDK:-$pinned_ppu_sdk}
 
 mkdir -p -- "$out_dir" "$runtime_dir" "$build_dir"
 
-if [[ ! -d "$ppu_sdk/lib" ]]; then
-  echo "[PPU FA runner] FAIL: PPU SDK runtime directory not found: $ppu_sdk/lib" >&2
+if [[ ! -x "$ppu_sdk/bin/hgcc" || ! -d "$ppu_sdk/lib" ]]; then
+  echo "[PPU FA runner] FAIL: required PPU SDK 2.1.1-a5c56e not found at $ppu_sdk" >&2
+  echo "[PPU FA runner] set PPU_SDK explicitly only to an ABI-compatible SDK" >&2
   false
 fi
 
 export LD_LIBRARY_PATH="$ppu_sdk/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-echo "[PPU FA runner] sha=$(git -C "$repo_root" rev-parse HEAD) out=$out_dir"
+echo "[PPU FA runner] sha=$(git -C "$repo_root" rev-parse HEAD) out=$out_dir ppu_sdk=$ppu_sdk"
+env -u LD_LIBRARY_PATH "$ppu_sdk/bin/hgcc" --version >"$out_dir/hgcc-version.log" 2>&1
+sed -n '1,2p' "$out_dir/hgcc-version.log"
 set +e
 "$python_bin" "$repo_root/tools/materialize_ppu_prebuilt.py" \
   --destination "$runtime_dir" 2>&1 | tee "$out_dir/materialize.log"
