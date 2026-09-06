@@ -12,6 +12,8 @@ build_dir="$out_dir/build"
 python_bin=${PYTHON:-python}
 pinned_ppu_sdk=/workspace/ppu-sdk-2.1.1-a5c56e/PPU_SDK
 ppu_sdk=${PPU_SDK:-$pinned_ppu_sdk}
+default_runtime_sdk=/usr/local/PPU_SDK
+runtime_sdk=${PPU_RUNTIME_SDK:-$default_runtime_sdk}
 
 mkdir -p -- "$out_dir" "$runtime_dir" "$build_dir"
 
@@ -19,15 +21,26 @@ if [[ ! -x "$ppu_sdk/bin/hgcc" || ! -x "$ppu_sdk/CUDA_SDK/bin/nvcc" ]]; then
   echo "[PPU FA3 runner] FAIL: required PPU SDK 2.1.1-a5c56e not found at $ppu_sdk" >&2
   false
 fi
+if [[ ! -d "$runtime_sdk/lib" ]]; then
+  echo "[PPU FA3 runner] FAIL: Torch-compatible runtime SDK not found at $runtime_sdk" >&2
+  echo "[PPU FA3 runner] set PPU_RUNTIME_SDK to the SDK used by the installed Torch" >&2
+  false
+fi
 if [[ ! -f "$repo_root/csrc/actlize/include/cute/tensor.hpp" ]]; then
   git -C "$repo_root" submodule update --init --recursive csrc/actlize
 fi
 
 export PATH="$ppu_sdk/CUDA_SDK/bin:$ppu_sdk/bin:$PATH"
-export LD_LIBRARY_PATH="$ppu_sdk/lib:$ppu_sdk/CUDA_SDK/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Compilation deliberately uses the pinned 2.1.1 HGCC, but the host process
+# must keep the CUDA facade already paired with the installed Torch.  Putting
+# the compiler SDK's CUDA_SDK/lib64 first makes Torch 2.9 request the missing
+# cudaGetDeviceProperties_v2 entry point from the 13.0 facade.  This mirrors
+# the working FA2 runner: add only the PPU runtime and preserve the operator's
+# existing CUDA-facade search path.
+export LD_LIBRARY_PATH="$runtime_sdk/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CUDA_HOME="$ppu_sdk/CUDA_SDK"
 
-echo "[PPU FA3 runner] sha=$(git -C "$repo_root" rev-parse HEAD) out=$out_dir ppu_sdk=$ppu_sdk"
+echo "[PPU FA3 runner] sha=$(git -C "$repo_root" rev-parse HEAD) out=$out_dir compile_sdk=$ppu_sdk runtime_sdk=$runtime_sdk"
 env -u LD_LIBRARY_PATH "$ppu_sdk/bin/hgcc" --version >"$out_dir/hgcc-version.log" 2>&1
 sed -n '1,2p' "$out_dir/hgcc-version.log"
 "$python_bin" - <<'PY' | tee "$out_dir/python-runtime.log"
@@ -72,6 +85,7 @@ if [[ ${#artifacts[@]} -ne 1 ]]; then
 fi
 artifact=${artifacts[0]}
 sha256sum "$artifact" | tee "$out_dir/binary.sha256"
+ldd "$artifact" | tee "$out_dir/binary.ldd"
 git -C "$repo_root" status --short --branch >"$out_dir/git-status.txt"
 
 export PYTHONPATH="$runtime_dir:$repo_root${PYTHONPATH:+:$PYTHONPATH}"
