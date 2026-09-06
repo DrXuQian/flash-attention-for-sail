@@ -248,16 +248,32 @@ class PerSourceBuildExtension(BuildExtension):
         import torch.utils.cpp_extension as torch_ext
 
         original_write_ninja_file = torch_ext._write_ninja_file
+        original_check_cuda_version = torch_ext._check_cuda_version
 
         def write_ninja_file_with_register_margin(path, *args, **kwargs):
             original_write_ninja_file(path, *args, **kwargs)
             self._patch_ninja_register_margin(path)
 
+        def skip_nvidia_cuda_version_check(*args, **kwargs):
+            # PPU_SDK/CUDA_SDK is a CUDA-compatible compiler facade, not the
+            # NVIDIA toolkit used to build the PyTorch wheel.  Comparing its
+            # reported 13.0 facade version with torch.version.cuda (e.g. 12.9)
+            # rejects an otherwise ABI-compatible HGCC build.  The box runner
+            # independently pins and records the exact PPU SDK identity.
+            return None
+
         torch_ext._write_ninja_file = write_ninja_file_with_register_margin
+        if USE_PPU:
+            print(
+                "[FA3 PPU build] bypassing NVIDIA CUDA toolkit version check; "
+                f"PPU_SDK={os.environ.get('PPU_SDK')} torch.version.cuda={torch.version.cuda}"
+            )
+            torch_ext._check_cuda_version = skip_nvidia_cuda_version_check
         try:
             super().build_extensions()
         finally:
             torch_ext._write_ninja_file = original_write_ninja_file
+            torch_ext._check_cuda_version = original_check_cuda_version
 
     @staticmethod
     def _patch_ninja_register_margin(path):
