@@ -9,11 +9,12 @@ timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 out_dir=${OUT:-/workspace/flash-attn3-ppu-fa73774-${source_sha}-${timestamp}}
 runtime_dir="$out_dir/runtime"
 build_dir="$out_dir/build"
+compat_dir="$out_dir/runtime-compat"
 python_bin=${PYTHON:-python}
 pinned_ppu_sdk=/workspace/ppu-sdk-2.1.1-a5c56e/PPU_SDK
 ppu_sdk=${PPU_SDK:-$pinned_ppu_sdk}
 
-mkdir -p -- "$out_dir" "$runtime_dir" "$build_dir"
+mkdir -p -- "$out_dir" "$runtime_dir" "$build_dir" "$compat_dir"
 
 if [[ ! -x "$ppu_sdk/bin/hgcc" || ! -x "$ppu_sdk/CUDA_SDK/bin/nvcc" ]]; then
   echo "[PPU FA3 runner] FAIL: required PPU SDK 2.1.1-a5c56e not found at $ppu_sdk" >&2
@@ -23,12 +24,36 @@ if [[ ! -f "$repo_root/csrc/actlize/include/cute/tensor.hpp" ]]; then
   git -C "$repo_root" submodule update --init --recursive csrc/actlize
 fi
 
+# PPU SDK 2.1.1's wrapper still dlopens the legacy filename although its
+# companion runtime is shipped with SONAME 13.0.  Keep the compatibility name
+# outside the SDK tree and bind it to the exact companion from this SDK.
+hggcrt_companion="$ppu_sdk/lib/libhggcrt.13.0.so"
+hggcrt_legacy_name="$compat_dir/libhggcrt.12.0.so"
+if [[ ! -f "$hggcrt_companion" ]]; then
+  echo "[PPU FA3 runner] FAIL: missing HGGC runtime companion: $hggcrt_companion" >&2
+  false
+fi
+if [[ ! -e "$hggcrt_legacy_name" ]]; then
+  ln -s "$hggcrt_companion" "$hggcrt_legacy_name"
+fi
+
+torch_lib=$($python_bin - <<'PY'
+from pathlib import Path
+import torch
+print(Path(torch.__file__).resolve().parent / "lib")
+PY
+)
+if [[ ! -d "$torch_lib" ]]; then
+  echo "[PPU FA3 runner] FAIL: Torch library directory not found: $torch_lib" >&2
+  false
+fi
+
 export PATH="$ppu_sdk/CUDA_SDK/bin:$ppu_sdk/bin:$PATH"
 # The HGCC-produced device ELF needs the matching 2.1.1 PPU UMD, while Torch
 # must keep its already-paired CUDA facade.  Add only PPU_SDK/lib.  Adding the
 # compiler SDK's CUDA_SDK/lib64 breaks Torch 2.9 at cudaGetDeviceProperties_v2;
 # using /usr/local/PPU_SDK/lib makes the older UMD reject the new device ELF.
-export LD_LIBRARY_PATH="$ppu_sdk/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$torch_lib:$ppu_sdk/lib:$compat_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export CUDA_HOME="$ppu_sdk/CUDA_SDK"
 
 echo "[PPU FA3 runner] sha=$(git -C "$repo_root" rev-parse HEAD) out=$out_dir compile_sdk_and_umd=$ppu_sdk cuda_facade=TORCH_ENV"
