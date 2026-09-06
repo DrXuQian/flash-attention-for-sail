@@ -169,10 +169,24 @@ if not SKIP_CUDA_BUILD:
         sources += ["flash_fwd_combine.cu"]
     sources += ["flash_prepare_scheduler.cu"]
 
+    ppu_include_dirs = []
+    if USE_PPU:
+        ppu_sdk = Path(os.environ["PPU_SDK"]).resolve()
+        ppu_include_dirs = [
+            ppu_sdk / "include",
+            ppu_sdk / "targets" / "x86_64-linux" / "include",
+        ]
+        missing_ppu_includes = [path for path in ppu_include_dirs if not path.is_dir()]
+        if missing_ppu_includes:
+            raise RuntimeError(
+                "PPU SDK include directories are missing: "
+                + ", ".join(map(str, missing_ppu_includes))
+            )
+
     include_dirs = [
         str(Path(this_dir)),
         str(actlize_dir / "include"),
-    ]
+    ] + [str(path) for path in ppu_include_dirs]
 
     os.environ["HGGC_ENABLE_COMPRESS"] = "1"
 
