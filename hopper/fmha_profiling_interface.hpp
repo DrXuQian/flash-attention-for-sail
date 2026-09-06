@@ -8,7 +8,12 @@
 #include <iostream>
 #include <sstream>
 #include <ATen/ATen.h>
+#ifdef USE_PPU
+#include <c10/cuda/CUDAStream.h>
+#include <cuda_runtime_api.h>
+#else
 #include <ATen/cuda/CUDAGraphsUtils.cuh>
+#endif
 #include <optional>
 #include <vector>
 
@@ -144,7 +149,14 @@ std::string val_to_string(const std::string& val) {
 std::string val_to_string(const at::Tensor& tensor) {
     TORCH_CHECK(tensor.dtype() == torch::kInt32, "only support int32 tensor to string");
 
+#ifdef USE_PPU
+    cudaStreamCaptureStatus capture_status = cudaStreamCaptureStatusNone;
+    cudaError_t capture_error = cudaStreamIsCapturing(
+        at::cuda::getCurrentCUDAStream().stream(), &capture_status);
+    if (capture_error != cudaSuccess || capture_status != cudaStreamCaptureStatusNone) {
+#else
     if (at::cuda::currentStreamCaptureStatus() != at::cuda::CaptureStatus::None) {
+#endif
       // to(at::kCPU) is not allowed when in stream capture
       return "";
     }

@@ -8,7 +8,7 @@
 #endif // FA3_HLLM_BUILD
 
 #include <torch/nn/functional/padding.h>
-#include <ATen/cuda/CUDAContextLight.h>
+#include "ppu_torch_compat.h"
 #include <c10/cuda/CUDAGuard.h>
 #include <cutlass/numeric_types.h>
 #include "flash.h"
@@ -44,6 +44,12 @@ PyObject* PyInit__C(void)
 #define CHECK_DEVICE(x) TORCH_CHECK(x.is_cuda(), #x " must be on CUDA")
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+
+#ifdef USE_PPU
+static inline hggcStream_t current_hggc_stream() {
+    return reinterpret_cast<hggcStream_t>(at::cuda::getCurrentCUDAStream().stream());
+}
+#endif
 
 #ifdef FA3_HLLM_BUILD
 namespace hllm_fa3 {
@@ -800,7 +806,7 @@ mha_fwd_get_scheduler_metadata(
         auto kBlockMN_kernel_args_sm8x = tile_size_fwd_sm8x(params.arch == 86 || params.arch == 89, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, params.page_table, is_varlen && params.num_splits > 1, params.softcap > 0.f, params.knew_ptr);
         int const kBlockM = params.arch >= 90 ? std::get<0>(kBlockMN_kernel_args_sm90) : std::get<0>(kBlockMN_kernel_args_sm8x);
         int const kBlockN = params.arch >= 90 ? std::get<1>(kBlockMN_kernel_args_sm90) : std::get<1>(kBlockMN_kernel_args_sm8x);
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        auto stream = current_hggc_stream();
         prepare_varlen_num_blocks(params, stream, params.pack_gqa, kBlockM, kBlockN, false /*enable_pdl*/);
         CHECK_CUDA_KERNEL_LAUNCH();
     }
@@ -1484,7 +1490,7 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
 #endif // FA3_HLLM_BUILD
 #endif
     if (total_q > 0 && (total_k + params.total_knew) > 0 && num_heads_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        auto stream = current_hggc_stream();
         run_mha_fwd(params, stream);
         if (params.num_splits > 1) {
             if (out_type == at::ScalarType::BFloat16) {
@@ -1957,7 +1963,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     #endif
 
     if (total_q > 0 && total_k > 0 && num_heads_k > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        auto stream = current_hggc_stream();
         run_mha_bwd(params, stream);
     } else if (total_k > 0 && num_heads_k > 0) {
         // If seqlen_q == 0, then we have an empty tensor. We need to set the output to 0.
@@ -2062,7 +2068,7 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
     params.arch = at::cuda::getCurrentDeviceProperties()->major * 10 + at::cuda::getCurrentDeviceProperties()->minor;
 
     if (seqlen > 0 && batch_size > 0) {
-        auto stream = at::cuda::getCurrentCUDAStream().stream();
+        auto stream = current_hggc_stream();
         run_mha_fwd_combine(params, stream, false /*enable_pdl*/);
     }
 
@@ -2108,7 +2114,7 @@ void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
   // stream on that device. CUDAStreamGuard will also restore the current device
   // and stream when it's destroyed
   at::cuda::CUDAStreamGuard g(at::cuda::getStreamFromExternal(
-      static_cast<hggcStream_t>(cudaStream), device_index));
+      reinterpret_cast<cudaStream_t>(cudaStream), device_index));
 
   auto data_type = at::kHalf;
   if constexpr (std::is_same<T, cutlass::bfloat16_t>::value)

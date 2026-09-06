@@ -9,7 +9,7 @@ import ast
 import itertools
 from pathlib import Path
 
-from setuptools import setup, find_packages
+from setuptools import Extension, setup, find_packages
 from setuptools.command.build_ext import build_ext
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 import subprocess
@@ -17,6 +17,9 @@ import subprocess
 from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 import torch
+
+if 'PPU_SDK' in os.environ.keys():
+    from ppu_build import HGCCBuildExtension
 
 PACKAGE_NAME = "flash_attn_3"
 this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,36 +59,6 @@ ENABLE_VCOLMAJOR = os.getenv("FLASH_ATTENTION_ENABLE_VCOLMAJOR", "FALSE") == "TR
 # ============================================================================
 # Source file generation
 # ============================================================================
-
-# PPU: monkey-patch ninja file writer to strip PTX code (code=compute_*) from the
-# ELF, preventing PC-relative offset overflow at link time on large PPU builds.
-if USE_PPU and hasattr(torch.utils.cpp_extension, "_write_ninja_file"):
-    _orig_write_ninja_file = torch.utils.cpp_extension._write_ninja_file
-
-    def _ppu_write_ninja_file(path, cflags=None, post_cflags=None,
-                              cuda_cflags=None, cuda_post_cflags=None,
-                              cuda_dlink_post_cflags=None, sources=None,
-                              objects=None, ldflags=None, library_target=None,
-                              with_cuda=None, **kwargs):
-        """Replace code=compute_* with code=sm_* in all nvcc flags for PPU."""
-        def _fix(flags):
-            if not flags:
-                return flags
-            r = [s.replace("code=compute_", "code=sm_") for s in flags]
-            if DISABLE_SM80:
-                r = [s.replace("sm_80", "sm_89") for s in r]
-            if DISABLE_SM89:
-                r = [s.replace("sm_80", "sm_80a") for s in r]
-            return r
-        return _orig_write_ninja_file(
-            path, cflags=_fix(cflags), post_cflags=_fix(post_cflags),
-            cuda_cflags=_fix(cuda_cflags), cuda_post_cflags=_fix(cuda_post_cflags),
-            cuda_dlink_post_cflags=cuda_dlink_post_cflags,
-            sources=sources, objects=objects, ldflags=ldflags,
-            library_target=library_target, with_cuda=with_cuda, **kwargs)
-
-    torch.utils.cpp_extension._write_ninja_file = _ppu_write_ninja_file
-
 
 ext_modules = []
 
@@ -169,24 +142,10 @@ if not SKIP_CUDA_BUILD:
         sources += ["flash_fwd_combine.cu"]
     sources += ["flash_prepare_scheduler.cu"]
 
-    ppu_include_dirs = []
-    if USE_PPU:
-        ppu_sdk = Path(os.environ["PPU_SDK"]).resolve()
-        ppu_include_dirs = [
-            ppu_sdk / "include",
-            ppu_sdk / "targets" / "x86_64-linux" / "include",
-        ]
-        missing_ppu_includes = [path for path in ppu_include_dirs if not path.is_dir()]
-        if missing_ppu_includes:
-            raise RuntimeError(
-                "PPU SDK include directories are missing: "
-                + ", ".join(map(str, missing_ppu_includes))
-            )
-
     include_dirs = [
         str(Path(this_dir)),
         str(actlize_dir / "include"),
-    ] + [str(path) for path in ppu_include_dirs]
+    ]
 
     os.environ["HGGC_ENABLE_COMPRESS"] = "1"
 
@@ -213,18 +172,40 @@ if not SKIP_CUDA_BUILD:
         "--compress-all",
     ]
 
+    if USE_PPU:
+        # These are nvcc-driver-only fatbin options.  The split PPU build calls
+        # HGCC directly and HGCC emits the two requested device images itself.
+        hgcc_flags = [flag for flag in hgcc_flags if flag not in ("-Xfatbin", "--compress-all")]
+        hgcc_flags += [
+            "-U__CUDA_NO_HALF_OPERATORS__",
+            "-U__CUDA_NO_HALF_CONVERSIONS__",
+            "-U__CUDA_NO_HALF2_OPERATORS__",
+            "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+            "--expt-relaxed-constexpr",
+            "--expt-extended-lambda",
+            "-Xcompiler", "-fPIC",
+            "-DSWITCH_TO_HGGCRT",
+            "-DUSE_CLANG",
+            "-DUSE_HGGC",
+            "-DFLASHATTN_PPU_DEVICE_COMPILE",
+            "-DTORCH_API_INCLUDE_EXTENSION_H",
+            "-DTORCH_EXTENSION_NAME=_C",
+        ]
+
     cc_flag = []
     cc_flag.append("-arch=ppu_10")
     cc_flag.append("-arch=ppu_15")
 
+    extension_type = Extension if USE_PPU else CUDAExtension
     ext_modules.append(
-        CUDAExtension(
+        extension_type(
             name=f"{PACKAGE_NAME}._C",
             sources=sources,
             include_dirs=include_dirs,
             extra_compile_args={
-                "nvcc": nvcc_threads_args() + hgcc_flags + cc_flag + feature_args,
-                "cxx": ["-O3", "-std=c++17", "-DPy_LIMITED_API=0x03090000"] + feature_args,
+                ("hgcc" if USE_PPU else "nvcc"): ([] if USE_PPU else nvcc_threads_args()) + hgcc_flags + cc_flag + feature_args,
+                "cxx": ["-O3", "-std=c++17", "-fPIC", "-DPy_LIMITED_API=0x03090000",
+                        "-DTORCH_API_INCLUDE_EXTENSION_H", "-DTORCH_EXTENSION_NAME=_C"] + feature_args,
             },
             py_limited_api=True,
         )
@@ -262,32 +243,16 @@ class PerSourceBuildExtension(BuildExtension):
         import torch.utils.cpp_extension as torch_ext
 
         original_write_ninja_file = torch_ext._write_ninja_file
-        original_check_cuda_version = torch_ext._check_cuda_version
 
         def write_ninja_file_with_register_margin(path, *args, **kwargs):
             original_write_ninja_file(path, *args, **kwargs)
             self._patch_ninja_register_margin(path)
 
-        def skip_nvidia_cuda_version_check(*args, **kwargs):
-            # PPU_SDK/CUDA_SDK is a CUDA-compatible compiler facade, not the
-            # NVIDIA toolkit used to build the PyTorch wheel.  Comparing its
-            # reported 13.0 facade version with torch.version.cuda (e.g. 12.9)
-            # rejects an otherwise ABI-compatible HGCC build.  The box runner
-            # independently pins and records the exact PPU SDK identity.
-            return None
-
         torch_ext._write_ninja_file = write_ninja_file_with_register_margin
-        if USE_PPU:
-            print(
-                "[FA3 PPU build] bypassing NVIDIA CUDA toolkit version check; "
-                f"PPU_SDK={os.environ.get('PPU_SDK')} torch.version.cuda={torch.version.cuda}"
-            )
-            torch_ext._check_cuda_version = skip_nvidia_cuda_version_check
         try:
             super().build_extensions()
         finally:
             torch_ext._write_ninja_file = original_write_ninja_file
-            torch_ext._check_cuda_version = original_check_cuda_version
 
     @staticmethod
     def _patch_ninja_register_margin(path):
@@ -331,7 +296,8 @@ setup(
     long_description=open("../README.md", "r", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": CachedWheelsCommand, "build_ext": PerSourceBuildExtension},
+    cmdclass={"bdist_wheel": CachedWheelsCommand,
+              "build_ext": HGCCBuildExtension if USE_PPU else PerSourceBuildExtension},
     python_requires=">=3.8",
     install_requires=["torch", "einops", "packaging", "ninja"],
     options={"bdist_wheel": {"py_limited_api": "cp39"}},
