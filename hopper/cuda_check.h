@@ -6,14 +6,15 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include "backend_runtime.h"
 
 #define CHECK_CUDA(call)                        \
     do {                                                                                                  \
-        hggcError_t status_ = call;                                                                       \
-        if (status_ != hggcSuccess) {                                                                     \
-            fprintf(stderr, "HGGC error (%s:%d): %s\n", __FILE__, __LINE__, hggcGetErrorString(status_)); \
+        flash::runtime::Error status_ = call;                                                             \
+        if (status_ != flash::runtime::success) {                                                         \
+            fprintf(stderr, "GPU error (%s:%d): %s\n", __FILE__, __LINE__, flash::runtime::error_string(status_)); \
             exit(1);                                                                                      \
         }                                                                                                 \
     } while(0)
 
-#define CHECK_CUDA_KERNEL_LAUNCH() CHECK_CUDA(hggcGetLastError())
+#define CHECK_CUDA_KERNEL_LAUNCH() CHECK_CUDA(flash::runtime::last_error())

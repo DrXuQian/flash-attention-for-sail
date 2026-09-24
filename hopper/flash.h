@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include <hggc.h>
-#include <hggc_runtime_api.h>
+#include "backend_runtime.h"
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,9 +241,9 @@ struct Flash_bwd_params : public Flash_fwd_params {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <int Arch, typename T, int kHeadDim, int kHeadDimV, bool Split, bool PagedKVNonTMA, bool Has_softcap, bool PackGQA, bool Is_QSA=false>
-void run_mha_fwd_(Flash_fwd_params &params, hggcStream_t stream);
-void prepare_varlen_num_blocks(Flash_fwd_params &params, hggcStream_t stream, bool packgqa, int blockM, int blockN, bool enable_pdl);
+void run_mha_fwd_(Flash_fwd_params &params, FlashStream stream);
+void prepare_varlen_num_blocks(Flash_fwd_params &params, FlashStream stream, bool packgqa, int blockM, int blockN, bool enable_pdl);
 template <int Arch, typename T, int kHeadDim, bool Has_softcap>
-void run_mha_bwd_(Flash_bwd_params &params, hggcStream_t stream);
+void run_mha_bwd_(Flash_bwd_params &params, FlashStream stream);
 template <typename T, typename Tpartial, int kBlockK>
-void run_mha_fwd_combine_(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl);
+void run_mha_fwd_combine_(Flash_fwd_params &params, FlashStream stream, bool enable_pdl);

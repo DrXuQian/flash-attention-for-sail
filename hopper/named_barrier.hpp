@@ -15,32 +15,48 @@ namespace flash {
 
 CUTLASS_DEVICE
 static void named_barrier_sync(uint32_t num_threads, uint32_t barrier_id_) {
+#if defined(FLASHATTN_PPU17)
+    cutlass::arch::NamedBarrier::sync(num_threads, barrier_id_);
+#else
     static constexpr uint32_t ReservedNamedBarrierCount = static_cast<uint32_t>(cutlass::arch::ReservedNamedBarriers::FirstUserBarrier);
     uint32_t barrier_id = barrier_id_ + ReservedNamedBarrierCount;
     asm volatile("ppu.bar.sync %0, %1;" : : "r"(barrier_id), "r"(num_threads));
     cutlass::arch::synclog_emit_named_barrier_arrive_and_wait(__LINE__, num_threads, barrier_id);
+#endif
 }
 
 CUTLASS_DEVICE
 static void named_barrier_sync(uint32_t num_threads, cutlass::arch::ReservedNamedBarriers reserved_named_barriers) {
+#if defined(FLASHATTN_PPU17)
+    cutlass::arch::NamedBarrier::sync(num_threads, reserved_named_barriers);
+#else
     uint32_t barrier_id = static_cast<uint32_t>(reserved_named_barriers);
     asm volatile("ppu.bar.sync %0, %1;" : : "r"(barrier_id), "r"(num_threads));
     cutlass::arch::synclog_emit_named_barrier_arrive_and_wait(__LINE__, num_threads, barrier_id);
+#endif
 }
 
 CUTLASS_DEVICE
 static void named_barrier_arrive(uint32_t num_threads, uint32_t barrier_id_) {
+#if defined(FLASHATTN_PPU17)
+    cutlass::arch::NamedBarrier::arrive(num_threads, barrier_id_);
+#else
     static constexpr uint32_t ReservedNamedBarrierCount = static_cast<uint32_t>(cutlass::arch::ReservedNamedBarriers::FirstUserBarrier);
     uint32_t barrier_id = barrier_id_ + ReservedNamedBarrierCount;
     cutlass::arch::synclog_emit_named_barrier_arrive(__LINE__, num_threads, barrier_id);
     asm volatile("ppu.bar.arrive %0, %1;" : : "r"(barrier_id), "r"(num_threads));
+#endif
 }
 
 CUTLASS_DEVICE
 static void named_barrier_arrive(uint32_t num_threads, cutlass::arch::ReservedNamedBarriers reserved_named_barriers) {
+#if defined(FLASHATTN_PPU17)
+    cutlass::arch::NamedBarrier::arrive(num_threads, reserved_named_barriers);
+#else
     uint32_t barrier_id = static_cast<uint32_t>(reserved_named_barriers);
     cutlass::arch::synclog_emit_named_barrier_arrive(__LINE__, num_threads, barrier_id);
     asm volatile("ppu.bar.arrive %0, %1;" : : "r"(barrier_id), "r"(num_threads));
+#endif
 }
 
 

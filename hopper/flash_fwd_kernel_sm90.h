@@ -145,7 +145,11 @@ public:
         CUTLASS_TRACE_HOST("to_underlying_arguments():");
 
         // Get CU count if needed, otherwise use user supplied CU count
+#if defined(FLASHATTN_PPU17)
+        int cu_count = args.hw_info.sm_count;
+#else
         int cu_count = args.hw_info.cu_count;
+#endif
         if (cu_count <= 0) {
             CUTLASS_TRACE_HOST("  WARNING: Arguments do not include a valid CU count.\n"
                 "  For optimal performance, populate the arguments KernelHardwareInfo struct with the CU count.");
@@ -166,7 +170,11 @@ public:
     // Computes the kernel launch grid shape based on runtime parameters
     static dim3
     get_grid_shape(Params const& params) {
+#if defined(FLASHATTN_PPU17)
+        return TileScheduler::get_grid_shape(params.scheduler, params.hw_info.sm_count);
+#else
         return TileScheduler::get_grid_shape(params.scheduler, params.hw_info.cu_count);
+#endif
     }
 
     static dim3
@@ -396,7 +404,11 @@ public:
                         // if (threadIdx.x == 128) { printf("Consumer: Before sync\n"); }
                         // We need this sync so that the gmem write from the consumers is visible to the producer
                         // that might do TMA read after that.
+#if defined(FLASHATTN_PPU17)
+                        asm volatile ("fence.proxy.async.global;" ::: "memory");
+#else
                         asm volatile ("ppu.fence.proxy.async.global;");
+#endif
                         cutlass::arch::NamedBarrier::arrive(NumMmaThreads + NumProducerThreads, static_cast<uint32_t>(FwdNamedBarriers::AppendKV) /*id*/);
                         // arrive is enough, we don't need sync. The producer will sync, which means
                         // after that sync we're guaranteed that the AppendKV pipeline have finished

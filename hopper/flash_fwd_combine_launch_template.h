@@ -19,7 +19,7 @@
 using namespace cute;
 
 template <int Arch, int kBlockM, int kBlockK, int kLogMaxSplits, bool IsEvenK, bool Varlen, typename Element, typename ElementPartial>
-void run_flash_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl) {
+void run_flash_fwd_combine(Flash_fwd_params &params, FlashStream stream, bool enable_pdl) {
     using ArchTag = std::conditional_t<Arch >= 90, cutlass::arch::PPU0015, cutlass::arch::PPU0010>;
     using TileShape_MK = cute::Shape<Int<kBlockM>, Int<kBlockK>>;
     using CombineKernel = flash::FlashAttnFwdCombine<TileShape_MK, kLogMaxSplits, 256 /*kNThreads*/, 1 /*AlignmentLSE*/,
@@ -52,7 +52,7 @@ void run_flash_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool e
     auto kernel = cutlass::device_kernel<CombineKernel>;
     int smem_size = CombineKernel::SharedStorageSize;
     if (smem_size >= 48 * 1024) {
-        CHECK_CUDA(hggcFuncSetAttribute(kernel, hggcFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+        CHECK_CUDA(flash::runtime::set_dynamic_smem(kernel, smem_size));
     }
     // kernel<<<grid_m, CombineKernel::MaxThreadsPerBlock, smem_size, stream>>>(kernel_params);
     cutlass::kernel_launch<CombineKernel>(grid_m, CombineKernel::MaxThreadsPerBlock, smem_size, stream, kernel_params, Arch >= 90 && enable_pdl /*launch_with_pdl*/);
@@ -60,7 +60,7 @@ void run_flash_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool e
 }
 
 template<typename T, typename Tpartial, int kBlockK>
-void run_mha_fwd_combine_(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl) {
+void run_mha_fwd_combine_(Flash_fwd_params &params, FlashStream stream, bool enable_pdl) {
     // We want kBlockM to be as small as possible to maximize parallelism.
     // E.g., if hdim is 64, we want kBlockM to be 16 so that we can use 256 threads, each reading 4 elements (floats).
     static_assert(kBlockK % 32 == 0, "kBlockK must be a multiple of 32");

@@ -88,6 +88,7 @@ __forceinline__ __device__ void scale_apply_exp2(Tensor<Engine0, Layout0> &tenso
     }
 }
 
+#if !defined(FLASHATTN_PPU17)
 __device__ __forceinline__
 __forceinline__ __device__ void exp2_approx_f32x2_ptx(float x, float y, float &out_x, float &out_y) {
     asm volatile(
@@ -178,6 +179,7 @@ __forceinline__ __device__ void scale_apply_ex2_emulation_2(Tensor<Engine0, Layo
         }
     }
 }
+#endif  // legacy PPU approximation; Hopper uses scale_apply_exp2
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -25,11 +25,15 @@
 #ifndef FLASHATTENTION_DISABLE_SM90
 #include "flash_fwd_kernel_sm90.h"
 #endif
+#if !defined(FLASHATTN_PPU17)
 #include "flash_fwd_kernel_sm80.h"
+#endif
 #ifndef FLASHATTENTION_DISABLE_SM90
 #include "mainloop_fwd_sm90_tma_gmma_ws.hpp"
 #endif
+#if !defined(FLASHATTN_PPU17)
 #include "mainloop_fwd_sm80.hpp"
+#endif
 #include "epilogue_fwd.hpp"
 
 using namespace cute;
@@ -47,7 +51,7 @@ template <int Arch, int kHeadDim, int kHeadDimV, int ClusterM, typename Element,
 #else
           bool PackGQA, bool Split, bool V_colmajor>
 #endif
-void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
+void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
 #ifdef USE_PPU
     static_assert(!QsaConfig::M || (Is_QSA && kHeadDim == 256 && kHeadDimV == 256 && PackGQA),
                   "QSA configurations require packed hdim256 QSA");
@@ -57,7 +61,10 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     static_assert(!(AppendKV && !Varlen), "AppendKV requires Varlen");
     static constexpr bool Is_FP8 = cute::is_same_v<Element, cutlass::float_e4m3_t> || cute::is_same_v<Element, cutlass::float_e5m2_t>;
     static constexpr bool FP8_TransposeV = Is_FP8 && !V_colmajor;
-#ifdef USE_PPU
+#if defined(FLASHATTN_PPU17)
+    static_assert(Arch == 90, "PPU1.7 may only instantiate the Hopper path");
+    using ArchTag = cutlass::arch::Sm90;
+#elif defined(USE_PPU)
     using ArchTag = std::conditional_t<Arch == 89, cutlass::arch::PPU0015, cutlass::arch::PPU0010>;
 #else
     using ArchTag = std::conditional_t<Arch >= 90, cutlass::arch::PPU0015, cutlass::arch::PPU0010>;
@@ -97,7 +104,9 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     using TileShape_MNK = cute::Shape<Int<kBlockM>, Int<kBlockN>, Int<kHeadDim>>;
     using TileShape_MNK_PV = cute::Shape<Int<kBlockM>, Int<kHeadDimV>, Int<kBlockN>>;
     using ClusterShape = cute::Shape<Int<ClusterM>, _1, _1>;
-#ifndef FLASHATTENTION_DISABLE_SM90
+#if defined(FLASHATTN_PPU17)
+    using CollectiveMainloop = flash::CollectiveMainloopFwdSm90<kStages, ClusterShape, TileShape_MNK, kHeadDimV, Element, float, ArchTag, Is_causal, Is_local, Has_softcap, Varlen, PagedKVNonTMA, AppendKV, HasQv, MmaPV_is_RS, IntraWGOverlap, PackGQA, Split, V_colmajor>;
+#elif !defined(FLASHATTENTION_DISABLE_SM90)
     using CollectiveMainloop = std::conditional_t<
         Arch >= 90,
         flash::CollectiveMainloopFwdSm90<kStages, ClusterShape, TileShape_MNK, kHeadDimV, Element, float, cutlass::arch::PPU0015, Is_causal, Is_local, Has_softcap, Varlen, PagedKVNonTMA, AppendKV, HasQv, MmaPV_is_RS, IntraWGOverlap, PackGQA, Split, V_colmajor>,
@@ -149,11 +158,15 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
 #ifndef FLASHATTENTION_DISABLE_SM90
     static constexpr bool UsePersistentScheduler = Arch >= 90 ? !(Split && !Varlen) : ((Is_causal && !Varlen) || (Varlen && Split));
     using Scheduler = std::conditional_t<!UsePersistentScheduler, SchedulerSingleTile, SchedulerPersistent>;
+#if defined(FLASHATTN_PPU17)
+    using AttnKernel = flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<CollectiveMainloop, CollectiveEpilogue, Scheduler>>;
+#else
     using AttnKernel = std::conditional_t<
         Arch >= 90,
         flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<CollectiveMainloop, CollectiveEpilogue, Scheduler>>,
         flash::enable_sm80_to_sm89<flash::FlashAttnFwdSm80<CollectiveMainloop, CollectiveEpilogue, Scheduler>>
     >;
+#endif
 #else
 #ifdef USE_PPU
     static constexpr bool UsePersistentScheduler = Is_QSA || Varlen || (!Varlen && Is_causal);
@@ -240,7 +253,9 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
         , params.is_generation_phase
         , static_cast<int const*>(params.mrope_position_deltas_ptr)
 #endif // FA3_HLLM_BUILD
+#if !defined(FLASHATTN_PPU17)
         , static_cast<ElementS const*>(params.s_aux_ptr)
+#endif
     };
 
     typename CollectiveEpilogue::Arguments epilogue_args {
@@ -283,7 +298,7 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     }
 
     int device;
-    CHECK_CUDA(hggcGetDevice(&device));
+    CHECK_CUDA(flash::runtime::get_device(&device));
     typename AttnKernel::Params kernel_params = AttnKernel::to_underlying_arguments({
         mainloop_args, epilogue_args, {device, params.num_sm}, scheduler_args
     });
@@ -300,7 +315,7 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
 #ifndef FLASHATTENTION_DISABLE_SM90
         void const* kernel = (void const*) cutlass::device_kernel<AttnKernel>;
         if (smem_size >= 48 * 1024) {
-            CHECK_CUDA(hggcFuncSetAttribute(kernel, hggcFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+            CHECK_CUDA(flash::runtime::set_dynamic_smem(kernel, smem_size));
         }
         dim3 cluster_dims(size<0>(ClusterShape{}), size<1>(ClusterShape{}), size<2>(ClusterShape{}));
         cutlass::ClusterLaunchParams launch_params{grid_dims, block_dims, cluster_dims, smem_size, stream};
@@ -309,7 +324,7 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     } else {
         auto kernel = cutlass::device_kernel<AttnKernel>;
         if (smem_size >= 48 * 1024) {
-            CHECK_CUDA(hggcFuncSetAttribute(kernel, hggcFuncAttributeMaxDynamicSharedMemorySize, smem_size));
+            CHECK_CUDA(flash::runtime::set_dynamic_smem(kernel, smem_size));
         }
 #ifdef USE_PPU
         int blocks_per_sm;
@@ -334,7 +349,10 @@ void run_flash_fwd(Flash_fwd_params &params, hggcStream_t stream) {
 }
 
 template<int Arch, typename T, int kHeadDim, int kHeadDimV, bool Split, bool PagedKVNonTMA, bool Has_softcap, bool PackGQA, bool Is_QSA>
-void run_mha_fwd_(Flash_fwd_params &params, hggcStream_t stream) {
+void run_mha_fwd_(Flash_fwd_params &params, FlashStream stream) {
+#if defined(FLASHATTN_PPU17)
+    static_assert(!Is_QSA, "PPU1.7 QSA instantiations are not admitted");
+#endif
     static_assert(sizeof(T) == 2 || sizeof(T) == 1, "Only 16bit and 8bit are supported");
     static constexpr bool Is_FP8 = cute::is_same_v<T, cutlass::float_e4m3_t> || cute::is_same_v<T, cutlass::float_e5m2_t>;
     using T_out = std::conditional_t<!Is_FP8, T, cutlass::bfloat16_t>;

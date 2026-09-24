@@ -9,6 +9,14 @@ import ast
 import itertools
 from pathlib import Path
 
+# Opt-in backend, separate from the legacy USE_PPU/USE_AIU path below.
+if os.getenv("FLASH_ATTENTION_PPU_ARCH") == "10700":
+    from ppu17_build import setup_extension
+    setup_extension()
+    sys.exit(0)
+if os.getenv("FLASH_ATTENTION_PPU_ARCH") not in (None, "10000", "10500"):
+    raise RuntimeError("unsupported FLASH_ATTENTION_PPU_ARCH")
+
 from setuptools import Extension, setup, find_packages
 from setuptools.command.build_ext import build_ext
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME

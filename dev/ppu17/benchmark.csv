@@ -1,0 +1,3 @@
+backend,scope,latency_us,verdict,reason
+ppu17,forward,,NOT_RUN,no-capable-local-SDK-or-device
+ppu17-simulation,forward,,NOT_RUN,simulation-model-not-available-locally

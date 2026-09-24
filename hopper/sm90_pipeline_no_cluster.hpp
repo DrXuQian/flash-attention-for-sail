@@ -10,6 +10,13 @@ namespace cutlass {
 
 using namespace cute;
 
+#if defined(FLASHATTN_PPU17)
+// This PPU CUTLASS3.6 tree already signals once per consumer warpgroup for
+// a 1x1x1 cluster. Its three-argument constructor and matching barrier counts
+// predate the newer API targeted by the FA workaround below.
+template <int Stages_, class Base=cutlass::PipelineTmaAsync<Stages_>>
+using PipelineTmaAsyncNoCluster = Base;
+#else
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // As of Cutlass v3.6.0, if size(ClusterShape) == 1, PipelineTmaAsync has all threads
@@ -96,4 +103,5 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#endif
 } // end namespace cutlass

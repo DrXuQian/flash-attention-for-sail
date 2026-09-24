@@ -36,7 +36,14 @@ PyObject* PyInit__C(void)
                     or -1 if the module keeps state in global variables. */
         NULL,   /* methods */
     };
-    return PyModule_Create(&module_def);
+    PyObject* module = PyModule_Create(&module_def);
+#if defined(FLASHATTN_PPU17)
+    if (module && PyModule_AddStringConstant(module, "ppu17_backend", "cutlass36-sm90-forward-v1") < 0) {
+        Py_DECREF(module);
+        return nullptr;
+    }
+#endif
+    return module;
 }
 }
 #endif // FA3_HLLM_BUILD
@@ -45,11 +52,13 @@ PyObject* PyInit__C(void)
 #define CHECK_SHAPE(x, ...) TORCH_CHECK(x.sizes() == torch::IntArrayRef({__VA_ARGS__}), #x " must have shape (" #__VA_ARGS__ ")")
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 
-#ifdef USE_PPU
-static inline hggcStream_t current_hggc_stream() {
-    return reinterpret_cast<hggcStream_t>(at::cuda::getCurrentCUDAStream().stream());
-}
+static inline FlashStream current_flash_stream() {
+#if defined(FLASHATTN_PPU17)
+    return at::cuda::getCurrentCUDAStream().stream();
+#else
+    return reinterpret_cast<FlashStream>(at::cuda::getCurrentCUDAStream().stream());
 #endif
+}
 
 #ifdef FA3_HLLM_BUILD
 namespace hllm_fa3 {
@@ -345,16 +354,18 @@ void set_params_dgrad(Flash_bwd_params &params,
 }
 
 template <int Arch, int Split, bool PagedKVNonTMA, bool PackGQA, bool Has_softcap>
-void run_mha_fwd_constexpr(Flash_fwd_params &params, hggcStream_t stream) {
+void run_mha_fwd_constexpr(Flash_fwd_params &params, FlashStream stream) {
     if (!params.is_e4m3) {
         if (params.is_bf16) {
             #ifndef FLASHATTENTION_DISABLE_HDIM64
             if (params.d <= 64) {
+#if !defined(FLASHATTN_PPU17)
                 if (params.dv > 256) {
                     return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 } else if (params.dv > 64) {
                     return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
+#endif
                 return run_mha_fwd_<Arch, cutlass::bfloat16_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
             #endif
@@ -379,11 +390,13 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, hggcStream_t stream) {
             #ifndef FLASHATTENTION_DISABLE_FP16
             #ifndef FLASHATTENTION_DISABLE_HDIM64
             if (params.d <= 64) {
+#if !defined(FLASHATTN_PPU17)
                 if (params.dv > 256) {
                     return run_mha_fwd_<Arch, cutlass::half_t, 64, 512, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 } else if (params.dv > 64) {
                     return run_mha_fwd_<Arch, cutlass::half_t, 64, 256, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
                 }
+#endif
                 return run_mha_fwd_<Arch, cutlass::half_t, 64, 64, Split, PagedKVNonTMA, Has_softcap, PackGQA>(params, stream);
             }
             #endif
@@ -493,7 +506,7 @@ void run_mha_fwd_qsa(Flash_fwd_params &params, hggcStream_t stream) {
 }
 #endif
 
-void run_mha_fwd(Flash_fwd_params &params, hggcStream_t stream) {
+void run_mha_fwd(Flash_fwd_params &params, FlashStream stream) {
     // HEADDIM_SWITCH(params.d, [&] {
     //     run_mha_fwd_<cutlass::half_t, kHeadSize>(params, stream);
     // });
@@ -529,7 +542,7 @@ void run_mha_fwd(Flash_fwd_params &params, hggcStream_t stream) {
     });
 }
 
-void run_mha_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl=false) {
+void run_mha_fwd_combine(Flash_fwd_params &params, FlashStream stream, bool enable_pdl=false) {
     #ifndef FLASHATTENTION_DISABLE_SPLIT
     // If hdim is 96 or 192, it's faster to round them to 128 or 256 respectively
     // so that kBlockM is smaller and we have more parallelism.
@@ -879,7 +892,7 @@ mha_fwd_get_scheduler_metadata(
         auto kBlockMN_kernel_args_sm8x = tile_size_fwd_sm8x(params.arch == 86 || params.arch == 89, params.d_rounded, params.dv_rounded, params.is_causal, params.is_local, params.is_e4m3 ? 1 : 2 /*element_size*/, params.page_table, is_varlen && params.num_splits > 1, params.softcap > 0.f, params.knew_ptr);
         int const kBlockM = params.arch >= 90 ? std::get<0>(kBlockMN_kernel_args_sm90) : std::get<0>(kBlockMN_kernel_args_sm8x);
         int const kBlockN = params.arch >= 90 ? std::get<1>(kBlockMN_kernel_args_sm90) : std::get<1>(kBlockMN_kernel_args_sm8x);
-        auto stream = current_hggc_stream();
+        auto stream = current_flash_stream();
         prepare_varlen_num_blocks(params, stream, params.pack_gqa, kBlockM, kBlockN, false /*enable_pdl*/);
         CHECK_CUDA_KERNEL_LAUNCH();
     }
@@ -942,6 +955,32 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         , bool qsa_allow_aiu = false
         ) {
     auto dprops = at::cuda::getCurrentDeviceProperties();
+#if defined(FLASHATTN_PPU17)
+    // A SM90-only build must not silently route an older device to Arch=90.
+    TORCH_CHECK(dprops->major == 9 && dprops->minor == 0,
+                "PPU1.7 forward requires the SM90 runtime capability");
+    TORCH_CHECK(q.scalar_type() == at::ScalarType::Half || q.scalar_type() == at::ScalarType::BFloat16,
+                "PPU1.7 source integration admits FP16/BF16 only");
+    TORCH_CHECK(q.dim() == 4 && k.dim() == 4 && v.dim() == 4,
+                "PPU1.7 source integration requires fixed-length BSHD tensors");
+    TORCH_CHECK((q.size(-1) == 64 || q.size(-1) == 128 || q.size(-1) == 256) &&
+                k.size(-1) == q.size(-1) && v.size(-1) == q.size(-1),
+                "PPU1.7 source integration requires equal Dq/Dk/Dv in {64,128,256}");
+    TORCH_CHECK(!cu_seqlens_q_ && !cu_seqlens_k_ && !cu_seqlens_k_new_ &&
+                !seqused_q_ && !seqused_k_ && !leftpad_k_,
+                "PPU1.7 varlen/partial sequence support is not admitted");
+    TORCH_CHECK(!page_table_ && !kv_batch_idx_ && !k_new_ && !v_new_ && !q_v_ &&
+                !rotary_cos_ && !rotary_sin_ && !seqlens_rotary_,
+                "PPU1.7 paged/append KV, Qv and rotary support is not admitted");
+    TORCH_CHECK(!s_aux_ && !q_descale_ && !k_descale_ && !v_descale_,
+                "PPU1.7 sinks and FP8 descales are not admitted");
+    TORCH_CHECK(window_size_left == -1 && window_size_right == -1 && attention_chunk == 0 && softcap == 0.0,
+                "PPU1.7 local/chunked attention and softcap are not admitted");
+    TORCH_CHECK(num_splits == 0 || num_splits == 1, "PPU1.7 split KV is not admitted");
+    TORCH_CHECK(!pack_gqa_.value_or(false), "PPU1.7 packed GQA is not admitted; ordinary GQA is supported");
+    TORCH_CHECK(!scheduler_metadata_, "PPU1.7 external scheduler metadata is not admitted");
+    TORCH_CHECK(!qsa_allow_aiu, "PPU1.7 QSA and its AIU load contract are not admitted");
+#endif
     bool is_sm8x = dprops->major >= 8;
     bool is_sm89 = (dprops->major == 8) && (dprops->minor == 9);
     bool is_fp8 = q.scalar_type() == at::ScalarType::Float8_e4m3fn;
@@ -1406,7 +1445,16 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
             tile_count_semaphore = torch::empty({metadata_size}, opts.dtype(torch::kInt32));
         }
         if (scheduler_needs_semaphore && !use_dynamic_split) {
+#if defined(FLASHATTN_PPU17)
+            // The simulation contract is one attention kernel. Tensor::zero_
+            // on CUDA may launch a fill kernel, so prepare the one counter on
+            // CPU and copy it instead. External metadata/varlen are rejected
+            // above; the new tensor remains alive through the forward launch.
+            tile_count_semaphore = torch::zeros({metadata_size}, opts.dtype(torch::kInt32).device(torch::kCPU))
+                .to(opts.device());
+#else
             tile_count_semaphore.zero_();  // If varlen we'll manually do the zero-ing
+#endif
         }
 #endif
         params.tile_count_semaphore = scheduler_needs_semaphore ? tile_count_semaphore.data_ptr<int>() : nullptr;
@@ -1578,6 +1626,9 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
         }
     }
 
+#if defined(FLASHATTN_PPU17)
+    TORCH_CHECK(!s_aux_, "PPU1.7 sink attention is not admitted");
+#else
     if(s_aux_.has_value()) {
         auto s_aux = s_aux_.value();
         TORCH_CHECK(s_aux.scalar_type() == at::ScalarType::BFloat16,
@@ -1589,6 +1640,7 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     } else {
         params.s_aux_ptr = nullptr;
     }
+#endif
 
     #ifdef FLASHATTENTION_DISABLE_LOCAL
     TORCH_CHECK(!params.is_local, "This flash attention build does not support local attention.");
@@ -1637,7 +1689,7 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
 #endif // FA3_HLLM_BUILD
 #endif
     if (total_q > 0 && (total_k + params.total_knew) > 0 && num_heads_k > 0) {
-        auto stream = current_hggc_stream();
+        auto stream = current_flash_stream();
         run_mha_fwd(params, stream);
         if (params.num_splits > 1) {
             if (out_type == at::ScalarType::BFloat16) {
@@ -1675,12 +1727,12 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
 }
 
 #ifdef FLASHATTENTION_DISABLE_BACKWARD
-void run_mha_bwd(Flash_bwd_params &params, hggcStream_t stream) {
+void run_mha_bwd(Flash_bwd_params &params, FlashStream stream) {
     TORCH_CHECK(false, "Flash-Attention was built with backward disabled");
 }
 #else
 template <int Arch, bool Has_softcap>
-void run_mha_bwd_constexpr(Flash_bwd_params &params, hggcStream_t stream) {
+void run_mha_bwd_constexpr(Flash_bwd_params &params, FlashStream stream) {
     if (!params.is_bf16) {
         #ifndef FLASHATTENTION_DISABLE_FP16
         #ifndef FLASHATTENTION_DISABLE_HDIM64
@@ -1720,7 +1772,7 @@ void run_mha_bwd_constexpr(Flash_bwd_params &params, hggcStream_t stream) {
     }
 }
 
-void run_mha_bwd(Flash_bwd_params &params, hggcStream_t stream) {
+void run_mha_bwd(Flash_bwd_params &params, FlashStream stream) {
         // FP16_SWITCH(!params.is_bf16, [&] {
         //     HEADDIM_SWITCH(params.d, [&] {
         //         run_mha_bwd_<elem_type, kHeadDim>(params, stream);
@@ -2119,7 +2171,7 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tensor, at::Tenso
     #endif
 
     if (total_q > 0 && total_k > 0 && num_heads_k > 0) {
-        auto stream = current_hggc_stream();
+        auto stream = current_flash_stream();
         run_mha_bwd(params, stream);
     } else if (total_k > 0 && num_heads_k > 0) {
         // If seqlen_q == 0, then we have an empty tensor. We need to set the output to 0.
@@ -2224,7 +2276,7 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
     params.arch = at::cuda::getCurrentDeviceProperties()->major * 10 + at::cuda::getCurrentDeviceProperties()->minor;
 
     if (seqlen > 0 && batch_size > 0) {
-        auto stream = current_hggc_stream();
+        auto stream = current_flash_stream();
         run_mha_fwd_combine(params, stream, false /*enable_pdl*/);
     }
 
@@ -2244,7 +2296,7 @@ mha_combine(at::Tensor out_partial,         // num_splits x batch_size x seqlen 
 #ifdef FA3_HOLMES_BUILD
 namespace holmes_fa3 {
 template <typename T>
-void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
+void mha_fwd_raw_impl(FlashStream cudaStream, T *devPtrQ,
                       const std::vector<int64_t> &q_shape,
                       const std::vector<int64_t> &q_strides, T *devPtrK,
                       const std::vector<int64_t> &k_shape,
@@ -2256,9 +2308,9 @@ void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
                       bool is_causal, void *workspace_ptr,
                       size_t workspace_size) {
   int device_id = -1;
-  auto err = hggcGetDevice(&device_id);
-  if (err != hggcSuccess) {
-    printf("hggcGetDevice failed: %d, %s", (int)err, hggcGetErrorString(err));
+  auto err = flash::runtime::get_device(&device_id);
+  if (err != flash::runtime::success) {
+    printf("hggcGetDevice failed: %d, %s", (int)err, flash::runtime::error_string(err));
     return;
   }
 
@@ -2330,7 +2382,7 @@ void mha_fwd_raw_impl(hggcStream_t cudaStream, T *devPtrQ,
 }
 
 template void mha_fwd_raw_impl(
-    hggcStream_t cudaStream, cutlass::half_t *devPtrQ,
+    FlashStream cudaStream, cutlass::half_t *devPtrQ,
     const std::vector<int64_t> &q_shape, const std::vector<int64_t> &q_strides,
     cutlass::half_t *devPtrK, const std::vector<int64_t> &k_shape,
     const std::vector<int64_t> &k_strides, cutlass::half_t *devPtrV,
@@ -2340,7 +2392,7 @@ template void mha_fwd_raw_impl(
     void *workspace_ptr, size_t workspace_size);
 
 template void mha_fwd_raw_impl(
-    hggcStream_t cudaStream, cutlass::bfloat16_t *devPtrQ,
+    FlashStream cudaStream, cutlass::bfloat16_t *devPtrQ,
     const std::vector<int64_t> &q_shape, const std::vector<int64_t> &q_strides,
     cutlass::bfloat16_t *devPtrK, const std::vector<int64_t> &k_shape,
     const std::vector<int64_t> &k_strides, cutlass::bfloat16_t *devPtrV,
@@ -2360,7 +2412,7 @@ void mha_fwd_raw(void *stream, void *devPtrQ,
                  const std::vector<int64_t> &out_strides, float scale,
                  bool is_causal, void *workspace_ptr, uint64_t workspace_size,
                  int32_t data_type) {
-  hggcStream_t cudaStream = reinterpret_cast<hggcStream_t>(stream);
+  FlashStream cudaStream = reinterpret_cast<FlashStream>(stream);
   if (data_type == 0) {
     auto devQ = reinterpret_cast<cutlass::half_t *>(devPtrQ);
     auto devK = reinterpret_cast<cutlass::half_t *>(devPtrK);

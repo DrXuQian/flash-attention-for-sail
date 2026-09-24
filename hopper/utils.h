@@ -9,10 +9,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "backend_runtime.h"
+
+#if defined(FLASHATTN_PPU17)
+#include <cuda_fp16.h>
+#include <cuda_bf16.h>
+#else
 #include <hggc_fp16.h>
 
 #if defined(__HGGC_ARCH__) && __HGGC_ARCH__ >= 100
 #include <hggc_bf16.h>
+#endif
 #endif
 
 #include <cute/tensor.hpp>
@@ -68,7 +75,8 @@ template <typename Kernel>
 struct enable_sm90_or_later : Kernel {
     template <typename... Args>
     CUTLASS_DEVICE void operator()(Args&&... args) {
-#if defined(__HGGC_ARCH__) && (__HGGC_ARCH__ > 150)
+#if (defined(FLASHATTN_PPU17) && defined(__CUDA_ARCH__) && __CUDA_ARCH__ == 900 && defined(__CUDA_ARCH_FEAT_SM90_ALL)) || \
+    (!defined(FLASHATTN_PPU17) && defined(__HGGC_ARCH__) && __HGGC_ARCH__ > 150)
         Kernel::operator()(std::forward<Args>(args)...);
 #endif
     }
@@ -316,6 +324,8 @@ CUTE_HOST_DEVICE
 void cp_async_wait() {
 #if defined(CUTE_ARCH_CP_ASYNC_PPU_ENABLED)
     asm volatile("ppu.cp.async.wait_group %0;\n" :: "n"(N));
+#elif defined(FLASHATTN_PPU17) && defined(CUTE_ARCH_CP_ASYNC_SM80_ENABLED)
+    asm volatile("cp.async.wait_group %0;\n" :: "n"(N));
 #endif
 }
 
@@ -742,7 +752,7 @@ CUTLASS_DEVICE void gemm_sm100(Atom& atom, TA const& tA, TB const& tB, TC&& tC) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef FLASHATTENTION_DISABLE_SM90
+#if !defined(FLASHATTENTION_DISABLE_SM90) && !defined(FLASHATTN_PPU17)
 template <class a_type, class b_type, class c_type,
           int M, int N, UMMA::Major a_major, UMMA::Major b_major,
           UMMA::ScaleIn a_neg, UMMA::ScaleIn b_neg, class... TAs, class... TMs>
