@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-24 09:30:27 UTC
+    updated-at: 2026-09-24 09:31:43 UTC
     working-on: source wiring and independent Hopper-to-PPU1.7 skill complete; source handoff
     blocked-on: native PPU1.7 SDK/device only; simulation input build is separate
-    last-commit: f600591 (parent; integration not committed yet)
+    last-commit: 4df4e04 (source integration; this checkpoint is documentation-only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA

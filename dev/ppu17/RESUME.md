@@ -1,6 +1,7 @@
 # Resume
 
 - parent: f600591
+- source-commit: 4df4e04
 - worktree: /workspace/flash-attn-ppu17-source
 - branch: ppu17-hopper-source
 - working-on: source handoff; native/simulator execution is the next evidence tier
