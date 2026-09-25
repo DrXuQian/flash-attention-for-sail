@@ -1,7 +1,7 @@
 # Resume
 
 - parent: f056429 (rebased from f600591 on 2026-09-25)
-- source-commit: f924819 (rebased source integration; QSA compatibility closure follows)
+- source-commit: a3d25ff (validated rebased source and QSA compatibility closure)
 - worktree: /workspace/flash-attn-ppu17-source
 - branch: ppu17-hopper-source
 - working-on: source handoff; native/simulator execution is the next evidence tier

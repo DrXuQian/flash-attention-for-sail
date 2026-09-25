@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-25 09:34:07 UTC
-    working-on: rebase onto f056429 validated; preparing lease-protected feature-branch push
+    updated-at: 2026-09-25 09:35:28 UTC
+    working-on: rebase and compatibility closure complete; publishing feature-branch handoff
     blocked-on: native PPU1.7 SDK/device only; simulation input build is separate
-    last-commit: 8e5249c (rebased handoff; compatibility closure follows)
+    last-commit: a3d25ff (validated rebased source; this checkpoint is documentation-only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
