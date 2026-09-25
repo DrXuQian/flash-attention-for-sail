@@ -39,6 +39,7 @@ public:
     static constexpr bool Transpose_V = CollectiveMainloop::Transpose_V;
     static constexpr bool AppendKV = CollectiveMainloop::AppendKV;
     static constexpr bool PackGQA = CollectiveMainloop::PackGQA;
+    static constexpr bool Is_QSA = CollectiveMainloop::Is_QSA;
     static constexpr int NumProducerThreads = CollectiveMainloop::NumProducerThreads;
     using SeqlenInfo_t = typename CollectiveMainloop::SeqlenInfo_t;
 
@@ -46,6 +47,10 @@ public:
     using TileShape_MNK = typename CollectiveMainloop::TileShape_MNK;
     using TileShape_MNK_PV = typename CollectiveMainloop::TileShape_MNK_PV;
     using TiledMma = typename CollectiveMainloop::TiledMma;
+    // Epilogue MMA view: same as TiledMma except on the zero-shfl FP8
+    // V-direct path, where it carries the pi_n-permuted CLayout so O columns
+    // land correctly (see CollectiveMainloop::TiledMmaOPerm).
+    using TiledMmaEpilogue = typename CollectiveMainloop::TiledMmaOPerm;
     using ArchTag = typename CollectiveMainloop::ArchTag;
     using MainloopArguments = typename CollectiveMainloop::Arguments;
     using MainloopParams = typename CollectiveMainloop::Params;
@@ -62,7 +67,7 @@ public:
 
     static constexpr uint32_t NumThreads = CUTE_STATIC_V(size(TiledMma{}));
     static constexpr uint32_t MaxThreadsPerBlock = CUTE_STATIC_V(size(TiledMma{}));
-    static constexpr uint32_t MinBlocksPerMultiprocessor = NumThreads == 128 ? 2 : 1;
+    static constexpr uint32_t MinBlocksPerMultiprocessor = (Is_QSA && NumThreads <= 64) ? (256 / NumThreads) : (NumThreads == 128 ? 2 : 1);
 
     // Kernel level shared memory storage
     // We overlap the shared memory for the mainloop and epilogue. However, we only want smem_o to overlap with smem_v + smem_k and not smem_q
@@ -238,7 +243,9 @@ public:
             SeqlenInfo_t seqlen_info{
                 bidb,
                 get<0>(params.mainloop.shape_Q),
-                !PagedKV ? size<0>(params.mainloop.shape_K) : size<0>(params.mainloop.shape_K) * size<1>(params.mainloop.shape_pagetable),
+                !PagedKV ? size<0>(params.mainloop.shape_K)
+                         : (Is_QSA ? size<1>(params.mainloop.shape_pagetable)
+                                   : size<0>(params.mainloop.shape_K) * size<1>(params.mainloop.shape_pagetable)),
                 get<0>(params.mainloop.shape_K_new),
                 params.mainloop.cu_seqlens_q, params.mainloop.cu_seqlens_k, params.mainloop.cu_seqlens_k_new,
                 params.mainloop.seqused_q, params.mainloop.seqused_k, params.mainloop.leftpad_k,
@@ -259,7 +266,7 @@ public:
             scheduler.prefetch_next_work(params.scheduler, work_tile_info);
             if (tile_valid) {
                 // if (threadIdx.x == 128) { printf("Before epilogue, bid.x = %d, bid.y = %d, bid.z = %d, m_block = %d, bidb = %d, split_idx = %d\n", blockIdx.x, blockIdx.y, blockIdx.z, m_block, bidb, split_idx); }
-                epilogue.store(params.epilogue, tOrO, softmax.row_sum, shared_storage, tiled_mma,
+                epilogue.store(params.epilogue, tOrO, softmax.row_sum, shared_storage, TiledMmaEpilogue{},
                                threadIdx.x, block_coord);
             } else {
                 // Write 0 to gO and -inf to gLSE.

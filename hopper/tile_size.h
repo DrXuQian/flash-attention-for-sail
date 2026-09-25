@@ -85,7 +85,7 @@ constexpr std::tuple<int, int, int, int, bool> tile_size_fwd_ppu(
         bool paged_kv=false, bool varlen=false, bool split=false,
         bool softcap=false, bool append_kv=false, bool pack_gqa = false,
         bool kBlockM128=false, bool kBlockM16=false, bool kBlockN16=false,
-        bool PagedKVAiu=false) {
+        bool PagedKVAiu=false, bool is_qsa=false) {
     if (element_size == 2) {
         bool const vreg_strain = paged_kv || pack_gqa || varlen || is_local;
         if (kBlockM16) {
@@ -131,37 +131,31 @@ constexpr std::tuple<int, int, int, int, bool> tile_size_fwd_ppu(
                 return {128, 64, 8, 1, true};
             }
         } else {
-            return {64, arch == 89 ? 48 : 32, 4, 1, true};
+            // One m_block covers only qhead_per_khead rows, so a narrower kBlockM wastes fewer.
+            // kBlockN must stay at the AIU per-load granularity that SmemCopyOpK is built on.
+            return is_qsa ? std::tuple<int, int, int, int, bool>{32, 16, 2, 1, true}
+                          : std::tuple<int, int, int, int, bool>{64, arch == 89 ? 48 : 32, 4, 1, true};
         }
     } else {
         if (kBlockM16) {
-            if (headdim <= 128) {
-                if (paged_kv && (!PagedKVAiu)) {
-                    return {16, 32, 1, 2, true};
-                } else {
-                    return {64, 64, 4, 2, true};
-                }
-            } else if (headdim <= 192) {
-                if (paged_kv && (!PagedKVAiu)) {
-                    return {16, 32, 1, 2, true};
-                } else {
-                    return {64, 32, 4, 2, true};
-                }
+            if (headdim <= 64) {
+                return {16, 64, 1, 2, true};
             } else {
-                if (paged_kv && (!PagedKVAiu)) {
-                    return {32, 32, 2, 2, true};  // head 256, use 2 warps to faster tranpose
-                } else {
-                    return {64, 32, 4, 2, true};
-                }
+                return {16, 32, 1, 2, true};
             }
         }
-        if (headdim <= 128) {
-            return {64, 64, 4, 2, true};
+        if (headdim <= 64) {
+            return {64, 64, 4, 1, true};
+        } else if (headdim <= 128) {
+            return {128, 64, 4, 1, false};
         } else if (headdim <= 192) {
-            return {64, 32, 4, 2, true};
+            if (!kBlockM128) {
+                return {64, 64, 4, 2, true};
+            } else {
+                return {128, 128, 8, 2, true};
+            }
         } else {
-            // use more threads to faster transpose
-            return {128, 32, 8, 2, true};
+            return {64, 64, 4, 2, true};
         }
     }
 }

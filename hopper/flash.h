@@ -171,6 +171,13 @@ struct Flash_fwd_params : public Qkv_params {
     bool use_kblockm_16;
     bool use_kblockm_128;
     bool use_kblockn_16;
+    bool is_qsa;
+    // QSA only: the caller certifies that every 16-column-aligned group of the (total_q, topk)
+    // table consists of 16 pool-contiguous tokens, the layout the AIU paged-KV bulk load
+    // assumes. False (the default) routes QSA onto the per-column load, which honors each
+    // table entry individually. Dense attention never reads this: a dense page table is
+    // per-page by construction, so the AIU bulk load is exact for it.
+    bool qsa_allow_aiu;
     // The S extra matrix, (num_heads)
     void *__restrict__ s_aux_ptr;
 
@@ -234,7 +241,7 @@ struct Flash_bwd_params : public Flash_fwd_params {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <int Arch, typename T, int kHeadDim, int kHeadDimV, bool Split, bool PagedKVNonTMA, bool Has_softcap, bool PackGQA>
+template <int Arch, typename T, int kHeadDim, int kHeadDimV, bool Split, bool PagedKVNonTMA, bool Has_softcap, bool PackGQA, bool Is_QSA=false>
 void run_mha_fwd_(Flash_fwd_params &params, hggcStream_t stream);
 void prepare_varlen_num_blocks(Flash_fwd_params &params, hggcStream_t stream, bool packgqa, int blockM, int blockN, bool enable_pdl);
 template <int Arch, typename T, int kHeadDim, bool Has_softcap>
