@@ -12,7 +12,7 @@ runtime and PPU CUTLASS3.6 headers, with `ACOMPUTE_VERSION=10700`.
 - Causal/noncausal, sequence tails and ordinary GQA (Hq divisible by Hkv).
 - Reuses WGMMA QK/PV, FP32 accumulators, online softmax, TMA and the Hopper
   persistent schedulers. Q/K/V storage and the attention formula do not change.
-- Backward, FP8, D96/192, unequal head dimensions, cluster launch, varlen,
+- Backward, FP8, D96/192, unequal head dimensions, cluster launch, varlen, QSA,
   split, paged/append KV, packed-GQA optimization, softcap, local attention,
   rotary fusion and sink bias are **not admitted**, and are rejected.
 - PPU1.7 native compilation and device correctness are NOT implied by the
@@ -101,7 +101,7 @@ python tools/check_ppu17_negative_builds.py \
     --objects /workspace/fa17-source-check --out /workspace/fa17-negative-check
 ```
 
-The second command instantiates all six generated source units, separately
+The source-check command instantiates all six generated source units, separately
 checks causal/noncausal bodies for WGMMA and TMA load/store, and assembles them.
 It rejects empty bodies, missing output stores and legacy PPU PTX leakage.
 `--torch-root` enables a real host API compile plus generated-definition
@@ -123,3 +123,8 @@ numerical or performance evidence.
 - Use `KernelHardwareInfo::sm_count`, without changing the legacy `cu_count`.
 - Keep host/device stream types coherent and reject unsupported API options
   before any launch. No blanket architecture macro redefinition or header stubs.
+- Preserve upstream's new `Is_QSA` template axis with its default `false`;
+  PPU1.7 rejects QSA instantiations, the QSA build switch and its AIU option.
+  The shared QSA header uses the runtime aliases. Its legacy direct-index
+  intrinsics stay outside the PPU1.7 parser path, without changing their
+  PPU1.0/1.5 implementation.

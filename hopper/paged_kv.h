@@ -591,6 +591,9 @@ struct PagedKVManager {
                 : get<0>(t0KcK(_0{}, m, _0{})) < seqlenk_row_limit;
             Element const* k_ptr;
             if constexpr (QsaConfig::DirectIndex) {
+#if defined(FLASHATTN_PPU17)
+                static_assert(!QsaConfig::DirectIndex, "PPU1.7 QSA direct-index loads are not admitted");
+#else
                 int const row_idx = n_block * kBlockN + get<0>(tKcK(_0{}, m, _0{}));
                 int token;
                 if constexpr (QsaConfig::RowBytes == 512) {
@@ -602,6 +605,7 @@ struct PagedKVManager {
                     token = should_load ? __ldg(&mPageTable[row_idx]) : -1;
                 }
                 k_ptr = token >= 0 ? raw_pointer_cast(mK_paged.data()) + int64_t(token) * QsaConfig::KVStride : nullptr;
+#endif
             } else { k_ptr = reinterpret_cast<Element const*>(__shfl_sync(0xffffffff, reinterpret_cast<uint64_t>(tPrKPtr(m / kGmemThreadsPerRow)), (m % kGmemThreadsPerRow), kGmemThreadsPerRow)); }
             if constexpr (Is_QSA && !QsaConfig::RowBytes) {
                 if (k_ptr == nullptr) { continue; }
@@ -698,6 +702,9 @@ struct PagedKVManager {
                 bool const should_load = !Seqlenk_mask || get<0>(t0VcV(_0{}, m, _0{})) < seqlenk_row_limit;
                 Element const* v_ptr;
                 if constexpr (QsaConfig::DirectIndex) {
+#if defined(FLASHATTN_PPU17)
+                    static_assert(!QsaConfig::DirectIndex, "PPU1.7 QSA direct-index loads are not admitted");
+#else
                     int const row_idx = n_block * kBlockN + get<0>(tVcV(_0{}, m, _0{}));
                     int token;
                     if constexpr (QsaConfig::RowBytes == 512) {
@@ -708,6 +715,7 @@ struct PagedKVManager {
                         token = should_load ? __ldg(&mPageTable[row_idx]) : -1;
                     }
                     v_ptr = token >= 0 ? raw_pointer_cast(mV_paged.data()) + int64_t(token) * QsaConfig::KVStride : nullptr;
+#endif
                 } else { v_ptr = reinterpret_cast<Element const*>(__shfl_sync(0xffffffff, reinterpret_cast<uint64_t>(tPrVPtr(m / kGmemThreadsPerRow)), m % kGmemThreadsPerRow, kGmemThreadsPerRow)); }
                 bool const qsa_valid = Is_QSA ? (v_ptr != nullptr) : true;
                 Tensor mV_paged_cur = make_tensor(make_gmem_ptr(v_ptr), Shape<Int<kHeadDimV>>{});

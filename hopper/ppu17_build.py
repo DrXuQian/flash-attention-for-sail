@@ -75,6 +75,8 @@ def check_environment(env):
         raise ValueError("PPU1.7 initial source integration does not admit the HLLM ABI")
     if env.get("FLASH_ATTENTION_ENABLE_VCOLMAJOR", "FALSE") != "FALSE":
         raise ValueError("PPU1.7 source integration does not admit V-colmajor")
+    if env.get("FLASH_ATTENTION_ENABLE_QSA", "FALSE") != "FALSE":
+        raise ValueError("PPU1.7 source integration does not admit QSA")
     if env.get("FLASH_ATTENTION_PPU17_COMPILE_MODE", "native") not in ("native", "simulation"):
         raise ValueError("PPU1.7 compile mode must be native or simulation")
 

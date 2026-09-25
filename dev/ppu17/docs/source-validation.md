@@ -1,5 +1,9 @@
 # Source admission, 2026-09-24 UTC
 
+This is the **pre-rebase historical receipt**, not validation of a later
+source tree. The 2026-09-25 rebase and fresh checks are recorded separately
+in `rebase-validation.md`.
+
 Parent FA commit: `f600591`. PPU CUTLASS3.6 backend:
 `023e82d03e80b4d5982f664925e15499033df314`. No backend/submodule update.
 

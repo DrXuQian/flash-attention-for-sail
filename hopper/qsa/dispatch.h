@@ -11,7 +11,7 @@ struct QsaConfig {
 }
 
 namespace qsa {
-hggcError_t cached_occupancy(int device, int* result, const void* function,
+flash::runtime::Error cached_occupancy(int device, int* result, const void* function,
                            int block, size_t smem, unsigned flags);
 }
 
@@ -64,4 +64,4 @@ inline bool qsa_uses_single_tile(Flash_fwd_params const& p) {
 }
 
 // Returns false without launching when this is not an eligible QSA request.
-bool run_qsa(Flash_fwd_params&, hggcStream_t);
+bool run_qsa(Flash_fwd_params&, FlashStream);

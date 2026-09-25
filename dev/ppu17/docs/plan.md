@@ -1,6 +1,9 @@
 # PPU1.7 Hopper source integration
 
-Parent: `f600591`; backend: `/root/cutlass3-3.6.0`, commit
+Parent after the requested 2026-09-25 rebase: `f056429` (DrXuQian/v2.8.2,
+including upstream `664597d`). Original parent: `f600591`; the pre-rebase
+branch is retained as `backup/ppu17-before-rebase-20260925`.
+Backend: `/root/cutlass3-3.6.0`, commit
 `023e82d03e80b4d5982f664925e15499033df314` (PPU CUTLASS 3.6.0).
 
 ## Contract
@@ -13,7 +16,7 @@ do not change the default Python FA2 route or publish a replacement binary.
 First integration scope: FP16/BF16 forward, equal Q/K/V head dimensions
 64/128/256, fixed-length batches, causal/noncausal, tails and GQA (without
 packed-GQA optimization). Cluster launch, backward, FP8, paged/append KV,
-varlen, split, softcap, local attention and auxiliary sinks are not admitted.
+varlen, split, QSA, softcap, local attention and auxiliary sinks are not admitted.
 Unsupported calls must fail before launch, never silently ignore an argument.
 
 ## Validation before handoff

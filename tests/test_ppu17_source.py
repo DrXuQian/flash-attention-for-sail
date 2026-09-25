@@ -70,6 +70,11 @@ class Ppu17Contracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             build.check_environment({"FLASH_ATTENTION_PPU17_COMPILE_MODE": "auto"})
 
+    def test_new_upstream_qsa_switch_is_not_silently_ignored(self):
+        build.check_environment({"FLASH_ATTENTION_ENABLE_QSA": "FALSE"})
+        with self.assertRaisesRegex(ValueError, "does not admit QSA"):
+            build.check_environment({"FLASH_ATTENTION_ENABLE_QSA": "TRUE"})
+
     def test_wrong_dependency_no_fallback(self):
         with self.assertRaises(ValueError):
             build.cutlass_root(None)

@@ -40,7 +40,7 @@ def inspect_ptx(text):
 def source_receipt(backend):
     # Include shared headers and build/runner code, not just the almost-empty
     # generated instantiation TU. This binds the body that actually compiled.
-    paths = sorted({*ROOT.glob("hopper/*.h"), *ROOT.glob("hopper/*.hpp"),
+    paths = sorted({*ROOT.glob("hopper/**/*.h"), *ROOT.glob("hopper/**/*.hpp"),
                     *ROOT.glob("hopper/*.cpp"), *ROOT.glob("hopper/*.cu"),
                     *ROOT.glob("hopper/*.py"), *ROOT.glob("dev/ppu17/*.cu"),
                     ROOT / "tools/check_ppu17_source.py", ROOT / "tools/run_ppu17_forward.py"})
