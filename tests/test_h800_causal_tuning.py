@@ -78,12 +78,15 @@ static_assert(std::get<1>(tile_size_fwd_sm90(256,256,true,false,1)) == 128);
         def trace(name, copies=2):
             return {"traceEvents": [{"cat":"kernel","name":name,"ts":i,"dur":1} for i in range(copies)]}
         for arm, symbol in (("candidate","FlashAttnFwdSm90"),
-                            ("flashinfer","SinglePrefillWithKVCacheKernel"), ("cudnn","fmha_fprop")):
+                            ("flashinfer","flashinfer::PrefillWithKVCacheKernel<flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, flashinfer::SingleTileScheduler>"),
+                            ("cudnn","fmha_fprop")):
             self.assertEqual(len(bench.inventory(trace(symbol), arm, 2)["kernel_durations_us"]), 2)
             with self.assertRaises(ValueError):
                 bench.inventory(trace("reference_matmul"), arm, 2)
             with self.assertRaises(ValueError):
                 bench.inventory(trace(symbol, 1), arm, 2)
+        with self.assertRaises(ValueError):
+            bench.inventory(trace("flashinfer::PrefillWithKVCacheKernel<FA2>"), "flashinfer", 2)
 
     def test_actual_candidate_type_grid_and_host_copies_are_bound(self):
         record = {"arm":"candidate", "source_identity":{"tile":[128,64],"scheduler":"single"},

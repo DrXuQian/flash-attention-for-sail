@@ -33,7 +33,12 @@ def inventory(trace, arm, calls):
     if arm in ("control", "candidate"):
         admitted = lambda n: "FlashAttnFwdSm90" in n
     elif arm == "flashinfer":
-        admitted = lambda n: "SinglePrefillWithKVCacheKernel" in n
+        # SinglePrefill... is the host dispatcher. The Hopper device entry is
+        # PrefillWithKVCacheKernel; bind its TMA traits and single-tile scheduler
+        # too, so the generic name cannot accidentally admit an FA2 fallback.
+        admitted = lambda n: ("flashinfer::PrefillWithKVCacheKernel<" in n and
+                              "flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2," in n and
+                              "flashinfer::SingleTileScheduler" in n)
     else:
         # The direct aten cuDNN op has no SDPA fallback. Also require its actual
         # attention symbol, not an arbitrary reference/transpose/expand kernel.

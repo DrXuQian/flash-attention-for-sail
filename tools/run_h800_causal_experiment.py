@@ -22,7 +22,9 @@ def main():
     ap.add_argument("--control-dir", type=Path, required=True)
     ap.add_argument("--flashinfer-root", type=Path, required=True)
     ap.add_argument("--flashinfer-python", type=Path, required=True)
-    ap.add_argument("--phase", choices=("references", "build", "screen", "confirm"), required=True)
+    ap.add_argument("--phase", choices=("references", "build", "screen", "confirm", "measure"), required=True)
+    ap.add_argument("--suffix", default="", help="new attempt suffix; old evidence is never overwritten")
+    ap.add_argument("--seqlens", nargs="+", type=int, choices=(2048,8192), default=(2048,8192))
     args = ap.parse_args()
     require_idle()
     args.out.mkdir(parents=True, exist_ok=True)
@@ -51,40 +53,41 @@ def main():
         return
 
     reference_identity = ROOT / "dev/ppu17/experiments/causal-tuning/reference-identity.json"
-    if args.phase == "references":
-        labels = ("flashinfer", "cudnn")
-    elif args.phase == "screen":
-        labels = ("N80-LPT", "N64-LPT", "N80-single", "N64-single")
-    else:
+    inventories = {
+        "references": ("flashinfer", "cudnn"),
+        "screen": ("N80-LPT", "N64-LPT", "N80-single", "N64-single"),
         # Reverse all cells, not only a retrospectively cherry-picked winner.
-        labels = ("N64-single", "N80-single", "N64-LPT", "N80-LPT", "cudnn", "flashinfer")
-    for seqlen in (2048, 8192):
-        for label in labels:
-            env = {**os.environ, "OMP_NUM_THREADS":"8"}
-            python = sys.executable
-            extra = []
-            identity = reference_identity
-            if label == "N80-LPT":
-                arm = "control"
-                extra = ["--extension-dir", args.control_dir, "--expected-sha256", CONTROL_SHA]
-            elif label.startswith("N"):
-                arm = "candidate"
-                identity = build_root / label / "identity.json"
-                built = json.loads(identity.read_text())
-                extra = ["--extension-dir", built["extension_dir"],
-                         "--expected-sha256", built["extension_sha256"]]
-            else:
-                arm = label
-                if label == "flashinfer":
-                    python = args.flashinfer_python
-                    extra = ["--flashinfer-source-root", args.flashinfer_root]
-                    env.update(PYTHONPATH=str(args.flashinfer_root), FLASHINFER_CUDA_ARCH_LIST="9.0a",
-                               FLASHINFER_WORKSPACE_BASE=str(args.out / "fi-cache"))
-            cell = args.out / f"S{seqlen}" / f"{args.phase}-{label}"
-            run([python, ROOT / "tools/bench_h800_causal_tuning.py", "--arm", arm,
-                 "--label", label, "--seqlen", seqlen, "--out", cell,
-                 "--oracle-cache", args.out / "oracles" / f"S{seqlen}.pt",
-                 "--source-identity", identity, *extra], cell.with_suffix(".log"), env)
+        "confirm": ("N64-single", "N80-single", "N64-LPT", "N80-LPT", "cudnn", "flashinfer"),
+    }
+    phases = tuple(inventories) if args.phase == "measure" else (args.phase,)
+    cells = [(phase, length, label) for phase in phases for length in args.seqlens
+             for label in inventories[phase]]
+    for phase, seqlen, label in cells:
+        env = {**os.environ, "OMP_NUM_THREADS":"8"}
+        python = sys.executable
+        extra = []
+        identity = reference_identity
+        if label == "N80-LPT":
+            arm = "control"
+            extra = ["--extension-dir", args.control_dir, "--expected-sha256", CONTROL_SHA]
+        elif label.startswith("N"):
+            arm = "candidate"
+            identity = build_root / label / "identity.json"
+            built = json.loads(identity.read_text())
+            extra = ["--extension-dir", built["extension_dir"],
+                     "--expected-sha256", built["extension_sha256"]]
+        else:
+            arm = label
+            if label == "flashinfer":
+                python = args.flashinfer_python
+                extra = ["--flashinfer-source-root", args.flashinfer_root]
+                env.update(PYTHONPATH=str(args.flashinfer_root), FLASHINFER_CUDA_ARCH_LIST="9.0a",
+                           FLASHINFER_WORKSPACE_BASE=str(args.out / "fi-cache"))
+        cell = args.out / f"S{seqlen}" / f"{phase}-{label}{args.suffix}"
+        run([python, ROOT / "tools/bench_h800_causal_tuning.py", "--arm", arm,
+             "--label", label, "--seqlen", seqlen, "--out", cell,
+             "--oracle-cache", args.out / "oracles" / f"S{seqlen}.pt",
+             "--source-identity", identity, "--prelaunch-idle-wait", 120, *extra], cell.with_suffix(".log"), env)
 
 
 if __name__ == "__main__":
