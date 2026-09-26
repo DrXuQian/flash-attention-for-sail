@@ -1,13 +1,23 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 05:30:36 UTC
-    working-on: S4096 four arms complete; S8192 a1-r3 after two prelaunch BUSY refusals
-    blocked-on: no current foreign parent; no measurements retained from BUSY attempts
-    last-commit: 19005e9 (sequence-scaling preregistration; 34 local tests PASS)
+    updated-at: 2026-09-26 05:47:38 UTC
+    working-on: sequence scaling complete; 12/12 new runs PASS, results handoff
+    blocked-on: none for H800; native PPU1.7/model remains unverified
+    last-commit: b7d5192 (bounded prelaunch idle wait; all earlier timing checks retained)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+
+S4096/8192/16384 A/B/B/A complete with immutable binaries and full CPU FP64
+O/LSE checks. Pooled port kernel MFU60.37/64.26/62.51%; official59.19/65.25/
+62.16%. Every relative speed comparison UNRESOLVED; no stable70% result.
+Same generated specialization/resources throughout. Snapshot/trace timestamp
+joins show SW Power Cap during attention at default350W; no clocks or power
+changed and no denominator adjustment. 36 local tests PASS. No GPU samples
+retained from three prelaunch BUSY refusals. GPU empty at05:41:33 UTC.
+Record: dev/ppu17/docs/h800-sequence-scaling.md; sample/hash-bound data in
+dev/ppu17/results/h800-sequence-scaling-20260926/summary.json.
 
 Completed task: official FA3 A/B on the same H800 and input, no kernel edits.
 Order A1/B1-r2/B2/A2, each200 warmups+9x50 calls. Pooled kernel-only medians:

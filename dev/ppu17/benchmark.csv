@@ -10,3 +10,15 @@ h800-port-traced,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,161.029950,B
 h800-official-fa3-traced,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,164.234290,BELOW_70,useful-MFU-55.337442-percent-relative-speed-UNRESOLVED
 h800-port-call-span,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,177.806082,BELOW_70,includes-CPU-counter-H2D-and-gaps-relative-speed-UNRESOLVED
 h800-official-fa3-call-span,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,173.628807,BELOW_70,includes-GPU-counter-fill-and-gaps-relative-speed-UNRESOLVED
+h800-port-traced,sequence-scaling-causal-bf16-S4096-H32-Hkv2-D256-pooled,601.987640,UNRESOLVED_AT_70,useful-MFU-60.373916-percent-relative-speed-UNRESOLVED
+h800-port-call-span,sequence-scaling-causal-bf16-S4096-H32-Hkv2-D256-pooled,625.862083,BELOW_70,useful-MFU-58.070863-percent-relative-speed-UNRESOLVED
+h800-official-fa3-traced,sequence-scaling-causal-bf16-S4096-H32-Hkv2-D256-pooled,614.033110,BELOW_70,useful-MFU-59.189562-percent-relative-speed-UNRESOLVED
+h800-official-fa3-call-span,sequence-scaling-causal-bf16-S4096-H32-Hkv2-D256-pooled,610.805435,BELOW_70,useful-MFU-59.502337-percent-relative-speed-UNRESOLVED
+h800-port-traced,sequence-scaling-causal-bf16-S8192-H32-Hkv2-D256-pooled,2262.172520,BELOW_70,useful-MFU-64.256665-percent-relative-speed-UNRESOLVED
+h800-port-call-span,sequence-scaling-causal-bf16-S8192-H32-Hkv2-D256-pooled,2408.787537,BELOW_70,useful-MFU-60.345572-percent-relative-speed-UNRESOLVED
+h800-official-fa3-traced,sequence-scaling-causal-bf16-S8192-H32-Hkv2-D256-pooled,2227.810050,BELOW_70,useful-MFU-65.247781-percent-relative-speed-UNRESOLVED
+h800-official-fa3-call-span,sequence-scaling-causal-bf16-S8192-H32-Hkv2-D256-pooled,2403.073959,BELOW_70,useful-MFU-60.489051-percent-relative-speed-UNRESOLVED
+h800-port-traced,sequence-scaling-causal-bf16-S16384-H32-Hkv2-D256-pooled,9300.693570,BELOW_70,useful-MFU-62.511807-percent-relative-speed-UNRESOLVED
+h800-port-call-span,sequence-scaling-causal-bf16-S16384-H32-Hkv2-D256-pooled,9489.451599,BELOW_70,useful-MFU-61.268363-percent-relative-speed-UNRESOLVED
+h800-official-fa3-traced,sequence-scaling-causal-bf16-S16384-H32-Hkv2-D256-pooled,9353.025210,BELOW_70,useful-MFU-62.162044-percent-relative-speed-UNRESOLVED
+h800-official-fa3-call-span,sequence-scaling-causal-bf16-S16384-H32-Hkv2-D256-pooled,9455.866089,BELOW_70,useful-MFU-61.485977-percent-relative-speed-UNRESOLVED

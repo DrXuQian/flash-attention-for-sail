@@ -1,0 +1,1838 @@
+{
+  "scope": "physical-H800-PCIe; NOT native PPU1.7 or 20-SM model",
+  "shape_fixed": "B1/Hq32/Hkv2/D256 BF16 causal; num_splits=1 pack_gqa=False",
+  "peak_dense_bf16_tflops": 756.5,
+  "binaries": {
+    "control": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+    "official": "c0611358efe2a1511843ef2638befce6932b1d5855225c7d7d89ebf8583ef585"
+  },
+  "shapes": [
+    {
+      "seqlen": 2048,
+      "previous_run_context": true,
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "cross_arm_output_raw_equal": true,
+      "cross_arm_lse_raw_equal": true,
+      "runs": [
+        {
+          "path": "/workspace/flash-attn-official-h800-ab-20260926/a1",
+          "result_sha256": "d5bbe0e9b738e3f1669d6ffe846679478330e973c3922579ad61487c4a940836",
+          "trace_sha256": "7d05ef92c55c85301f1ace8097c948fdfc171438492f4880087b97215fc72411",
+          "harness_sha256": "c58573e3b85be3147833825d20d2d4e7a24b2d05addbfe65f9fb8563cb22b635",
+          "arm": "control",
+          "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+          "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+          "max_output_abs": 0.00915942203100295,
+          "max_lse_abs": 0.000001624670279198881,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              169.48991775512695,
+              180.2444839477539,
+              181.38687133789062,
+              169.29792404174805,
+              169.0822410583496,
+              177.74463653564453,
+              177.8156852722168,
+              177.6767921447754,
+              177.79647827148438
+            ],
+            "median_us": 177.74463653564453,
+            "min_us": 169.0822410583496,
+            "max_us": 181.38687133789062,
+            "useful_tflops": 386.8079088519355,
+            "useful_mfu_percent": 51.13125034394389,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              148.14782,
+              148.08132,
+              148.126,
+              152.30346,
+              164.0576,
+              163.93666,
+              164.07744,
+              169.84216,
+              173.84944000000002
+            ],
+            "median_us": 163.93666,
+            "min_us": 148.08132,
+            "max_us": 173.84944000000002,
+            "useful_tflops": 419.38777554697043,
+            "useful_mfu_percent": 55.43790820184672,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-official-h800-ab-20260926/b1-r2",
+          "result_sha256": "2d8d46b0ad69cdaee67af39d502918501dbe27eebb523ddff848e0e886371618",
+          "trace_sha256": "a23bc660f457828cd83aaf8f3e97c86c6aaefcb14adbcb6465c81cbaaf9591cc",
+          "harness_sha256": "c58573e3b85be3147833825d20d2d4e7a24b2d05addbfe65f9fb8563cb22b635",
+          "arm": "official",
+          "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+          "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+          "max_output_abs": 0.00915942203100295,
+          "max_lse_abs": 0.000001624670279198881,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              158.43456268310547,
+              158.38272094726562,
+              172.71488189697266,
+              172.6425552368164,
+              173.44640731811523,
+              173.8470458984375,
+              173.81120681762695,
+              173.91103744506836,
+              173.92127990722656
+            ],
+            "median_us": 173.44640731811523,
+            "min_us": 158.38272094726562,
+            "max_us": 173.92127990722656,
+            "useful_tflops": 396.39351561719684,
+            "useful_mfu_percent": 52.39834971806964,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              149.49616,
+              149.61968,
+              150.25452,
+              161.98086,
+              162.11588,
+              170.39066,
+              175.24892,
+              177.46838,
+              181.11908
+            ],
+            "median_us": 162.11588,
+            "min_us": 149.49616,
+            "max_us": 181.11908,
+            "useful_tflops": 424.09806595134296,
+            "useful_mfu_percent": 56.0605506875536,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-official-h800-ab-20260926/b2",
+          "result_sha256": "95bfc8da26b8df2c6eb3e7a81ad8b2b8cd6c97077ae380160dc4d87bfba000f9",
+          "trace_sha256": "4424acc92d3d5c71fee6c188a908a1daf302f560266ae7aa6856c8b373249e19",
+          "harness_sha256": "c58573e3b85be3147833825d20d2d4e7a24b2d05addbfe65f9fb8563cb22b635",
+          "arm": "official",
+          "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+          "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+          "max_output_abs": 0.00915942203100295,
+          "max_lse_abs": 0.000001624670279198881,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              166.78144454956055,
+              176.25343322753906,
+              177.82272338867188,
+              163.47711563110352,
+              161.5078353881836,
+              172.17151641845703,
+              174.20799255371094,
+              174.24383163452148,
+              174.38528060913086
+            ],
+            "median_us": 174.20799255371094,
+            "min_us": 161.5078353881836,
+            "max_us": 177.82272338867188,
+            "useful_tflops": 394.6606017333126,
+            "useful_mfu_percent": 52.16927980612196,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              149.4258,
+              149.44814,
+              149.58894,
+              155.87374,
+              166.36226,
+              166.46788,
+              166.3527,
+              175.81072,
+              177.46708
+            ],
+            "median_us": 166.3527,
+            "min_us": 149.4258,
+            "max_us": 177.46708,
+            "useful_tflops": 413.29675543589013,
+            "useful_mfu_percent": 54.63275022285396,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-official-h800-ab-20260926/a2",
+          "result_sha256": "3e877dd4b20d2ce15010f93ed427c3b4f72d0557f8ba2cea78d6fa7cca209655",
+          "trace_sha256": "3d325af0e87d8810d26dec48ec5927ccc75cc232c6fe130c7c7156224b9d9d65",
+          "harness_sha256": "c58573e3b85be3147833825d20d2d4e7a24b2d05addbfe65f9fb8563cb22b635",
+          "arm": "control",
+          "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+          "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+          "max_output_abs": 0.00915942203100295,
+          "max_lse_abs": 0.000001624670279198881,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              174.17407989501953,
+              178.63103866577148,
+              178.85311126708984,
+              169.98336791992188,
+              171.96224212646484,
+              178.4364891052246,
+              178.35840225219727,
+              178.48384857177734,
+              178.4275245666504
+            ],
+            "median_us": 178.4275245666504,
+            "min_us": 169.98336791992188,
+            "max_us": 178.85311126708984,
+            "useful_tflops": 385.32749549141323,
+            "useful_mfu_percent": 50.9355578970804,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              146.56522,
+              146.64332,
+              146.52816,
+              146.6721,
+              158.12324,
+              169.36114,
+              171.05454,
+              174.4414,
+              174.84969999999998
+            ],
+            "median_us": 158.12324,
+            "min_us": 146.52816,
+            "max_us": 174.84969999999998,
+            "useful_tflops": 434.80661772425105,
+            "useful_mfu_percent": 57.47608958681442,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        }
+      ],
+      "pooled": {
+        "control": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              148.14782,
+              148.08132,
+              148.126,
+              152.30346,
+              164.0576,
+              163.93666,
+              164.07744,
+              169.84216,
+              173.84944000000002,
+              146.56522,
+              146.64332,
+              146.52816,
+              146.6721,
+              158.12324,
+              169.36114,
+              171.05454,
+              174.4414,
+              174.84969999999998
+            ],
+            "median_us": 161.02994999999999,
+            "min_us": 146.52816,
+            "max_us": 174.84969999999998,
+            "useful_tflops": 426.9580358684829,
+            "useful_mfu_percent": 56.43860355168313,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              169.48991775512695,
+              180.2444839477539,
+              181.38687133789062,
+              169.29792404174805,
+              169.0822410583496,
+              177.74463653564453,
+              177.8156852722168,
+              177.6767921447754,
+              177.79647827148438,
+              174.17407989501953,
+              178.63103866577148,
+              178.85311126708984,
+              169.98336791992188,
+              171.96224212646484,
+              178.4364891052246,
+              178.35840225219727,
+              178.48384857177734,
+              178.4275245666504
+            ],
+            "median_us": 177.8060817718506,
+            "min_us": 169.0822410583496,
+            "max_us": 181.38687133789062,
+            "useful_tflops": 386.67423792747144,
+            "useful_mfu_percent": 51.11358069100746,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        },
+        "official": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              149.49616,
+              149.61968,
+              150.25452,
+              161.98086,
+              162.11588,
+              170.39066,
+              175.24892,
+              177.46838,
+              181.11908,
+              149.4258,
+              149.44814,
+              149.58894,
+              155.87374,
+              166.36226,
+              166.46788,
+              166.3527,
+              175.81072,
+              177.46708
+            ],
+            "median_us": 164.23429,
+            "min_us": 149.4258,
+            "max_us": 181.11908,
+            "useful_tflops": 418.6277492233809,
+            "useful_mfu_percent": 55.33744206521889,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              158.43456268310547,
+              158.38272094726562,
+              172.71488189697266,
+              172.6425552368164,
+              173.44640731811523,
+              173.8470458984375,
+              173.81120681762695,
+              173.91103744506836,
+              173.92127990722656,
+              166.78144454956055,
+              176.25343322753906,
+              177.82272338867188,
+              163.47711563110352,
+              161.5078353881836,
+              172.17151641845703,
+              174.20799255371094,
+              174.24383163452148,
+              174.38528060913086
+            ],
+            "median_us": 173.6288070678711,
+            "min_us": 158.38272094726562,
+            "max_us": 177.82272338867188,
+            "useful_tflops": 395.97709809251063,
+            "useful_mfu_percent": 52.34330444051694,
+            "target_70_latency_us": 129.83293582853366,
+            "verdict": "BELOW_70"
+          }
+        }
+      },
+      "relative_verdict": {
+        "instrumented_kernel_only": "UNRESOLVED",
+        "full_call_event_span": "UNRESOLVED"
+      }
+    },
+    {
+      "seqlen": 4096,
+      "previous_run_context": false,
+      "input_sha256": [
+        "9fdd0cff683db971d1fe80b01dbaaa3ced195dc5c7fb7d948bf49bfca482b245",
+        "9c969bdb7718817ce61dbed8b06de45954fb7c354de3c0d96bc3df5d2b2874c0",
+        "705273a0a617ada8154c454fac314e584c2c126b00fb16a6bdf52d467a1332e9"
+      ],
+      "cross_arm_output_raw_equal": true,
+      "cross_arm_lse_raw_equal": true,
+      "runs": [
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s4096-a1",
+          "result_sha256": "0b88b27a35eea70fb089ada632ba74ad0153f1898bc933bc797bf8130b4acc7f",
+          "trace_sha256": "2c3c00750c2823e12b37c41e07219b983c4014ed73fbd9340c8ae6cf54002b2d",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "control",
+          "output_sha256": "4030199c16b3330ac1f75767cab438e7b115b7eef47d1a8f72ed1d15a04d0f9b",
+          "lse_sha256": "34425d83b68d4a71843e3d4c8ce03a45111a33a8c1339c859ce46e71dd682af8",
+          "max_output_abs": 0.008851648667820289,
+          "max_lse_abs": 0.0000018379645645438814,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              585.214729309082,
+              587.2083282470703,
+              586.7935943603516,
+              591.3708877563477,
+              640.2188873291016,
+              632.8441619873047,
+              632.6982498168945,
+              630.3942489624023,
+              624.1561508178711
+            ],
+            "median_us": 624.1561508178711,
+            "min_us": 585.214729309082,
+            "max_us": 640.2188873291016,
+            "useful_tflops": 440.5067793495622,
+            "useful_mfu_percent": 58.229580878990376,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              519.79772,
+              554.3393,
+              606.41144,
+              606.35178,
+              606.38012,
+              602.37038,
+              601.5557,
+              601.6049,
+              601.54606
+            ],
+            "median_us": 601.6049,
+            "min_us": 519.79772,
+            "max_us": 606.41144,
+            "useful_tflops": 457.0192427089606,
+            "useful_mfu_percent": 60.41232553984939,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s4096-b1",
+          "result_sha256": "d891ff96cd36f3d05d2dd1487f63a6f574b9f2abfbb2ecb0f0b9dad83bbf414e",
+          "trace_sha256": "a246b5af9ab7920d2533a425a51af339d58280e40df8f0530dd335e58d3d1923",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "official",
+          "output_sha256": "4030199c16b3330ac1f75767cab438e7b115b7eef47d1a8f72ed1d15a04d0f9b",
+          "lse_sha256": "34425d83b68d4a71843e3d4c8ce03a45111a33a8c1339c859ce46e71dd682af8",
+          "max_output_abs": 0.008851648667820289,
+          "max_lse_abs": 0.0000018379645645438814,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              553.3958435058594,
+              582.5139236450195,
+              631.3727951049805,
+              625.9552001953125,
+              621.317138671875,
+              626.6719818115234,
+              621.3900756835938,
+              621.1808013916016,
+              619.0963363647461
+            ],
+            "median_us": 621.317138671875,
+            "min_us": 553.3958435058594,
+            "max_us": 631.3727951049805,
+            "useful_tflops": 442.5196066468106,
+            "useful_mfu_percent": 58.49565190308137,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              528.75398,
+              541.59612,
+              612.46964,
+              631.1296600000001,
+              631.14108,
+              630.6713599999999,
+              593.6798,
+              573.5754,
+              575.88644
+            ],
+            "median_us": 593.6798,
+            "min_us": 528.75398,
+            "max_us": 631.14108,
+            "useful_tflops": 463.12004519608047,
+            "useful_mfu_percent": 61.21877662869537,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s4096-b2",
+          "result_sha256": "a217aa30ef2efc2d4c3b2ae33bd884a536920f8598b60707a61364e0bab22c07",
+          "trace_sha256": "33ad85bf54373297d1e6ba7f2caad557ad8c335381a9c8d5c3728f27e56e93ec",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "official",
+          "output_sha256": "4030199c16b3330ac1f75767cab438e7b115b7eef47d1a8f72ed1d15a04d0f9b",
+          "lse_sha256": "34425d83b68d4a71843e3d4c8ce03a45111a33a8c1339c859ce46e71dd682af8",
+          "max_output_abs": 0.008851648667820289,
+          "max_lse_abs": 0.0000018379645645438814,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              560.1555252075195,
+              553.3324813842773,
+              600.6496047973633,
+              622.993278503418,
+              617.1807861328125,
+              604.4300842285156,
+              597.2601699829102,
+              597.5507354736328,
+              597.6006317138672
+            ],
+            "median_us": 597.6006317138672,
+            "min_us": 553.3324813842773,
+            "max_us": 622.993278503418,
+            "useful_tflops": 460.0815347525342,
+            "useful_mfu_percent": 60.81712290185515,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              527.38806,
+              572.83222,
+              615.95254,
+              615.89106,
+              615.76686,
+              615.97242,
+              615.09364,
+              615.07756,
+              612.98866
+            ],
+            "median_us": 615.09364,
+            "min_us": 527.38806,
+            "max_us": 615.97242,
+            "useful_tflops": 446.9970065175767,
+            "useful_mfu_percent": 59.087509123275176,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s4096-a2",
+          "result_sha256": "daf191711638497a54e8961a959afa21c3e60bd03ef85e009899f3cb3fb27c28",
+          "trace_sha256": "3b72970ca399ee70f913d971cdf28a06d02ba53516fbfefdca05c56d532b09d2",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "control",
+          "output_sha256": "4030199c16b3330ac1f75767cab438e7b115b7eef47d1a8f72ed1d15a04d0f9b",
+          "lse_sha256": "34425d83b68d4a71843e3d4c8ce03a45111a33a8c1339c859ce46e71dd682af8",
+          "max_output_abs": 0.008851648667820289,
+          "max_lse_abs": 0.0000018379645645438814,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              646.3801574707031,
+              630.2438354492188,
+              626.9132614135742,
+              624.213752746582,
+              624.2233657836914,
+              623.9334487915039,
+              625.8214569091797,
+              626.2643051147461,
+              625.9027099609375
+            ],
+            "median_us": 625.9027099609375,
+            "min_us": 623.9334487915039,
+            "max_us": 646.3801574707031,
+            "useful_tflops": 439.2775609250187,
+            "useful_mfu_percent": 58.06709331460921,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              518.73338,
+              548.52936,
+              584.85542,
+              585.69762,
+              622.58248,
+              614.55932,
+              614.49402,
+              613.19922,
+              611.48722
+            ],
+            "median_us": 611.48722,
+            "min_us": 518.73338,
+            "max_us": 622.58248,
+            "useful_tflops": 449.6332986452276,
+            "useful_mfu_percent": 59.43599453340749,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "UNRESOLVED_AT_70"
+          }
+        }
+      ],
+      "pooled": {
+        "control": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              519.79772,
+              554.3393,
+              606.41144,
+              606.35178,
+              606.38012,
+              602.37038,
+              601.5557,
+              601.6049,
+              601.54606,
+              518.73338,
+              548.52936,
+              584.85542,
+              585.69762,
+              622.58248,
+              614.55932,
+              614.49402,
+              613.19922,
+              611.48722
+            ],
+            "median_us": 601.98764,
+            "min_us": 518.73338,
+            "max_us": 622.58248,
+            "useful_tflops": 456.72867271494147,
+            "useful_mfu_percent": 60.373915758749696,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "UNRESOLVED_AT_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              585.214729309082,
+              587.2083282470703,
+              586.7935943603516,
+              591.3708877563477,
+              640.2188873291016,
+              632.8441619873047,
+              632.6982498168945,
+              630.3942489624023,
+              624.1561508178711,
+              646.3801574707031,
+              630.2438354492188,
+              626.9132614135742,
+              624.213752746582,
+              624.2233657836914,
+              623.9334487915039,
+              625.8214569091797,
+              626.2643051147461,
+              625.9027099609375
+            ],
+            "median_us": 625.8620834350586,
+            "min_us": 585.214729309082,
+            "max_us": 646.3801574707031,
+            "useful_tflops": 439.3060757075391,
+            "useful_mfu_percent": 58.07086261831317,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          }
+        },
+        "official": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              528.75398,
+              541.59612,
+              612.46964,
+              631.1296600000001,
+              631.14108,
+              630.6713599999999,
+              593.6798,
+              573.5754,
+              575.88644,
+              527.38806,
+              572.83222,
+              615.95254,
+              615.89106,
+              615.76686,
+              615.97242,
+              615.09364,
+              615.07756,
+              612.98866
+            ],
+            "median_us": 614.03311,
+            "min_us": 527.38806,
+            "max_us": 631.14108,
+            "useful_tflops": 447.7690393731374,
+            "useful_mfu_percent": 59.18956237582781,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              553.3958435058594,
+              582.5139236450195,
+              631.3727951049805,
+              625.9552001953125,
+              621.317138671875,
+              626.6719818115234,
+              621.3900756835938,
+              621.1808013916016,
+              619.0963363647461,
+              560.1555252075195,
+              553.3324813842773,
+              600.6496047973633,
+              622.993278503418,
+              617.1807861328125,
+              604.4300842285156,
+              597.2601699829102,
+              597.5507354736328,
+              597.6006317138672
+            ],
+            "median_us": 610.8054351806641,
+            "min_us": 553.3324813842773,
+            "max_us": 631.3727951049805,
+            "useful_tflops": 450.13518212501947,
+            "useful_mfu_percent": 59.50233735955314,
+            "target_70_latency_us": 519.2050152166935,
+            "verdict": "BELOW_70"
+          }
+        }
+      },
+      "relative_verdict": {
+        "instrumented_kernel_only": "UNRESOLVED",
+        "full_call_event_span": "UNRESOLVED"
+      }
+    },
+    {
+      "seqlen": 8192,
+      "previous_run_context": false,
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "cross_arm_output_raw_equal": true,
+      "cross_arm_lse_raw_equal": true,
+      "runs": [
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s8192-a1-r3",
+          "result_sha256": "183623e99ad2509d68c938b2f7514e7b1dd0cf467874a71d291becf5e234bcc4",
+          "trace_sha256": "a91c7a7d7aa6608a329f0c97ff0712f4c04df4f0b639e526ec621db321917424",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "control",
+          "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+          "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+          "max_output_abs": 0.008259462448213739,
+          "max_lse_abs": 0.0000024377827472221725,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2272.282257080078,
+              2251.703643798828,
+              2339.081573486328,
+              2533.2582092285156,
+              2409.2063903808594,
+              2409.0284729003906,
+              2408.7904357910156,
+              2408.784637451172,
+              2398.9971923828125
+            ],
+            "median_us": 2408.784637451172,
+            "min_us": 2251.703643798828,
+            "max_us": 2533.2582092285156,
+            "useful_tflops": 456.51480352663566,
+            "useful_mfu_percent": 60.345644881247274,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2118.30648,
+              2289.98342,
+              2239.31846,
+              2264.06108,
+              2216.7949,
+              2221.51476,
+              2221.50854,
+              2457.55626,
+              2395.9944
+            ],
+            "median_us": 2239.31846,
+            "min_us": 2118.30648,
+            "max_us": 2457.55626,
+            "useful_tflops": 491.06273410705506,
+            "useful_mfu_percent": 64.91245659048977,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s8192-b1",
+          "result_sha256": "5002bdef59f756fde81fcb53f83e3494912021f053f667cb465a85be53228c9e",
+          "trace_sha256": "9d6bee4f6c16a387a4088c1dc32eb91a00960ce5dfbb4e6a143ac51d2373c97e",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "official",
+          "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+          "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+          "max_output_abs": 0.008259462448213739,
+          "max_lse_abs": 0.0000024377827472221725,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2318.224639892578,
+              2221.075897216797,
+              2262.3008728027344,
+              2405.714569091797,
+              2403.055419921875,
+              2403.098907470703,
+              2403.2057189941406,
+              2403.0662536621094,
+              2403.0816650390625
+            ],
+            "median_us": 2403.0662536621094,
+            "min_us": 2221.075897216797,
+            "max_us": 2405.714569091797,
+            "useful_tflops": 457.6011351448237,
+            "useful_mfu_percent": 60.48924456640101,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2172.52568,
+              2230.43534,
+              2314.52824,
+              2214.90176,
+              2222.29802,
+              2222.2928,
+              2290.2324399999998,
+              2466.2009,
+              2465.61714
+            ],
+            "median_us": 2230.43534,
+            "min_us": 2172.52568,
+            "max_us": 2466.2009,
+            "useful_tflops": 493.0184819901571,
+            "useful_mfu_percent": 65.17098241773392,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s8192-b2",
+          "result_sha256": "5e06a27ff819a2ba07d4bbd7dad89424710f656d5d2f1cb8fa36e2dca6d62b79",
+          "trace_sha256": "85a49202136e68c3914d3ce360a10f4c3a555279755b8348be05245134e13120",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "official",
+          "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+          "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+          "max_output_abs": 0.008259462448213739,
+          "max_lse_abs": 0.0000024377827472221725,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2240.4754638671875,
+              2311.254425048828,
+              2299.0956115722656,
+              2473.0636596679688,
+              2472.5369262695312,
+              2472.5509643554688,
+              2415.531463623047,
+              2403.7306213378906,
+              2384.5587158203125
+            ],
+            "median_us": 2403.7306213378906,
+            "min_us": 2240.4754638671875,
+            "max_us": 2473.0636596679688,
+            "useful_tflops": 457.4746586586932,
+            "useful_mfu_percent": 60.47252592976777,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2140.71888,
+              2297.37708,
+              2225.18476,
+              2222.15766,
+              2221.91198,
+              2222.2108,
+              2263.36378,
+              2501.53578,
+              2481.73278
+            ],
+            "median_us": 2225.18476,
+            "min_us": 2140.71888,
+            "max_us": 2501.53578,
+            "useful_tflops": 494.181815942331,
+            "useful_mfu_percent": 65.32476086481573,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s8192-a2",
+          "result_sha256": "fe18043419718c79bdda93988fa851cb62fd163d3dcaa9231c6ae4adb5a67ee2",
+          "trace_sha256": "1e64846377a55e8c726369296275ddb7a5db95eacece5fda0662245402208170",
+          "harness_sha256": "ec8dcf1fd65747fe1c758899acaa3183a7ec67169a533f0613ec5c1c4e1edd36",
+          "arm": "control",
+          "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+          "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+          "max_output_abs": 0.008259462448213739,
+          "max_lse_abs": 0.0000024377827472221725,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2265.0125122070312,
+              2300.2630615234375,
+              2315.0015258789062,
+              2513.9724731445312,
+              2482.6368713378906,
+              2410.9657287597656,
+              2412.929229736328,
+              2412.0755004882812,
+              2342.076873779297
+            ],
+            "median_us": 2410.9657287597656,
+            "min_us": 2265.0125122070312,
+            "max_us": 2513.9724731445312,
+            "useful_tflops": 456.1018152960943,
+            "useful_mfu_percent": 60.29105291422264,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2161.22552,
+              2265.00578,
+              2268.03306,
+              2258.60964,
+              2265.26364,
+              2260.28396,
+              2245.71714,
+              2436.24556,
+              2399.72802
+            ],
+            "median_us": 2265.00578,
+            "min_us": 2161.22552,
+            "max_us": 2436.24556,
+            "useful_tflops": 485.4936156074622,
+            "useful_mfu_percent": 64.17628758856077,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        }
+      ],
+      "pooled": {
+        "control": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2118.30648,
+              2289.98342,
+              2239.31846,
+              2264.06108,
+              2216.7949,
+              2221.51476,
+              2221.50854,
+              2457.55626,
+              2395.9944,
+              2161.22552,
+              2265.00578,
+              2268.03306,
+              2258.60964,
+              2265.26364,
+              2260.28396,
+              2245.71714,
+              2436.24556,
+              2399.72802
+            ],
+            "median_us": 2262.17252,
+            "min_us": 2118.30648,
+            "max_us": 2457.55626,
+            "useful_tflops": 486.101672521422,
+            "useful_mfu_percent": 64.2566652374649,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2272.282257080078,
+              2251.703643798828,
+              2339.081573486328,
+              2533.2582092285156,
+              2409.2063903808594,
+              2409.0284729003906,
+              2408.7904357910156,
+              2408.784637451172,
+              2398.9971923828125,
+              2265.0125122070312,
+              2300.2630615234375,
+              2315.0015258789062,
+              2513.9724731445312,
+              2482.6368713378906,
+              2410.9657287597656,
+              2412.929229736328,
+              2412.0755004882812,
+              2342.076873779297
+            ],
+            "median_us": 2408.7875366210938,
+            "min_us": 2251.703643798828,
+            "max_us": 2533.2582092285156,
+            "useful_tflops": 456.51425407427956,
+            "useful_mfu_percent": 60.34557225040047,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        },
+        "official": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              2172.52568,
+              2230.43534,
+              2314.52824,
+              2214.90176,
+              2222.29802,
+              2222.2928,
+              2290.2324399999998,
+              2466.2009,
+              2465.61714,
+              2140.71888,
+              2297.37708,
+              2225.18476,
+              2222.15766,
+              2221.91198,
+              2222.2108,
+              2263.36378,
+              2501.53578,
+              2481.73278
+            ],
+            "median_us": 2227.81005,
+            "min_us": 2140.71888,
+            "max_us": 2501.53578,
+            "useful_tflops": 493.5994635197915,
+            "useful_mfu_percent": 65.24778103368031,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              2318.224639892578,
+              2221.075897216797,
+              2262.3008728027344,
+              2405.714569091797,
+              2403.055419921875,
+              2403.098907470703,
+              2403.2057189941406,
+              2403.0662536621094,
+              2403.0816650390625,
+              2240.4754638671875,
+              2311.254425048828,
+              2299.0956115722656,
+              2473.0636596679688,
+              2472.5369262695312,
+              2472.5509643554688,
+              2415.531463623047,
+              2403.7306213378906,
+              2384.5587158203125
+            ],
+            "median_us": 2403.073959350586,
+            "min_us": 2221.075897216797,
+            "max_us": 2473.0636596679688,
+            "useful_tflops": 457.59966780263875,
+            "useful_mfu_percent": 60.48905060180287,
+            "target_70_latency_us": 2076.5666046718916,
+            "verdict": "BELOW_70"
+          }
+        }
+      },
+      "relative_verdict": {
+        "instrumented_kernel_only": "UNRESOLVED",
+        "full_call_event_span": "UNRESOLVED"
+      }
+    },
+    {
+      "seqlen": 16384,
+      "previous_run_context": false,
+      "input_sha256": [
+        "8f05a981638ee8c83a70cf56003484ea423902bb2ad211660f7597ef9a2239f0",
+        "ed0b554ca154477345f1def99d7c7a2d5d938e66e3918d5c526ec27b32ea3a25",
+        "efd0d9ff17f507abee2fdcaaf76ab12252c2233a85848e8a8a0a8b1750fa53aa"
+      ],
+      "cross_arm_output_raw_equal": true,
+      "cross_arm_lse_raw_equal": true,
+      "runs": [
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s16384-a1-r2",
+          "result_sha256": "bf42871ed5a7fe65106eaa46a6a9bd9a2faea77bad2895412842363f5b6c7c8b",
+          "trace_sha256": "325001c6d44d87690c53a6bf8f41b33808200a86f65477ebe48b368756208b1f",
+          "harness_sha256": "4c61b18ea1e788fc93fa02503f690d1e723ed1b4420523e4ffaaa2321b794291",
+          "arm": "control",
+          "output_sha256": "55ee78862c27f5a70dffabae8ad228b84adfce76ffa091014b6d2e178ef1dc91",
+          "lse_sha256": "6330c30705cee858612f85a7e66f565b47c999d579c0c4da3844f100234c613e",
+          "max_output_abs": 0.008222517389027129,
+          "max_lse_abs": 0.0000028916481795704385,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9472.492065429688,
+              9346.712036132812,
+              9506.005249023438,
+              9461.298217773438,
+              9485.612182617188,
+              9493.291015625,
+              9476.041259765625,
+              9388.134765625,
+              9335.360717773438
+            ],
+            "median_us": 9472.492065429688,
+            "min_us": 9335.360717773438,
+            "max_us": 9506.005249023438,
+            "useful_tflops": 464.32500720817285,
+            "useful_mfu_percent": 61.37805779354565,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8710.87854,
+              8956.79834,
+              9605.0237,
+              9228.05274,
+              9447.43796,
+              9251.42328,
+              9441.16168,
+              9302.3226,
+              9390.22026
+            ],
+            "median_us": 9302.3226,
+            "min_us": 8710.87854,
+            "max_us": 9605.0237,
+            "useful_tflops": 472.81900829369215,
+            "useful_mfu_percent": 62.50086031641667,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s16384-b1",
+          "result_sha256": "36d67cd211cda5de06d176c1ff184685b3efbd14ff77c9938d8808af17d2a8ed",
+          "trace_sha256": "adce7491975d88687ac8c172a816e8c4217c570d79a801fb70221694257b094f",
+          "harness_sha256": "4c61b18ea1e788fc93fa02503f690d1e723ed1b4420523e4ffaaa2321b794291",
+          "arm": "official",
+          "output_sha256": "55ee78862c27f5a70dffabae8ad228b84adfce76ffa091014b6d2e178ef1dc91",
+          "lse_sha256": "6330c30705cee858612f85a7e66f565b47c999d579c0c4da3844f100234c613e",
+          "max_output_abs": 0.008222517389027129,
+          "max_lse_abs": 0.0000028916481795704385,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9590.036010742188,
+              9322.093505859375,
+              9477.8857421875,
+              9374.981689453125,
+              9441.517333984375,
+              9412.19970703125,
+              9402.555541992188,
+              9380.046997070312,
+              9419.332885742188
+            ],
+            "median_us": 9412.19970703125,
+            "min_us": 9322.093505859375,
+            "max_us": 9590.036010742188,
+            "useful_tflops": 467.29936502242947,
+            "useful_mfu_percent": 61.77123133145135,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8658.19854,
+              9017.48906,
+              9670.57468,
+              9304.26144,
+              9557.3707,
+              9289.17612,
+              9513.92978,
+              9341.89942,
+              9468.88946
+            ],
+            "median_us": 9341.89942,
+            "min_us": 8658.19854,
+            "max_us": 9670.57468,
+            "useful_tflops": 470.81591749357545,
+            "useful_mfu_percent": 62.23607633755128,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s16384-b2",
+          "result_sha256": "92f2ac3fa3847500cb140a316edb86d6e9128c3a0ec741d6bf994eecdf5a62bd",
+          "trace_sha256": "9090b59cfa74f813a91e6e4d12527e9d1c7355249e95bb61e625923a6703af06",
+          "harness_sha256": "4c61b18ea1e788fc93fa02503f690d1e723ed1b4420523e4ffaaa2321b794291",
+          "arm": "official",
+          "output_sha256": "55ee78862c27f5a70dffabae8ad228b84adfce76ffa091014b6d2e178ef1dc91",
+          "lse_sha256": "6330c30705cee858612f85a7e66f565b47c999d579c0c4da3844f100234c613e",
+          "max_output_abs": 0.008222517389027129,
+          "max_lse_abs": 0.0000028916481795704385,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 51,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9746.531982421875,
+              9288.515625,
+              9685.4052734375,
+              9406.621704101562,
+              9638.73779296875,
+              9470.21484375,
+              9595.498657226562,
+              9543.384399414062,
+              9534.4921875
+            ],
+            "median_us": 9543.384399414062,
+            "min_us": 9288.515625,
+            "max_us": 9746.531982421875,
+            "useful_tflops": 460.87580280534905,
+            "useful_mfu_percent": 60.922115374137356,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8738.24842,
+              8960.3452,
+              9529.34582,
+              9240.5668,
+              9465.82254,
+              9270.01744,
+              9477.8257,
+              9364.151,
+              9443.31712
+            ],
+            "median_us": 9364.151,
+            "min_us": 8738.24842,
+            "max_us": 9529.34582,
+            "useful_tflops": 469.6971403558102,
+            "useful_mfu_percent": 62.08818775357702,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        },
+        {
+          "path": "/workspace/flash-attn-h800-sequence-scaling-20260926/s16384-a2",
+          "result_sha256": "976db3c4a2785f441ec7228561bc36e05bb6178631f3b4329dae5ae7dc08a06f",
+          "trace_sha256": "510f576c47db73dab38fffd0facb2875677b337c4f19c2c7aee0ae39b8481b7c",
+          "harness_sha256": "4c61b18ea1e788fc93fa02503f690d1e723ed1b4420523e4ffaaa2321b794291",
+          "arm": "control",
+          "output_sha256": "55ee78862c27f5a70dffabae8ad228b84adfce76ffa091014b6d2e178ef1dc91",
+          "lse_sha256": "6330c30705cee858612f85a7e66f565b47c999d579c0c4da3844f100234c613e",
+          "max_output_abs": 0.008222517389027129,
+          "max_lse_abs": 0.0000028916481795704385,
+          "attention_arguments": {
+            "External id": 1,
+            "queued": 0,
+            "device": 0,
+            "context": 1,
+            "stream": 7,
+            "correlation": 55,
+            "registers per thread": 168,
+            "shared memory": 232448,
+            "blocks per SM": 1,
+            "warps per SM": 12,
+            "grid": [
+              114,
+              1,
+              1
+            ],
+            "block": [
+              384,
+              1,
+              1
+            ],
+            "est. achieved occupancy %": 0
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9580.390014648438,
+              9398.328247070312,
+              9538.92822265625,
+              9474.603881835938,
+              9545.496826171875,
+              9539.082641601562,
+              9515.043334960938,
+              9539.67041015625,
+              9539.359130859375
+            ],
+            "median_us": 9539.082641601562,
+            "min_us": 9398.328247070312,
+            "max_us": 9580.390014648438,
+            "useful_tflops": 461.0836399905165,
+            "useful_mfu_percent": 60.949588894979044,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8718.99068,
+              8975.94882,
+              9509.36946,
+              9182.73582,
+              9525.60244,
+              9240.09542,
+              9475.01846,
+              9299.06454,
+              9397.73136
+            ],
+            "median_us": 9299.06454,
+            "min_us": 8718.99068,
+            "max_us": 9525.60244,
+            "useful_tflops": 472.9846671824476,
+            "useful_mfu_percent": 62.522758384989764,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        }
+      ],
+      "pooled": {
+        "control": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8710.87854,
+              8956.79834,
+              9605.0237,
+              9228.05274,
+              9447.43796,
+              9251.42328,
+              9441.16168,
+              9302.3226,
+              9390.22026,
+              8718.99068,
+              8975.94882,
+              9509.36946,
+              9182.73582,
+              9525.60244,
+              9240.09542,
+              9475.01846,
+              9299.06454,
+              9397.73136
+            ],
+            "median_us": 9300.69357,
+            "min_us": 8710.87854,
+            "max_us": 9605.0237,
+            "useful_tflops": 472.9018232303723,
+            "useful_mfu_percent": 62.51180743296395,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9472.492065429688,
+              9346.712036132812,
+              9506.005249023438,
+              9461.298217773438,
+              9485.612182617188,
+              9493.291015625,
+              9476.041259765625,
+              9388.134765625,
+              9335.360717773438,
+              9580.390014648438,
+              9398.328247070312,
+              9538.92822265625,
+              9474.603881835938,
+              9545.496826171875,
+              9539.082641601562,
+              9515.043334960938,
+              9539.67041015625,
+              9539.359130859375
+            ],
+            "median_us": 9489.451599121094,
+            "min_us": 9335.360717773438,
+            "max_us": 9580.390014648438,
+            "useful_tflops": 463.49516625042577,
+            "useful_mfu_percent": 61.26836302054538,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        },
+        "official": {
+          "instrumented_kernel_only": {
+            "samples_us": [
+              8658.19854,
+              9017.48906,
+              9670.57468,
+              9304.26144,
+              9557.3707,
+              9289.17612,
+              9513.92978,
+              9341.89942,
+              9468.88946,
+              8738.24842,
+              8960.3452,
+              9529.34582,
+              9240.5668,
+              9465.82254,
+              9270.01744,
+              9477.8257,
+              9364.151,
+              9443.31712
+            ],
+            "median_us": 9353.02521,
+            "min_us": 8658.19854,
+            "max_us": 9670.57468,
+            "useful_tflops": 470.2558635100696,
+            "useful_mfu_percent": 62.162044085931214,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          },
+          "full_call_event_span": {
+            "samples_us": [
+              9590.036010742188,
+              9322.093505859375,
+              9477.8857421875,
+              9374.981689453125,
+              9441.517333984375,
+              9412.19970703125,
+              9402.555541992188,
+              9380.046997070312,
+              9419.332885742188,
+              9746.531982421875,
+              9288.515625,
+              9685.4052734375,
+              9406.621704101562,
+              9638.73779296875,
+              9470.21484375,
+              9595.498657226562,
+              9543.384399414062,
+              9534.4921875
+            ],
+            "median_us": 9455.866088867188,
+            "min_us": 9288.515625,
+            "max_us": 9746.531982421875,
+            "useful_tflops": 465.14141647356155,
+            "useful_mfu_percent": 61.48597706193808,
+            "target_70_latency_us": 8305.759506297802,
+            "verdict": "BELOW_70"
+          }
+        }
+      },
+      "relative_verdict": {
+        "instrumented_kernel_only": "UNRESOLVED",
+        "full_call_event_span": "UNRESOLVED"
+      }
+    }
+  ],
+  "power_samples": [
+    {
+      "run": "s8192-b2",
+      "monitor_path": "/workspace/flash-attn-h800-sequence-scaling-20260926/clock-observation-r3.csv",
+      "monitor_sha256": "523c8715d789cb2b9a496d82ab1edffc2562895c51052776be3909de10ebb9c8",
+      "clock_timestamp_zone": "remote host CST/UTC+08:00 verified against date; converted for trace join",
+      "trace_start_utc": "2026-09-26T05:31:55.436420+00:00",
+      "trace_end_utc": "2026-09-26T05:31:56.468025+00:00",
+      "samples_inside_trace_window": 5,
+      "sw_power_cap_active": 5,
+      "active_cap_sm_clock_range_mhz": [
+        990,
+        1140
+      ],
+      "active_cap_power_draw_range_w": [
+        193.15,
+        369.1
+      ],
+      "power_limit_w": 350,
+      "scope": "200ms passive snapshots inside attention trace window, NOT per-kernel cycle averages or percentage of time throttled"
+    },
+    {
+      "run": "s8192-a2",
+      "monitor_path": "/workspace/flash-attn-h800-sequence-scaling-20260926/clock-observation-r3.csv",
+      "monitor_sha256": "523c8715d789cb2b9a496d82ab1edffc2562895c51052776be3909de10ebb9c8",
+      "clock_timestamp_zone": "remote host CST/UTC+08:00 verified against date; converted for trace join",
+      "trace_start_utc": "2026-09-26T05:32:15.234386+00:00",
+      "trace_end_utc": "2026-09-26T05:32:16.272903+00:00",
+      "samples_inside_trace_window": 5,
+      "sw_power_cap_active": 4,
+      "active_cap_sm_clock_range_mhz": [
+        1110,
+        1155
+      ],
+      "active_cap_power_draw_range_w": [
+        187.47,
+        303.98
+      ],
+      "power_limit_w": 350,
+      "scope": "200ms passive snapshots inside attention trace window, NOT per-kernel cycle averages or percentage of time throttled"
+    },
+    {
+      "run": "s16384-b1",
+      "monitor_path": "/workspace/flash-attn-h800-sequence-scaling-20260926/clock-observation-16k.csv",
+      "monitor_sha256": "2bf30d1fd9a4b2b3fe11d97157472eff916c86ef07895a37f9af2a0aba374ffd",
+      "clock_timestamp_zone": "remote host CST/UTC+08:00 verified against date; converted for trace join",
+      "trace_start_utc": "2026-09-26T05:38:35.106661+00:00",
+      "trace_end_utc": "2026-09-26T05:38:39.300704+00:00",
+      "samples_inside_trace_window": 21,
+      "sw_power_cap_active": 20,
+      "active_cap_sm_clock_range_mhz": [
+        975,
+        1110
+      ],
+      "active_cap_power_draw_range_w": [
+        174.56,
+        373.68
+      ],
+      "power_limit_w": 350,
+      "scope": "200ms passive snapshots inside attention trace window, NOT per-kernel cycle averages or percentage of time throttled"
+    },
+    {
+      "run": "s16384-b2",
+      "monitor_path": "/workspace/flash-attn-h800-sequence-scaling-20260926/clock-observation-16k.csv",
+      "monitor_sha256": "2bf30d1fd9a4b2b3fe11d97157472eff916c86ef07895a37f9af2a0aba374ffd",
+      "clock_timestamp_zone": "remote host CST/UTC+08:00 verified against date; converted for trace join",
+      "trace_start_utc": "2026-09-26T05:39:45.103129+00:00",
+      "trace_end_utc": "2026-09-26T05:39:49.280595+00:00",
+      "samples_inside_trace_window": 21,
+      "sw_power_cap_active": 20,
+      "active_cap_sm_clock_range_mhz": [
+        975,
+        1125
+      ],
+      "active_cap_power_draw_range_w": [
+        196.13,
+        369.42
+      ],
+      "power_limit_w": 350,
+      "scope": "200ms passive snapshots inside attention trace window, NOT per-kernel cycle averages or percentage of time throttled"
+    }
+  ],
+  "invalid_attempts": [
+    "s8192-a1: BUSY before first launch",
+    "s8192-a1-r2: BUSY before first launch",
+    "s16384-a1: BUSY before first launch"
+  ]
+}
