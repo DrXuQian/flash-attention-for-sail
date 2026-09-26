@@ -42,3 +42,13 @@ dependence, not prove which startup/masking/scheduling term caused it or that
 the smaller shape has no headroom.
 
 Evidence root: /workspace/flash-attn-h800-sequence-scaling-20260926 (both hosts).
+
+## Admission-only checkpoint before any S16384 timing
+
+S4096/S8192 completed. Two S8192 attempts and the first S16384 attempt were
+refused after CPU reference when foreign GDN tasks arrived, before any target
+launch. Preserve those refusals, not as numerical/performance failures. Add an
+optional bounded prelaunch idle wait so the complete CPU oracle need not be
+recomputed while waiting. This does not change any timing/sample/accuracy
+criterion. During/after measurement BUSY still fails immediately; samples
+from an occupied device are never retained as valid.

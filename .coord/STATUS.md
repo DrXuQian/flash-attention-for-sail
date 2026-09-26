@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 05:24:23 UTC
-    working-on: user-requested S4096/8192/16384 scaling; immutable port/official binaries
-    blocked-on: H800 occupied by foreign benchmark parent; no GPU work started
-    last-commit: 113ba60 (completed S2048 official A/B)
+    updated-at: 2026-09-26 05:30:36 UTC
+    working-on: S4096 four arms complete; S8192 a1-r3 after two prelaunch BUSY refusals
+    blocked-on: no current foreign parent; no measurements retained from BUSY attempts
+    last-commit: 19005e9 (sequence-scaling preregistration; 34 local tests PASS)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA

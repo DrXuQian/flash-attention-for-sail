@@ -2,6 +2,7 @@
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import bench_h800_official_fa3 as ab
@@ -43,6 +44,17 @@ class OfficialABTests(unittest.TestCase):
                     8192: 1099645845504, 16384: 4398314946560}
         for length in ab.SEQUENCE_LENGTHS:
             self.assertEqual(ab.logical_flops(1, length, 32, 256, True), expected[length])
+
+    def test_busy_prelaunch_does_not_become_a_pass(self):
+        with patch.object(ab, "require_idle", side_effect=RuntimeError("BUSY")):
+            with self.assertRaisesRegex(RuntimeError, "BUSY"):
+                ab.wait_before_first_launch(0)
+
+    def test_prelaunch_wait_rechecks_instead_of_ignoring_busy(self):
+        with patch.object(ab, "require_idle", side_effect=[RuntimeError("BUSY"), None]) as check:
+            with patch.object(ab.time, "sleep"):
+                ab.wait_before_first_launch(60)
+        self.assertEqual(check.call_count, 2)
 
     def test_official_counter_zero_is_separate_not_attention(self):
         trace = {"traceEvents": [event("FillFunctor<int>"), event("FlashAttnFwdSm90", 2)]}

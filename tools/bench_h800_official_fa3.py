@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import statistics
 import sys
+import time
 
 from bench_ppu17_hopper_control import (
     ADMISSION, CALLS, PEAK_BF16_DENSE_TFLOPS, PEAK_SOURCE, SAMPLES, WARMUP,
@@ -41,6 +42,25 @@ def check_sequence_inputs(seqlen, hashes, reference):
             reference.get("causal") is not True):
         raise ValueError("same-input reference shape/type mismatch")
     check_inputs(hashes, reference["input_sha256"])
+
+
+def wait_before_first_launch(timeout):
+    """Retain the CPU oracle while a newly arrived foreign task finishes.
+
+    Waiting is allowed only before the first target launch. Checks between
+    and after timing phases still fail immediately; never keep busy samples.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            require_idle()
+            return
+        except RuntimeError:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            print("[H800 official A/B] BUSY before first launch; retaining CPU oracle, not timing", flush=True)
+            time.sleep(min(15, remaining))
 
 
 def parse_trace(trace, expected, arm):
@@ -77,8 +97,12 @@ def main():
     ap.add_argument("--seqlen", type=int, choices=SEQUENCE_LENGTHS, default=2048)
     ap.add_argument("--same-input-as", type=Path,
                     help="prior completed result for this length; required for new official lengths")
+    ap.add_argument("--prelaunch-idle-wait", type=int, default=0,
+                    help="seconds to wait after CPU reference if another task arrived; no timed samples yet")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
+    if args.prelaunch_idle_wait < 0:
+        ap.error("--prelaunch-idle-wait must be nonnegative")
     if args.seqlen != 2048 and args.arm == "official" and args.same_input_as is None:
         ap.error("larger official shapes require --same-input-as from the control")
     args.out.mkdir(parents=True, exist_ok=False)
@@ -89,6 +113,7 @@ def main():
         "samples": SAMPLES, "calls_per_sample": CALLS,
         "peak_bf16_dense_tflops": PEAK_BF16_DENSE_TFLOPS, "peak_source": PEAK_SOURCE,
         "cache": "repeated-prepared-inputs-no-flush", "kernel_changed": False,
+        "prelaunch_idle_wait_seconds": args.prelaunch_idle_wait,
         "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "source_commit": UPSTREAM if args.arm == "official" else "e7ee864",
         "backend_commit": UPSTREAM_CUTLASS if args.arm == "official" else "023e82d",
@@ -126,7 +151,7 @@ def main():
         record["same_input_reference_sha256"] = hashlib.sha256(args.same_input_as.read_bytes()).hexdigest()
     print(f"[H800 official A/B] arm={args.arm} S={args.seqlen} full CPU-FP64 reference starting", flush=True)
     expected, expected_lse = cpu_reference(host, causal=True)
-    require_idle()
+    wait_before_first_launch(args.prelaunch_idle_wait)
     q, k, v = [t.to("cuda") for t in host]
     flops = logical_flops(1, args.seqlen, 32, 256, True)
     record["useful_causal_flops"] = flops
