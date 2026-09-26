@@ -1,0 +1,68 @@
+[
+  {
+    "extension_sha256": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73",
+    "tests": [
+      {
+        "plant": "noncausal",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "fp16",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "D64",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      }
+    ],
+    "device_kernel_launches": 0,
+    "trace_sha256": "00fb5ab78a3e66a03bf974e77bd6be31e56a50ca84ee730e25df96743ee61196"
+  },
+  {
+    "extension_sha256": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce",
+    "tests": [
+      {
+        "plant": "noncausal",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "fp16",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "D64",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      }
+    ],
+    "device_kernel_launches": 0,
+    "trace_sha256": "fe2d5234d70e66144c8f54821b56474574b2845ae344ea4d75fd7b0491385b52"
+  },
+  {
+    "extension_sha256": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c",
+    "tests": [
+      {
+        "plant": "noncausal",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "fp16",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      },
+      {
+        "plant": "D64",
+        "verdict": "EXPECTED_RED",
+        "reason": "causal experiment binary admits only BF16 D256 causal forward"
+      }
+    ],
+    "device_kernel_launches": 0,
+    "trace_sha256": "97077898f6780bf9cf2caaa8a7ab2e999159a0599afc699e12925dbf0aef1126"
+  }
+]

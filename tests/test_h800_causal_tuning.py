@@ -9,9 +9,31 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import bench_h800_causal_tuning as bench
+import summarize_h800_causal_tuning as summary
 
 
 class PolicyTest(unittest.TestCase):
+    def test_device_driver_power_limit_identity_is_not_a_label(self):
+        header = "name, uuid, driver_version, power.limit [W]\n"
+        one = header+"H800, GPU-A, 595, 350 W\n"
+        self.assertEqual(summary.device_identity(one), ("H800","GPU-A","595","350 W"))
+        self.assertNotEqual(summary.device_identity(one), summary.device_identity(one.replace("GPU-A","GPU-B")))
+        with self.assertRaises(ValueError):
+            summary.device_identity(one+"H800, GPU-B, 595, 350 W\n")
+
+    def test_comparison_is_disjoint_or_unresolved(self):
+        control = {"min_us":10,"max_us":12}
+        self.assertEqual(summary.compare(control,{"min_us":8,"max_us":9}),"FASTER")
+        self.assertEqual(summary.compare(control,{"min_us":13,"max_us":14}),"SLOWER")
+        self.assertEqual(summary.compare(control,{"min_us":9,"max_us":11}),"UNRESOLVED")
+        self.assertEqual(summary.compare(control,{"min_us":8,"max_us":10}),"UNRESOLVED")
+
+    def test_missing_shape_arm_is_not_a_smaller_denominator(self):
+        folder = Path("/workspace/flash-attn-ppu17-causal-policy-tests") / f"missing-{time.time_ns()}"
+        folder.mkdir(parents=True)
+        with self.assertRaises(FileNotFoundError):
+            summary.summarize_root(folder)
+
     def compile(self, n=80, single=0, experiment=True, plant=""):
         folder = Path("/workspace/flash-attn-ppu17-causal-policy-tests")
         folder.mkdir(exist_ok=True)

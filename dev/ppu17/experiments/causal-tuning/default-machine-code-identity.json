@@ -1,0 +1,38 @@
+[
+  {
+    "unit": "flash_fwd_hdim128_bf16_sm90.o",
+    "bodies": 2,
+    "machine_words": 12016,
+    "machine_code_sha256": "505833c9d9a22d1730b3bfa35500dc7bd850b49d4406796cb60f4c64733b4573"
+  },
+  {
+    "unit": "flash_fwd_hdim128_fp16_sm90.o",
+    "bodies": 2,
+    "machine_words": 12016,
+    "machine_code_sha256": "ddf306bf846e66ad75373a48a4c74ff7687b6235ea91f53a124cccf319b03adf"
+  },
+  {
+    "unit": "flash_fwd_hdim256_bf16_sm90.o",
+    "bodies": 2,
+    "machine_words": 12800,
+    "machine_code_sha256": "72a912ff51d2e44f084087992279302728b86fc12e07ef1dd19e73311660e9b4"
+  },
+  {
+    "unit": "flash_fwd_hdim256_fp16_sm90.o",
+    "bodies": 2,
+    "machine_words": 12800,
+    "machine_code_sha256": "62807950a9b4d24d9b8d145f753760969c550c526c504f83ae2ebaf035333e55"
+  },
+  {
+    "unit": "flash_fwd_hdim64_bf16_sm90.o",
+    "bodies": 2,
+    "machine_words": 10976,
+    "machine_code_sha256": "148739a462746feb0ab06871696cf0b8592b16a81a81f0f8e61e903c29060c68"
+  },
+  {
+    "unit": "flash_fwd_hdim64_fp16_sm90.o",
+    "bodies": 2,
+    "machine_words": 10976,
+    "machine_code_sha256": "63c94ff2df10fc5000ef83b2e883a8136be7c2d0dc9ce2eb76721388d123b0c7"
+  }
+]

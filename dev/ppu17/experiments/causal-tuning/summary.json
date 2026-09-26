@@ -1,0 +1,3758 @@
+{
+  "scope": "physical H800; NOT native PPU1.7/model",
+  "source_parent": "ed150c9",
+  "registered_primary_runs": 24,
+  "admitted_primary_runs": 24,
+  "shape_count": 2,
+  "rows": [
+    {
+      "label": "N80-LPT",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          174.52608108520508,
+          174.50944900512695,
+          173.80416870117188,
+          168.54272842407227,
+          173.80992889404297,
+          176.8569564819336,
+          176.77440643310547,
+          176.88831329345703,
+          176.63616180419922,
+          171.2076759338379,
+          177.10655212402344,
+          178.53567123413086,
+          169.5039939880371,
+          170.00640869140625,
+          178.49920272827148,
+          178.26688766479492,
+          178.1862449645996,
+          178.33215713500977
+        ],
+        "median_us": 176.70528411865234,
+        "min_us": 168.54272842407227,
+        "max_us": 178.53567123413086,
+        "useful_tflops": 389.08305153927586,
+        "useful_mfu_percent": 51.43199623784215,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "CONTROL",
+        "median_speedup_vs_control": 1
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          146.6318,
+          146.5742,
+          146.73804,
+          148.79874,
+          161.79476,
+          161.66026,
+          171.93096,
+          174.25932,
+          175.66482,
+          146.68306,
+          146.55956,
+          146.83352,
+          146.692,
+          157.15698,
+          162.43004,
+          164.11832,
+          169.92834,
+          176.99168
+        ],
+        "median_us": 159.40861999999998,
+        "min_us": 146.55956,
+        "max_us": 176.99168,
+        "useful_tflops": 431.3005856772363,
+        "useful_mfu_percent": 57.01263525145226,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "CONTROL",
+        "median_speedup_vs_control": 1
+      }
+    },
+    {
+      "label": "N64-LPT",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          168.30848693847656,
+          165.7868766784668,
+          165.52000045776367,
+          165.65439224243164,
+          165.87200164794922,
+          174.11455154418945,
+          177.5904083251953,
+          177.33247756958008,
+          177.32927322387695,
+          169.17375564575195,
+          173.06751251220703,
+          167.99232482910156,
+          172.7187156677246,
+          177.45471954345703,
+          177.02144622802734,
+          177.14176177978516,
+          177.1468734741211,
+          176.90496444702148
+        ],
+        "median_us": 173.59103202819824,
+        "min_us": 165.52000045776367,
+        "max_us": 177.5904083251953,
+        "useful_tflops": 396.0632664297526,
+        "useful_mfu_percent": 52.3546948353936,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 1.0179401669203063
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          147.9752,
+          147.91888,
+          151.58932,
+          153.7122,
+          158.26766,
+          169.16368,
+          169.49774,
+          174.22026,
+          174.37326000000002,
+          148.03152,
+          147.89652,
+          147.99126,
+          157.18884,
+          161.52308,
+          161.31065999999998,
+          166.25728,
+          172.92298,
+          174.40352
+        ],
+        "median_us": 159.78915999999998,
+        "min_us": 147.89652,
+        "max_us": 174.40352,
+        "useful_tflops": 430.27343762242697,
+        "useful_mfu_percent": 56.87685890580661,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.9976184867609292
+      }
+    },
+    {
+      "label": "N80-single",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          205.5628776550293,
+          206.99968338012695,
+          211.23136520385742,
+          211.16352081298828,
+          213.95519256591797,
+          217.24544525146484,
+          217.36383438110352,
+          219.11808013916016,
+          224.91199493408203,
+          199.81887817382812,
+          201.59616470336914,
+          206.24832153320312,
+          206.40640258789062,
+          206.22272491455078,
+          206.29695892333984,
+          206.67007446289062,
+          208.3417510986328,
+          208.46656799316406
+        ],
+        "median_us": 207.67071723937988,
+        "min_us": 199.81887817382812,
+        "max_us": 224.91199493408203,
+        "useful_tflops": 331.0675288358016,
+        "useful_mfu_percent": 43.763057347759634,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8508916734513224
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          185.67564,
+          185.71214,
+          188.03524,
+          188.50894,
+          203.96686,
+          210.52504,
+          215.26924,
+          216.47442,
+          218.55122,
+          188.1024,
+          187.982,
+          187.98274,
+          204.79264,
+          204.89566,
+          206.18584,
+          215.86684,
+          216.01221999999999,
+          216.42178
+        ],
+        "median_us": 204.84415,
+        "min_us": 185.67564,
+        "max_us": 218.55122,
+        "useful_tflops": 335.63580491803157,
+        "useful_mfu_percent": 44.36692728592618,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.7781946421218277
+      }
+    },
+    {
+      "label": "N64-single",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          204.65280532836914,
+          211.82144165039062,
+          208.2828712463379,
+          197.91744232177734,
+          198.03071975708008,
+          198.0454444885254,
+          198.6809539794922,
+          203.46176147460938,
+          203.56544494628906,
+          207.2115135192871,
+          201.68575286865234,
+          201.21856689453125,
+          206.9977569580078,
+          206.92224502563477,
+          206.87360763549805,
+          206.96640014648438,
+          206.89983367919922,
+          206.95680618286133
+        ],
+        "median_us": 205.7632064819336,
+        "min_us": 197.91744232177734,
+        "max_us": 211.82144165039062,
+        "useful_tflops": 334.1366629317018,
+        "useful_mfu_percent": 44.168759144970494,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8587797942105233
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          189.30832,
+          189.25252,
+          189.29862,
+          189.37298,
+          208.68306,
+          210.72082,
+          218.10062,
+          218.68362,
+          220.26312,
+          189.28566,
+          189.2172,
+          194.7201,
+          201.27626,
+          206.70684,
+          212.5739,
+          214.90364,
+          216.71352,
+          218.2284
+        ],
+        "median_us": 207.69495,
+        "min_us": 189.2172,
+        "max_us": 220.26312,
+        "useful_tflops": 331.0289016078629,
+        "useful_mfu_percent": 43.75795130308829,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.7675132207114327
+      }
+    },
+    {
+      "label": "flashinfer",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void flashinfer::PrefillWithKVCacheKernel<flashinfer::CollectiveMainloop<Params::AdditionalParams, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, true>, flashinfer::CollectiveEpilogue<flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention> >, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, false, true, flashinfer::SingleTileScheduler, false>(flashinfer::CollectiveMainloop<Params::AdditionalParams, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, true>::Params, flashinfer::CollectiveEpilogue<flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention> >::Params, flashinfer::SingleTileScheduler::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          211.6499137878418,
+          211.0348892211914,
+          214.9612808227539,
+          219.94752883911133,
+          221.11936569213867,
+          210.44864654541016,
+          193.70304107666016,
+          199.41823959350586,
+          201.4463996887207,
+          203.12959671020508,
+          212.9465675354004,
+          219.01824951171875,
+          219.0060806274414,
+          207.90655136108398,
+          196.08831405639648,
+          200.51647186279297,
+          201.97120666503906,
+          202.06144332885742
+        ],
+        "median_us": 209.17759895324707,
+        "min_us": 193.70304107666016,
+        "max_us": 221.11936569213867,
+        "useful_tflops": 328.6825717096355,
+        "useful_mfu_percent": 43.44779533504766,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8447619869570615
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          189.11366,
+          189.04774,
+          189.11868,
+          189.26018,
+          189.49956,
+          213.21662,
+          217.42344,
+          218.14854,
+          221.30632,
+          189.235,
+          189.2785,
+          185.5204,
+          185.05562,
+          202.9632,
+          203.4312,
+          209.90488,
+          209.90418,
+          210.49054
+        ],
+        "median_us": 196.23138,
+        "min_us": 185.05562,
+        "max_us": 221.30632,
+        "useful_tflops": 350.3671592586262,
+        "useful_mfu_percent": 46.314231230485944,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8123502978983279
+      }
+    },
+    {
+      "label": "cudnn",
+      "seqlen": 2048,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "cudnn_generated_fort_native_sdpa_sm90_flash_fprop_wgmma_f16_knob_7_64x128x256_4x1x1_kernel0_0",
+      "full_call_event_span": {
+        "samples_us": [
+          192.17151641845703,
+          207.5071907043457,
+          216.8614387512207,
+          217.64415740966797,
+          199.78303909301758,
+          193.83167266845703,
+          200.06528854370117,
+          200.03456115722656,
+          200.14976501464844,
+          212.40192413330078,
+          211.5443229675293,
+          199.0662384033203,
+          203.1622314453125,
+          206.7487907409668,
+          206.61888122558594,
+          206.61056518554688,
+          206.56896591186523,
+          206.61760330200195
+        ],
+        "median_us": 206.58976554870605,
+        "min_us": 192.17151641845703,
+        "max_us": 217.64415740966797,
+        "useful_tflops": 332.7997927941432,
+        "useful_mfu_percent": 43.99204134754041,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8553438436280713
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          189.84142,
+          189.675,
+          185.44338,
+          184.70604,
+          200.95498,
+          201.55028,
+          206.56138,
+          206.53192,
+          206.66374,
+          189.61,
+          189.6241,
+          189.70614,
+          189.65802,
+          207.1209,
+          209.2592,
+          215.27528,
+          215.8538,
+          218.79222
+        ],
+        "median_us": 201.25263,
+        "min_us": 184.70604,
+        "max_us": 218.79222,
+        "useful_tflops": 341.6255040642202,
+        "useful_mfu_percent": 45.15869187894517,
+        "target_70_latency_us": 129.83293582853366,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.7920821705534977
+      }
+    },
+    {
+      "label": "N80-LPT",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          2233.9910888671875,
+          2233.822021484375,
+          2305.7049560546875,
+          2478.118438720703,
+          2417.2511291503906,
+          2408.8429260253906,
+          2469.4744873046875,
+          2447.393341064453,
+          2365.980224609375,
+          2269.169921875,
+          2235.3158569335938,
+          2249.3370056152344,
+          2483.5244750976562,
+          2463.0528259277344,
+          2488.0210876464844,
+          2478.257293701172,
+          2462.611846923828,
+          2362.0089721679688
+        ],
+        "median_us": 2413.0470275878906,
+        "min_us": 2233.822021484375,
+        "max_us": 2488.0210876464844,
+        "useful_tflops": 455.708418829789,
+        "useful_mfu_percent": 60.23905073757951,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "CONTROL",
+        "median_speedup_vs_control": 1
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2143.1194,
+          2319.58992,
+          2208.98114,
+          2290.04484,
+          2227.99304,
+          2234.17224,
+          2256.38986,
+          2394.83668,
+          2396.35028,
+          2177.87092,
+          2220.3326,
+          2214.42462,
+          2323.52914,
+          2258.73664,
+          2276.65438,
+          2308.3641000000002,
+          2434.86058,
+          2407.82268
+        ],
+        "median_us": 2267.69551,
+        "min_us": 2143.1194,
+        "max_us": 2434.86058,
+        "useful_tflops": 484.9177681284027,
+        "useful_mfu_percent": 64.10016763098515,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "CONTROL",
+        "median_speedup_vs_control": 1
+      }
+    },
+    {
+      "label": "N64-LPT",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::DynamicPersistentTileScheduler<256, 32, false, false, true> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          2304.7879028320312,
+          2300.7589721679688,
+          2345.0880432128906,
+          2463.6582946777344,
+          2462.4012756347656,
+          2461.6192626953125,
+          2460.9580993652344,
+          2466.6085815429688,
+          2461.7599487304688,
+          2285.08544921875,
+          2285.6813049316406,
+          2406.241912841797,
+          2464.76806640625,
+          2463.3106994628906,
+          2472.988739013672,
+          2463.597412109375,
+          2463.0624389648438,
+          2460.499267578125
+        ],
+        "median_us": 2461.6896057128906,
+        "min_us": 2285.08544921875,
+        "max_us": 2472.988739013672,
+        "useful_tflops": 446.7036960923224,
+        "useful_mfu_percent": 59.048737090855575,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.9802401659363901
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2228.83966,
+          2279.1616400000003,
+          2336.93828,
+          2253.26076,
+          2261.75994,
+          2261.80408,
+          2321.57822,
+          2451.90734,
+          2448.7305,
+          2183.1804,
+          2316.39604,
+          2362.0726,
+          2271.83764,
+          2369.4879,
+          2285.61778,
+          2370.30762,
+          2456.86574,
+          2452.82594
+        ],
+        "median_us": 2318.98713,
+        "min_us": 2183.1804,
+        "max_us": 2456.86574,
+        "useful_tflops": 474.1923020090241,
+        "useful_mfu_percent": 62.68239286305673,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.9778818867356112
+      }
+    },
+    {
+      "label": "N80-single",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<80>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<80> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          2462.529296875,
+          2489.0591430664062,
+          2633.3489990234375,
+          2629.8565673828125,
+          2643.4759521484375,
+          2574.1720581054688,
+          2560.9246826171875,
+          2527.0970153808594,
+          2516.4743041992188,
+          2475.0259399414062,
+          2519.208984375,
+          2592.5933837890625,
+          2629.5404052734375,
+          2594.034423828125,
+          2585.9091186523438,
+          2557.0028686523438,
+          2542.8268432617188,
+          2474.851837158203
+        ],
+        "median_us": 2558.9637756347656,
+        "min_us": 2462.529296875,
+        "max_us": 2643.4759521484375,
+        "useful_tflops": 429.72309962896077,
+        "useful_mfu_percent": 56.80411098862667,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.942978189282621
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2370.53766,
+          2512.8458,
+          2463.76024,
+          2494.8195,
+          2457.99388,
+          2523.83272,
+          2560.82478,
+          2697.75684,
+          2592.8645,
+          2230.16294,
+          2517.8423000000003,
+          2368.74974,
+          2440.574,
+          2471.11358,
+          2417.58536,
+          2501.65494,
+          2605.87876,
+          2598.10198
+        ],
+        "median_us": 2498.23722,
+        "min_us": 2230.16294,
+        "max_us": 2697.75684,
+        "useful_tflops": 440.16870643853434,
+        "useful_mfu_percent": 58.184891796237196,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.9077182470285988
+      }
+    },
+    {
+      "label": "N64-single",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void cutlass::device_kernel<flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > > >(flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cute::tuple<cute::C<128>, cute::C<64>, cute::C<256> >, 256, cutlass::bfloat16_t, float, cutlass::arch::Sm90, true, false, false, false, false, false, false, true, true, false, false, false>, flash::CollectiveEpilogueFwd<cute::tuple<cute::C<128>, cute::C<256>, cute::C<64> >, cute::tuple<cute::C<1>, cute::C<1>, cute::C<1> >, cutlass::bfloat16_t, cutlass::arch::Sm90, 256, false, false, false, false, false, flash::QsaConfig>, flash::SingleTileScheduler<false, false, false, 128> > >::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          2556.233673095703,
+          2540.8985900878906,
+          2650.5056762695312,
+          2698.828125,
+          2712.6693725585938,
+          2669.144287109375,
+          2612.0889282226562,
+          2549.0663146972656,
+          2553.625030517578,
+          2539.47265625,
+          2533.255615234375,
+          2646.6879272460938,
+          2663.8528442382812,
+          2657.628173828125,
+          2646.2579345703125,
+          2636.4923095703125,
+          2574.5370483398438,
+          2547.376708984375
+        ],
+        "median_us": 2624.2906188964844,
+        "min_us": 2533.255615234375,
+        "max_us": 2712.6693725585938,
+        "useful_tflops": 419.0259407955365,
+        "useful_mfu_percent": 55.390078095907,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.9195044977917035
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2451.25006,
+          2543.04542,
+          2549.73732,
+          2556.3492,
+          2556.33,
+          2556.28892,
+          2651.23324,
+          2673.8892,
+          2702.14902,
+          2312.20026,
+          2532.2358600000002,
+          2541.21774,
+          2533.78912,
+          2541.06358,
+          2539.97492,
+          2636.05134,
+          2727.50282,
+          2719.25188
+        ],
+        "median_us": 2553.01312,
+        "min_us": 2312.20026,
+        "max_us": 2727.50282,
+        "useful_tflops": 430.7247138252074,
+        "useful_mfu_percent": 56.93651207206971,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "UNRESOLVED",
+        "median_speedup_vs_control": 0.888242795242666
+      }
+    },
+    {
+      "label": "flashinfer",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "void flashinfer::PrefillWithKVCacheKernel<flashinfer::CollectiveMainloop<Params::AdditionalParams, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, true>, flashinfer::CollectiveEpilogue<flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention> >, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, false, true, flashinfer::SingleTileScheduler, false>(flashinfer::CollectiveMainloop<Params::AdditionalParams, flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention>, true>::Params, flashinfer::CollectiveEpilogue<flashinfer::AttentionKernelTraits<true, 256, 256, 128, 64, 2, cutlass::bfloat16_t, cutlass::bfloat16_t, cutlass::bfloat16_t, int, flashinfer::StandardAttention> >::Params, flashinfer::SingleTileScheduler::Params)",
+      "full_call_event_span": {
+        "samples_us": [
+          2576.6387939453125,
+          2577.8143310546875,
+          2669.5706176757812,
+          2694.7418212890625,
+          2693.1768798828125,
+          2637.2647094726562,
+          2575.1046752929688,
+          2576.9415283203125,
+          2583.160400390625,
+          2575.6927490234375,
+          2578.7188720703125,
+          2658.118896484375,
+          2735.572509765625,
+          2719.7268676757812,
+          2573.0374145507812,
+          2601.4105224609375,
+          2632.7334594726562,
+          2617.4740600585938
+        ],
+        "median_us": 2609.4422912597656,
+        "min_us": 2573.0374145507812,
+        "max_us": 2735.572509765625,
+        "useful_tflops": 421.41029490754585,
+        "useful_mfu_percent": 55.705260397560586,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.9247366901618427
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2454.46636,
+          2560.3596000000002,
+          2561.03794,
+          2573.18544,
+          2576.2998,
+          2578.33678,
+          2709.78384,
+          2692.1603999999998,
+          2680.12436,
+          2450.46586,
+          2578.74298,
+          2618.67222,
+          2575.43742,
+          2578.52928,
+          2578.65658,
+          2688.0695,
+          2689.58058,
+          2720.1693999999998
+        ],
+        "median_us": 2578.59293,
+        "min_us": 2450.46586,
+        "max_us": 2720.1693999999998,
+        "useful_tflops": 426.4518965791162,
+        "useful_mfu_percent": 56.371698159830295,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8794313687969354
+      }
+    },
+    {
+      "label": "cudnn",
+      "seqlen": 8192,
+      "runs": 2,
+      "numerics": "CPU-FP64-O/LSE+RAW-REPLAY/PASS",
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "kernel_name": "cudnn_generated_fort_native_sdpa_sm90_flash_fprop_wgmma_f16_knob_7_64x128x256_4x1x1_kernel0_0",
+      "full_call_event_span": {
+        "samples_us": [
+          2627.0828247070312,
+          2635.9768676757812,
+          2771.925048828125,
+          2775.3713989257812,
+          2720.3878784179688,
+          2642.9067993164062,
+          2650.1272583007812,
+          2635.62744140625,
+          2653.203125,
+          2663.4030151367188,
+          2663.2916259765625,
+          2808.0389404296875,
+          2867.3471069335938,
+          2681.9659423828125,
+          2661.0494995117188,
+          2660.8261108398438,
+          2635.9033203125,
+          2631.605224609375
+        ],
+        "median_us": 2660.9378051757812,
+        "min_us": 2627.0828247070312,
+        "max_us": 2867.3471069335938,
+        "useful_tflops": 413.25499730398906,
+        "useful_mfu_percent": 54.62723031116842,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.9068408223951273
+      },
+      "instrumented_kernel_only": {
+        "samples_us": [
+          2494.52054,
+          2630.112,
+          2507.40194,
+          2617.6082,
+          2645.17672,
+          2575.25742,
+          2800.52354,
+          2739.7801,
+          2754.21676,
+          2466.96494,
+          2670.81502,
+          2641.92536,
+          2657.43044,
+          2657.6589,
+          2657.74852,
+          2729.23476,
+          2830.61738,
+          2716.1261
+        ],
+        "median_us": 2657.54467,
+        "min_us": 2466.96494,
+        "max_us": 2830.61738,
+        "useful_tflops": 413.782638507446,
+        "useful_mfu_percent": 54.69697799173113,
+        "target_70_latency_us": 2076.5666046718916,
+        "verdict": "BELOW_70",
+        "vs_control": "SLOWER",
+        "median_speedup_vs_control": 0.8533047574323557
+      }
+    }
+  ],
+  "receipts": [
+    {
+      "path": "S2048/screen-N80-LPT-r2/result.json",
+      "result_sha256": "f3ec9241e4138ea486f5932158c246f7215f89f7a0c1e4ff62ed891c7d7b3870",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:42:14.555000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 119.73,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "control",
+      "label": "N80-LPT",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "e566f7192941b5846141ebeac68ff96803eba41a0f310357deb4f80bdff3bb48",
+      "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+      "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 53.16 W, 350.00 W, 34",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 111.24 W, 350.00 W, 35",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:13.079832+00:00",
+        "host_timezone": "2026-09-26T15:42:13.079850+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:14.964578+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "e89858f7ad02ff2d48aa16014760a8aca9fdc119872479c63846eb60cfeb823f"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-control-e7ee864/python/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S2048/confirm-N80-LPT-r2/result.json",
+      "result_sha256": "4ed4b35f96805cc981ff000fe447d3ccaf486cd7f1c2c0cbc62414450375ea6e",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "control",
+      "label": "N80-LPT",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "c99f9db61977a89ef6a7e3a6556c58098f7c9c5acadd9a328a97f8ab68ad3ce3",
+      "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+      "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 615 MHz, 1755 MHz, 87.96 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 111.33 W, 350.00 W, 35",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:00.354098+00:00",
+        "host_timezone": "2026-09-26T15:45:00.354119+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:02.630724+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "9ed5d7b7d71dcf8d61c7c4d00ddd25a3e57b6949b94a331595d88e8d988e8619"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-control-e7ee864/python/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S2048/screen-N64-LPT-r2/result.json",
+      "result_sha256": "532507490b94714cac0ede013e1906263f36fc28d9266aeda2febef6870efa74",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-LPT",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73",
+      "source_identity_sha256": "4b52963b1f588efb62ce3cc37d28c8494fe4ce411694cb21b2f722d0c2d21b34",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "f537d48c149e8614472fd57358f02d310774a01525b8cd614c2b24a746f88f2d",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "fdf72ad4dcc7d1b766f5999f31fe5ca7c9c23474109ea80c8b7fffca22dd3c2e",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.89 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 110.53 W, 350.00 W, 36",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:18.191979+00:00",
+        "host_timezone": "2026-09-26T15:42:18.192001+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:20.294172+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "937a972f2d9bff3966e3ed7641cc9d201a4682e3125e2c1591f6525de8c728bb"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-LPT/python/flash_attn_3/_C.so": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S2048/confirm-N64-LPT-r2/result.json",
+      "result_sha256": "d6157f3c7c765f7fd2cefc05fe5b610d2f9b86212176b1b6fbb595ae1ec33ab3",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-LPT",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73",
+      "source_identity_sha256": "4b52963b1f588efb62ce3cc37d28c8494fe4ce411694cb21b2f722d0c2d21b34",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "4ec7323607a233d135dfecd4f1a210e77d56317d8f4478232544f48b817271f9",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "fdf72ad4dcc7d1b766f5999f31fe5ca7c9c23474109ea80c8b7fffca22dd3c2e",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.56 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 110.84 W, 350.00 W, 35",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:44:55.046205+00:00",
+        "host_timezone": "2026-09-26T15:44:55.046226+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:44:57.148072+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "40cfb1416cc6034342b3381641f8421ec7f708d0211450d9e832a6e8e933edd5"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-LPT/python/flash_attn_3/_C.so": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S2048/screen-N80-single-r2/result.json",
+      "result_sha256": "4c5379ab96b657d6a81a67e5d5f8fd79c79d31cd1756828874f8036875e75f83",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:42:25.124000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 115.88,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N80-single",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce",
+      "source_identity_sha256": "d7630bea551d7752d52c935fb6e23585ec76c78513ea8dc1dd430604cba3e278",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "f4cb6d6d9f4bbd014a688eff59a424755f27a1d2e06001c7f268720b33cf988c",
+      "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+      "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 570 MHz, 1755 MHz, 79.32 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 114.66 W, 350.00 W, 36",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:23.643883+00:00",
+        "host_timezone": "2026-09-26T15:42:23.643901+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:25.550440+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "17484946199ce042d9ffb2b4ea935d13de256ba4dd5af0c37b17acb4bc789302"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N80-single/python/flash_attn_3/_C.so": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/confirm-N80-single-r2/result.json",
+      "result_sha256": "942c9a2023aecca9f08cc3548387c2c4fcd135dda367f41f7138fdad1bb22005",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N80-single",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce",
+      "source_identity_sha256": "d7630bea551d7752d52c935fb6e23585ec76c78513ea8dc1dd430604cba3e278",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "fd559d2b68c5d3625863b39ca4d897ff49156c0e74cd23d362189f3c12ac8091",
+      "output_sha256": "65dad8c0e3574f5adad956142fd2ffd22cdf87d2c801238e5204f6d1aa7e5f1f",
+      "lse_sha256": "4b0b7d435d8d894d664012598d537adba1d70bdde77de8e097917c4bb04a79d8",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 76.79 W, 350.00 W, 34",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 110.87 W, 350.00 W, 35",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:44:49.705222+00:00",
+        "host_timezone": "2026-09-26T15:44:49.705242+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:44:51.818956+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "73f08d5832413fd01b1752a390754157c5df01cfc2d08f7ba66c2bff41e685ae"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N80-single/python/flash_attn_3/_C.so": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/screen-N64-single-r2/result.json",
+      "result_sha256": "5708d405719fa72f5c0ab911a14b1601895d5b8870d5a89686fe70de7a23438c",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:42:30.141000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 121.6,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-single",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c",
+      "source_identity_sha256": "f45495001bbe02f9b3360a7da5ec22a6a4d18da219e091e5fbcf54bb29ce9a85",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "b540d8d175df34691a175c4319e72e4bec34270a8736152d3ccac8a03bed2b1f",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "fdf72ad4dcc7d1b766f5999f31fe5ca7c9c23474109ea80c8b7fffca22dd3c2e",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 76.88 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 113.59 W, 350.00 W, 36",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:28.689129+00:00",
+        "host_timezone": "2026-09-26T15:42:28.689149+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:30.557571+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "a7da0bc4dffde7a27c66f5fc3e4ec17c4ec3648a5c977f04d6f171e536b50ba8"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-single/python/flash_attn_3/_C.so": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/confirm-N64-single-r2/result.json",
+      "result_sha256": "edaa30751136f8ae884866eaf793260da31804d01e2b4bb52c76455e654a55bc",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-single",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "extension_sha256": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c",
+      "source_identity_sha256": "f45495001bbe02f9b3360a7da5ec22a6a4d18da219e091e5fbcf54bb29ce9a85",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "270788f943f6564d839f3d5331c710ee3c57d5fd4e30ea72cbf5b303d206f773",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "fdf72ad4dcc7d1b766f5999f31fe5ca7c9c23474109ea80c8b7fffca22dd3c2e",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001624670279198881,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 52.82 W, 350.00 W, 33",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 111.67 W, 350.00 W, 34",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:44:44.292653+00:00",
+        "host_timezone": "2026-09-26T15:44:44.292672+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:44:46.384500+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "1c4cd0c2d20867add89011176c63622024ffa5af82b7dbfb209677deb22e4859"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-single/python/flash_attn_3/_C.so": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/references-flashinfer-r2/result.json",
+      "result_sha256": "31c346c539ec18d2760b024c73f5e067cdb284ca895a75f2cca14230f56d1d53",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:39:40.687000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 128.55,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "flashinfer",
+      "label": "flashinfer",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "a963035d7efa61f497460bd69868d404075d57b2989b324853a66401e8de1168",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "b88a40f4c6da3f649a8f7ca06e23eba03d9840c3271f1eba6442db43e45fac5a",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001317653751442549,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 52.70 W, 350.00 W, 33",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 112.79 W, 350.00 W, 34",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:39:39.232381+00:00",
+        "host_timezone": "2026-09-26T15:39:39.232398+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:39:41.100334+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "6423d53a06d3ea8848f7ead0c3b79d790a45d5ecc73a59036d977b91a69bddab"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/fi-cache/.cache/flashinfer/0.0.0+unknown/90a/cached_ops/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90.so": "269c63310199d7b5fb67508399b262ca1eface88f594bc56a5e2c01f955fa502",
+        "/workspace/gdn-sm90-library-compare-20260926/fi-venv/lib/python3.12/site-packages/cudnn/_compiled_module.cpython-312-x86_64-linux-gnu.so": "5ad2f3eaa96eaec1f7b14f161f236d0232bb4e19b4dc88ce5ffdeec13779d0de"
+      },
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/confirm-flashinfer-r2/result.json",
+      "result_sha256": "5acd34f397cc9bbcb5c5a14aaa20afb4702939919f998278f256a74c39080f68",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:45:16.247000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 99.45,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "flashinfer",
+      "label": "flashinfer",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "067b1e01dfc9db118846e9ae6c6e88988047944b5ca8e5513aad81db553fc543",
+      "output_sha256": "7d6b39ea76e9cfd4acbbbbbacab5669eddc26a94fdc133e982008463f309147b",
+      "lse_sha256": "b88a40f4c6da3f649a8f7ca06e23eba03d9840c3271f1eba6442db43e45fac5a",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.000001317653751442549,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 360 MHz, 1755 MHz, 80.77 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 114.69 W, 350.00 W, 36",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:14.589794+00:00",
+        "host_timezone": "2026-09-26T15:45:14.589816+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:16.880493+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "5aa3b2de77eeefd7b4370d99ccb96adaedfe781d496a9936b5a2202130b0855e"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/fi-cache/.cache/flashinfer/0.0.0+unknown/90a/cached_ops/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90.so": "269c63310199d7b5fb67508399b262ca1eface88f594bc56a5e2c01f955fa502",
+        "/workspace/gdn-sm90-library-compare-20260926/fi-venv/lib/python3.12/site-packages/cudnn/_compiled_module.cpython-312-x86_64-linux-gnu.so": "5ad2f3eaa96eaec1f7b14f161f236d0232bb4e19b4dc88ce5ffdeec13779d0de"
+      },
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 4.491228,
+        "warps per SM": 53.894737,
+        "grid": [
+          16,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S2048/references-cudnn-r2/result.json",
+      "result_sha256": "b7d7f51c1c1c1e446288e5fc11a390068381b2574deedae364440c2cf24aff8a",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 1,
+        "cap_active_samples": 0,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:39:47.063000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 114.88,
+            "sw_power_cap": false
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "cudnn",
+      "label": "cudnn",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "379fcc8455282df4fcca0f20fb6792aa9b1a4e75c0d465dee3aedf63de6262d6",
+      "output_sha256": "23601c262200a7ad29a149b3f9a8e9c644b66e8657c7e97b6b6901f4692febc1",
+      "lse_sha256": "5146a1a6ca5b63a4fd9c244d3b5a5c3f016485ebb2a244c41be7b275381ebbdc",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.0000012620778448990677,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 510 MHz, 1755 MHz, 79.96 W, 350.00 W, 34",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 113.11 W, 350.00 W, 35",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:39:44.584176+00:00",
+        "host_timezone": "2026-09-26T15:39:44.584204+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:39:47.501982+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "6f159c0514c0b691ac69331d1ce270daa237243c14655813c806558c2349363d"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9": "f504745d346542609f975de51227080647d3675eac576ead82c396b8124f8f28",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9": "8222672743c4f2e39feb1c365d6f6b6c40f56023471506f49944910847f1ee0a",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9": "2804eee5f6fc11d0299ba07687eda0a974d3b2436357c639706c4e282cc2cc05"
+      },
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memset (Device)": 450
+      }
+    },
+    {
+      "path": "S2048/confirm-cudnn-r2/result.json",
+      "result_sha256": "88aca4053e1ba3850de3790d9e2595cb680a86776a6d4ee03f709c8e432db9cf",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 0,
+        "cap_active_samples": 0,
+        "hits": [],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "cudnn",
+      "label": "cudnn",
+      "shape": [
+        1,
+        2048,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+        "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+        "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "5f905191954b2f867a48ae16d170dd5561eddb56c2bbbf09049bedc6544bd5ba",
+          "c4233c4c3b4ef26ac49e0aaec565ef2edb7c5d09330ff79991764fb87369cdba",
+          "5520f9849e7cf703e35848efde1e04eab7a04dc30dc884c3e3f73ba6e599474f"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "e065e679540a9f1b9fd66376c1607c68709681f826b2942633eec69391275c38",
+          "dbf2581a4f322bdd3251ee69d53c051bbcc7bd50161edd4947c1a23e6ba57348"
+        ],
+        "cache_sha256": "675f7611c5b58978db034ae9511e10fd962ecf35a82ffe8a9237ed4d9df5b43a"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "8dbc6fad386d5a96ec32ef5c8e62ca95914bea8e475344498cd502b917d41565",
+      "output_sha256": "23601c262200a7ad29a149b3f9a8e9c644b66e8657c7e97b6b6901f4692febc1",
+      "lse_sha256": "5146a1a6ca5b63a4fd9c244d3b5a5c3f016485ebb2a244c41be7b275381ebbdc",
+      "max_output_abs": 0.00915942203100295,
+      "max_lse_abs": 0.0000012620778448990677,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.96 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 112.64 W, 350.00 W, 36",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:06.187052+00:00",
+        "host_timezone": "2026-09-26T15:45:06.187078+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:09.282523+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "32b76d1a1a16b55e1d01b51264b512b55d0c3ffc6f0cfe8dbd90fd337cfbb29c"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9": "f504745d346542609f975de51227080647d3675eac576ead82c396b8124f8f28",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9": "8222672743c4f2e39feb1c365d6f6b6c40f56023471506f49944910847f1ee0a",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9": "2804eee5f6fc11d0299ba07687eda0a974d3b2436357c639706c4e282cc2cc05"
+      },
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memset (Device)": 450
+      }
+    },
+    {
+      "path": "S8192/screen-N80-LPT-r2/result.json",
+      "result_sha256": "91975c2721c80ffcb4d77e41ac05d7b21b599dfe22c5ebaba4ac7a6727a3466f",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 5,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:42:41.019000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 187.71,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:41.219000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 184.52,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:41.420000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 228.19,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:41.620000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 285.83,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:41.821000+00:00",
+            "sm_mhz": 1005,
+            "power_w": 341.49,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "control",
+      "label": "N80-LPT",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "d93c3865dd2255caff07956620a0058d454a2a98dc5e702b32cd80b4658a7467",
+      "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+      "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000024377827472221725,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.18 W, 350.00 W, 36",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 86.98 W, 350.00 W, 38",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:35.732536+00:00",
+        "host_timezone": "2026-09-26T15:42:35.732563+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:43.033879+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "e79f9fe68596d14c1b600aa7abeceb9e895589424dbc7f6d5638343d42064ce3"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-control-e7ee864/python/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S8192/confirm-N80-LPT-r2/result.json",
+      "result_sha256": "f70843d5aea0a4776833449dd1617b9c99327c34dca297dd6b6376b5097178aa",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 5,
+        "cap_active_samples": 4,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:46:05.992000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 193.98,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:46:06.192000+00:00",
+            "sm_mhz": 1140,
+            "power_w": 178.48,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:06.393000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 196.35,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:06.593000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 256.68,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:06.794000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 315.07,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "control",
+      "label": "N80-LPT",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "2a3eff9e6aba3670aa7c94664e59e366f34376709d60a807ee12e9c72efbd0b6",
+      "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+      "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000024377827472221725,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 78.29 W, 350.00 W, 39",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.17 W, 350.00 W, 40",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:46:00.730502+00:00",
+        "host_timezone": "2026-09-26T15:46:00.730542+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:46:08.454697+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "5535c053e811ce38cc31526bf63524b255109c1cb3093a3e130fb614b805b3ff"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-control-e7ee864/python/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S8192/screen-N64-LPT-r2/result.json",
+      "result_sha256": "56ccc9169ba8a575004b100226efe819a4e2d6430bd55a2930ecddf32fe72773",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 5,
+        "cap_active_samples": 4,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:42:52.989000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 194,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:42:53.190000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 185.63,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:53.390000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 200.26,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:53.591000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 259.32,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:42:53.791000+00:00",
+            "sm_mhz": 1020,
+            "power_w": 322.96,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-LPT",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73",
+      "source_identity_sha256": "4b52963b1f588efb62ce3cc37d28c8494fe4ce411694cb21b2f722d0c2d21b34",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "d0686a39eb07d86f914442bbd9f4429534943195990aadc25f558b241b90481c",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "3b7b0e46b5f005cf17d76f5e0111d4e43db9340e6056f7a2d1b02110621125f4",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000025586314329473225,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.98 W, 350.00 W, 38",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.66 W, 350.00 W, 39",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:42:48.105086+00:00",
+        "host_timezone": "2026-09-26T15:42:48.105108+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:42:55.249885+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "a8123ee775df8d4997b42e9c7257d70cb860a4ebc7a7ac4674fc0c04d5b60a89"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-LPT/python/flash_attn_3/_C.so": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S8192/confirm-N64-LPT-r2/result.json",
+      "result_sha256": "96ce93c31251a003d01fcee1747c0ce8b043348414f601c2d87d55e6b327e5cd",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 5,
+        "cap_active_samples": 4,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:45:52.914000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 183.34,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:45:53.114000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 185.32,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:53.315000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 212.62,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:53.515000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 269.69,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:53.716000+00:00",
+            "sm_mhz": 990,
+            "power_w": 328.86,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-LPT",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73",
+      "source_identity_sha256": "4b52963b1f588efb62ce3cc37d28c8494fe4ce411694cb21b2f722d0c2d21b34",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "1a5fc5f1b780fc6d977151909307bdfa4ef76668754125d77c12cf394200dcc6",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "3b7b0e46b5f005cf17d76f5e0111d4e43db9340e6056f7a2d1b02110621125f4",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000025586314329473225,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 360 MHz, 1755 MHz, 82.48 W, 350.00 W, 38",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.53 W, 350.00 W, 40",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:47.604632+00:00",
+        "host_timezone": "2026-09-26T15:45:47.604663+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:55.362821+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "bfe8dde81fe21ba24e1c0292a90860c960eff3005ca8301597175e7cad43d904"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-LPT/python/flash_attn_3/_C.so": "164df8ade342d8dd5b007ea11eaf284bad9f3be7eb6b448b1ab25f6ca3257a73"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 55,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memcpy HtoD (Pageable -> Device)": 450
+      }
+    },
+    {
+      "path": "S8192/screen-N80-single-r2/result.json",
+      "result_sha256": "8e1c6eb8112d8dd502e4b303b4a30de464ad3a91762b9caaa51fd778a235d384",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:43:05.467000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 197.82,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:43:05.668000+00:00",
+            "sm_mhz": 1185,
+            "power_w": 185.26,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:05.868000+00:00",
+            "sm_mhz": 1230,
+            "power_w": 190.01,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:06.069000+00:00",
+            "sm_mhz": 1200,
+            "power_w": 244.33,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:06.269000+00:00",
+            "sm_mhz": 1185,
+            "power_w": 302.21,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:06.470000+00:00",
+            "sm_mhz": 1095,
+            "power_w": 353.02,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N80-single",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce",
+      "source_identity_sha256": "d7630bea551d7752d52c935fb6e23585ec76c78513ea8dc1dd430604cba3e278",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "79df2bde25da1fe3c289602590965a33af615ef83243698bb967e30fee36f57d",
+      "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+      "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000024377827472221725,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 375 MHz, 1755 MHz, 84.83 W, 350.00 W, 38",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.24 W, 350.00 W, 40",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:43:00.404960+00:00",
+        "host_timezone": "2026-09-26T15:43:00.404983+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:43:07.690148+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "3100fc78d2692458050298b3051e8f88b4c223e466b768800b862baea73220e9"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N80-single/python/flash_attn_3/_C.so": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/confirm-N80-single-r2/result.json",
+      "result_sha256": "cfa882c2a21c1fac7a67c6d4c40d6bfffa9fe5f1e66b196821a0d91e7c14f6da",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:45:40.071000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 199.19,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:45:40.272000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 188.91,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:40.473000+00:00",
+            "sm_mhz": 1155,
+            "power_w": 192.11,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:40.673000+00:00",
+            "sm_mhz": 1170,
+            "power_w": 247.06,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:40.874000+00:00",
+            "sm_mhz": 1140,
+            "power_w": 306.34,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:41.075000+00:00",
+            "sm_mhz": 1050,
+            "power_w": 357.76,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N80-single",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce",
+      "source_identity_sha256": "d7630bea551d7752d52c935fb6e23585ec76c78513ea8dc1dd430604cba3e278",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "53bb0c0fdb54a738f3309bec8e03e26b8952aa99f7c4ddd80a66bb0cc410b765",
+      "output_sha256": "317b9693671fafa25fdd69f038c50eafd0db6f2189a46e7abb65b76cb89d5540",
+      "lse_sha256": "3790a69a805a739244d1040beeea9da57e6a96532e9901b9199d3926550b5517",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000024377827472221725,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.93 W, 350.00 W, 38",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.82 W, 350.00 W, 39",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:34.975871+00:00",
+        "host_timezone": "2026-09-26T15:45:34.975898+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:42.308075+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "96e41110d5f030103c4bf4da1fda97e0646d203ac6edd0b57a53f509980009b8"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N80-single/python/flash_attn_3/_C.so": "532014bfcde96dc39b5538ad7b837a18bec3dbfbe43449560f13b2739909cbce"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/screen-N64-single-r2/result.json",
+      "result_sha256": "646485b626a03301e8e21c1b29679ba46094ff1d3265850a1e5e1794f1e3f558",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:43:18.059000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 198.42,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:43:18.259000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 180.2,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:18.460000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 183.53,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:18.661000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 237.04,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:18.861000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 288.58,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:43:19.062000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 337.71,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-single",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c",
+      "source_identity_sha256": "f45495001bbe02f9b3360a7da5ec22a6a4d18da219e091e5fbcf54bb29ce9a85",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "f36c05349e3a002f09315bd91cc7053cb958a75d958cd45c2094843f32d35a58",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "3b7b0e46b5f005cf17d76f5e0111d4e43db9340e6056f7a2d1b02110621125f4",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000025586314329473225,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 90.07 W, 350.00 W, 40",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.62 W, 350.00 W, 41",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:43:12.774057+00:00",
+        "host_timezone": "2026-09-26T15:43:12.774078+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:43:20.496709+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "c4cc3dcca62b994aaa2c7c9881642e725c05540dffa8518114f1e55d3b393029"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-single/python/flash_attn_3/_C.so": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/confirm-N64-single-r2/result.json",
+      "result_sha256": "95bf03a602ffd8a7f3175816ba85bcd559591df634777695570fab6177560b6d",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 5,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:45:27.485000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 166.63,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:27.685000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 169.42,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:27.886000+00:00",
+            "sm_mhz": 1230,
+            "power_w": 221.57,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:28.086000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 277.6,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:45:28.287000+00:00",
+            "sm_mhz": 1065,
+            "power_w": 331.28,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "candidate",
+      "label": "N64-single",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "extension_sha256": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c",
+      "source_identity_sha256": "f45495001bbe02f9b3360a7da5ec22a6a4d18da219e091e5fbcf54bb29ce9a85",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "a9283e223a72c3fe1c4ba67c5616d953f4d4b87e20b175fa8d0e9514e4ae408a",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "3b7b0e46b5f005cf17d76f5e0111d4e43db9340e6056f7a2d1b02110621125f4",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000025586314329473225,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 360 MHz, 1755 MHz, 84.35 W, 350.00 W, 35",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 86.77 W, 350.00 W, 38",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:45:22.419032+00:00",
+        "host_timezone": "2026-09-26T15:45:22.419072+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:45:29.702343+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "4f05bb583db86fb772d2e4e921183075c635cf5e009093b37b6adff25690a878"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/build-r2/N64-single/python/flash_attn_3/_C.so": "a1b27f3d2b54e8306f9b8b7522bdfe5b7e7f00549153b0f908f0c7d957f5ac4c"
+      },
+      "kernel_arguments": {
+        "External id": 1,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 199680,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/references-flashinfer-r3/result.json",
+      "result_sha256": "d82f2af9a3e51e8f31cfddb9ad09146e0f987b693a788bd8e04610e68531c5c9",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:47:33.150000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 205.86,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:47:33.351000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 182.46,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:33.551000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 186.22,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:33.752000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 236.49,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:33.952000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 290.78,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:34.153000+00:00",
+            "sm_mhz": 1110,
+            "power_w": 341.11,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "flashinfer",
+      "label": "flashinfer",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "2f7f79615ba528c168076c553a27988d95493b984b2015bb346b15cda13809f7",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "4e487bf660d90fb5b4a08a8315841d60f4879776bbc7e3ad2d2d0af5c2fa758e",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.000002306447806077472,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 53.12 W, 350.00 W, 34",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 87.05 W, 350.00 W, 38",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:47:28.092226+00:00",
+        "host_timezone": "2026-09-26T15:47:28.092247+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:47:35.569790+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "b3337f562e6805f0fc7fccba0960fa24a2a68ee7b2e17dead6ae119c405b22e7"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/fi-cache/.cache/flashinfer/0.0.0+unknown/90a/cached_ops/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90.so": "269c63310199d7b5fb67508399b262ca1eface88f594bc56a5e2c01f955fa502",
+        "/workspace/gdn-sm90-library-compare-20260926/fi-venv/lib/python3.12/site-packages/cudnn/_compiled_module.cpython-312-x86_64-linux-gnu.so": "5ad2f3eaa96eaec1f7b14f161f236d0232bb4e19b4dc88ce5ffdeec13779d0de"
+      },
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/confirm-flashinfer-r2/result.json",
+      "result_sha256": "a8e3348a97dd6a7ad7595e5709a37cf4310156324c8416809ca5d745e8f103a5",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:46:34.718000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 199.69,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:46:34.919000+00:00",
+            "sm_mhz": 1200,
+            "power_w": 192.05,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:35.120000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 192.82,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:35.320000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 245.56,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:35.521000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 303.27,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:35.721000+00:00",
+            "sm_mhz": 1065,
+            "power_w": 352.4,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "flashinfer",
+      "label": "flashinfer",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "53f83dad2666dd7278f7e4a1e0fc7232a33a26b62e041e01c726267d91abd70a",
+      "output_sha256": "cd9142e7a2dcb1bb279b6b8bb45b3f27e92d63f780f5c766973f2ac870f8c353",
+      "lse_sha256": "4e487bf660d90fb5b4a08a8315841d60f4879776bbc7e3ad2d2d0af5c2fa758e",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.000002306447806077472,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 90.90 W, 350.00 W, 40",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 89.22 W, 350.00 W, 41",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:46:29.656441+00:00",
+        "host_timezone": "2026-09-26T15:46:29.656461+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:46:36.962471+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "1fcb3e09328b6378d134b29a279c4b729d7a6c07f81badee531bb01ecb512413"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/workspace/flash-attn-ppu17-causal-tune-20260926/fi-cache/.cache/flashinfer/0.0.0+unknown/90a/cached_ops/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90/single_prefill_with_kv_cache_dtype_q_bf16_dtype_kv_bf16_dtype_o_bf16_head_dim_qk_256_head_dim_vo_256_posenc_0_use_swa_False_use_logits_cap_False_f16qk_False_sm90.so": "269c63310199d7b5fb67508399b262ca1eface88f594bc56a5e2c01f955fa502",
+        "/workspace/gdn-sm90-library-compare-20260926/fi-venv/lib/python3.12/site-packages/cudnn/_compiled_module.cpython-312-x86_64-linux-gnu.so": "5ad2f3eaa96eaec1f7b14f161f236d0232bb4e19b4dc88ce5ffdeec13779d0de"
+      },
+      "kernel_arguments": {
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 35,
+        "registers per thread": 168,
+        "shared memory": 196688,
+        "blocks per SM": 17.964912,
+        "warps per SM": 215.578949,
+        "grid": [
+          64,
+          32,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {}
+    },
+    {
+      "path": "S8192/references-cudnn-r3/result.json",
+      "result_sha256": "befbb72186fb6f7a1ffb23497436f7d05b539d7e1974eec2ab52a3e0de420004",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:47:47.103000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 195.43,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:47:47.304000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 187.8,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:47.504000+00:00",
+            "sm_mhz": 1215,
+            "power_w": 195.74,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:47.705000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 248.95,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:47.905000+00:00",
+            "sm_mhz": 1260,
+            "power_w": 309.3,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:47:48.106000+00:00",
+            "sm_mhz": 1125,
+            "power_w": 356.75,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "cudnn",
+      "label": "cudnn",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "5c2e2c95526632ebe7b9766e58a07a28ebefc89e123bddeb8f21303391a00cfb",
+      "output_sha256": "5a8dd91042426d0bb3a99e34db3730e3ccbf1d66d1270370b047036f7cb741b5",
+      "lse_sha256": "f5b43ee7a3ffcb4e4a596a596aab49609fa4ecaac22c6790108312edec9506ca",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000016943511020883761,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 89.20 W, 350.00 W, 37",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.37 W, 350.00 W, 39",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:47:40.843137+00:00",
+        "host_timezone": "2026-09-26T15:47:40.843159+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:47:49.538030+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "f16c9f12de32d86dd0fdf9139cf5b225f6b39501838c75176652ea44cd385297"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9": "f504745d346542609f975de51227080647d3675eac576ead82c396b8124f8f28",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9": "8222672743c4f2e39feb1c365d6f6b6c40f56023471506f49944910847f1ee0a",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9": "2804eee5f6fc11d0299ba07687eda0a974d3b2436357c639706c4e282cc2cc05"
+      },
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memset (Device)": 450
+      }
+    },
+    {
+      "path": "S8192/confirm-cudnn-r2/result.json",
+      "result_sha256": "324e59354dc1155d2ec11436c23efbee2729a898bec47a28f67ddcbe3c5f21d2",
+      "power_trace_join": {
+        "inside_actual_attention_samples": 6,
+        "cap_active_samples": 5,
+        "hits": [
+          {
+            "utc": "2026-09-26T07:46:20.208000+00:00",
+            "sm_mhz": 1755,
+            "power_w": 191.29,
+            "sw_power_cap": false
+          },
+          {
+            "utc": "2026-09-26T07:46:20.409000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 185.73,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:20.609000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 191.82,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:20.810000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 246.83,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:21.010000+00:00",
+            "sm_mhz": 1275,
+            "power_w": 300.11,
+            "sw_power_cap": true
+          },
+          {
+            "utc": "2026-09-26T07:46:21.211000+00:00",
+            "sm_mhz": 1170,
+            "power_w": 349.61,
+            "sw_power_cap": true
+          }
+        ],
+        "scope": "passive point samples, not cycle-weighted clocks or fraction of time throttled"
+      },
+      "arm": "cudnn",
+      "label": "cudnn",
+      "shape": [
+        1,
+        8192,
+        32,
+        256
+      ],
+      "input_sha256": [
+        "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+        "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+        "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+      ],
+      "oracle": {
+        "input_sha256": [
+          "7646899e75bf2ac23061e65a9f27294183d97186f74a82ef3c068a21c679dcc3",
+          "05fb4fa73e4f67e73a03fd8d0ca5d09aa024f2315fa5ac14796607442a5699fb",
+          "7f50ad1d7de9e840c36233dd709e8a781cfe4a61308d026d69eccba208fc3c58"
+        ],
+        "oracle_source_sha256": "a0826eb7988167d9884a2d3651d6e36423f57f2413b0d80593630397e47313c9",
+        "reference_sha256": [
+          "113a8a9dad46c1999be47252911a718cf5a459b47973197253222984341abfce",
+          "017afff9197ea8fb191cb65719f2154d66fe5736c7b7e21db0f4d9b5c8013e5c"
+        ],
+        "cache_sha256": "6196a21af0637baf5df6a710b97bdb5514af41f957754fa76eb0b0b5db1d9b40"
+      },
+      "source_identity_sha256": "8fadda17ea5ce2cd33b5e6a6137747ba8f1c08a6579dd062d5f2c13900e94708",
+      "script_sha256": "8c756c349bda7498aef8dfa9678fce1e468e7e44e74bf7271a50e234aae721e0",
+      "trace_sha256": "20ea5c18e76c86740e7b31fd39e26f664314ca939afba99fadba4b50f3ea6d4f",
+      "output_sha256": "5a8dd91042426d0bb3a99e34db3730e3ccbf1d66d1270370b047036f7cb741b5",
+      "lse_sha256": "f5b43ee7a3ffcb4e4a596a596aab49609fa4ecaac22c6790108312edec9506ca",
+      "max_output_abs": 0.008259462448213739,
+      "max_lse_abs": 0.0000016943511020883761,
+      "device_before": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 345 MHz, 1755 MHz, 76.19 W, 350.00 W, 39",
+      "device_after_trace": "name, uuid, driver_version, clocks.current.sm [MHz], clocks.max.sm [MHz], power.draw [W], power.limit [W], temperature.gpu\nNVIDIA H800 PCIe, GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c, 595.71.05, 1755 MHz, 1755 MHz, 88.90 W, 350.00 W, 41",
+      "power_monitor": {
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+          "--format=csv",
+          "--loop-ms=200"
+        ],
+        "start_utc": "2026-09-26T07:46:13.745389+00:00",
+        "host_timezone": "2026-09-26T15:46:13.745413+08:00",
+        "read_only": true,
+        "interval_ms": 200,
+        "end_utc": "2026-09-26T07:46:22.860895+00:00",
+        "sampler_exit_before_stop": null,
+        "sha256": "d047cfa2c01674f681370e4168040e983f63840bfc9d9090e2c1b3b0424f9ae2"
+      },
+      "loaded_library_sha256": {
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9": "3b68ea689be647bce63cb3c2d9edb589add415405a7e9f296d69ca029cae0b8b",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9": "f504745d346542609f975de51227080647d3675eac576ead82c396b8124f8f28",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9": "8222672743c4f2e39feb1c365d6f6b6c40f56023471506f49944910847f1ee0a",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9": "787c955dce49091ead850e4536666594095ea9f92a8a08879d8ddad466674657",
+        "/root/miniconda3/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9": "2804eee5f6fc11d0299ba07687eda0a974d3b2436357c639706c4e282cc2cc05"
+      },
+      "kernel_arguments": {
+        "External id": 2,
+        "queued": 0,
+        "device": 0,
+        "context": 1,
+        "stream": 7,
+        "correlation": 47,
+        "registers per thread": 168,
+        "shared memory": 232448,
+        "blocks per SM": 1,
+        "warps per SM": 12,
+        "grid": [
+          114,
+          1,
+          1
+        ],
+        "block": [
+          384,
+          1,
+          1
+        ],
+        "est. achieved occupancy %": 0
+      },
+      "gpu_copy_memset_counts": {
+        "Memset (Device)": 450
+      }
+    }
+  ],
+  "excluded_from_primary_pool": [
+    "cudnn-r3: valid preliminary pilot, not the two-pass balanced comparison",
+    "BUSY, missing packaging/build tool, and old FlashInfer symbol-parser failures: no admitted timing"
+  ],
+  "order_note": "S8192 first reference pass was deferred after a prelaunch BUSY refusal; recovered in references-r3. Candidate order reversed without dropping cells."
+}

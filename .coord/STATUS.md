@@ -1,25 +1,27 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 07:35:42 UTC
-    working-on: three candidate extensions link/load; FlashInfer JIT then 2x2 measurements
+    updated-at: 2026-09-26 08:09:12 UTC
+    working-on: causal 2x2 and same-input FlashInfer/cuDNN comparison complete; keep existing default
     blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: 950cf98 (opt-in candidate policy and real cubin checks)
+    last-commit: e11d1b3 (measured harness and opt-in candidate code)
     branch: ppu17-causal-tuning
     workspace: /workspace/flash-attn-ppu17-causal-tune-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 
-Causal experiment: four shared-policy cells + default compile PASS; wrong
-tile/host-counter/trace-grid negatives are red. 39 host / 3 CPU tests PASS.
-All six default TUs/twelve bodies compile with identical instruction text;
-real host/internal linkage PASS. All three narrow Torch2.8 candidate extensions
-link/load on H800; causal bodies168regs/0spill. Numerics/timing still pending.
-First cuDNN S2048 CPU FP64 O/LSE PASS, kernel205.586us/44.21%; needs paired
-confirmation, not a default decision. Other attempts were refused prelaunch
-BUSY, or failed packaging/build-tool admission; none contribute timings.
-FlashInfer's exact pinned CUTLASS/CCCL/spdlog were absent from the shared
-reference, so use an isolated complete snapshot; no reference algorithm edit.
-See dev/ppu17/experiments/causal-tuning/docs/plan.md.
+Causal experiment:24/24 primary runs CPU FP64 O/LSE+raw replay PASS, plus
+9/9 actual API negatives (zero device kernels).42 host+3 CPU tests PASS.
+Six default TUs/twelve bodies have identical instruction text AND machine
+words; real host/internal link PASS. Three candidate Torch2.8 extensions run;
+causal bodies168regs/0spill. No default route changed or promoted.
+Pooled incumbent:159.409us/57.01% atS2048;2267.696us/64.10% atS8192.
+N64+LPT UNRESOLVED both lengths; single-tile clearly slower atS2048. Explicit
+FlashInfer/cuDNN slower in both timing scopes at both lengths. All BELOW_70.
+Full-call times and all samples are separate in the report.8K in-kernel power
+cap samples observed at default350W; no clock/power/partition change.
+Earlier BUSY/setup/symbol-parser failures are retained, excluded from timing.
+Raw artifacts local+H800:/workspace/flash-attn-ppu17-causal-tune-20260926.
+Report:dev/ppu17/experiments/causal-tuning/docs/results.md.
 
 S4096/8192/16384 A/B/B/A complete with immutable binaries and full CPU FP64
 O/LSE checks. Pooled port kernel MFU60.37/64.26/62.51%; official59.19/65.25/
