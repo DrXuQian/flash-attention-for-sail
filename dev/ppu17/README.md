@@ -112,6 +112,9 @@ It does not time the kernel or alter hardware partitioning/clocks.
 The 2026-09-26 H800 control passed 22/22 cases and a one-kernel trace, without
 changing compute code. See [hardware validation](docs/h800-validation.md) for
 the raw evidence, priority-shape errors, source/binary identities and limits.
+The subsequent [causal timing control](docs/h800-causal-performance.md) measured
+about54–56% useful kernel MFU on H800, below70%, with the same binary. Its
+repeated-launch benchmark is physical-device-only, never a simulation runner.
 
 ## Local checks
 

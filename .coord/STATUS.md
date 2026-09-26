@@ -1,21 +1,27 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 04:10:02 UTC
-    working-on: user authorized H800 causal timing; preregistered useful FLOPs and fixed 70-percent criterion
+    updated-at: 2026-09-26 04:22:02 UTC
+    working-on: H800 causal baseline measured twice; useful kernel MFU 53.84/55.64 percent, BELOW_70
     blocked-on: none for H800 control; native PPU1.7 SDK/model still unavailable
-    last-commit: 5fb1cc0 (22/22 H800 numerical control; compute source unchanged)
+    last-commit: e7a2157 (preregistered benchmark; admitted compute binary unchanged)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
-    model-target: 20 SM / 32 MiB LLC; no hardware performance result
+    model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 
 Current performance task: H800 only, priority BF16 causal shape unchanged.
 Numerator=68,753,031,168 useful causal FLOPs; fixed dense BF16 peak=756.5TFLOPS
 (OEM1513 rating includes structural sparsity); 70-percent threshold=129.833us.
 Keep uninstrumented complete-call event span separate from warmed CUPTI
 kernel-only duration. Preserve the admitted binary; no kernel/config edits.
-Contract: dev/ppu17/docs/h800-perf-plan.md. Timing remains NOT_RUN at this
-checkpoint; only proceed on an idle device with no other task parents.
+Contract: dev/ppu17/docs/h800-perf-plan.md. Completed runs baseline-v1/v3:
+kernel-only warmed CUPTI medians168.810/163.354us (53.84/55.64% useful MFU);
+uninstrumented full-call spans174.563/182.928us (52.06/49.68%). All sample
+ranges miss the fixed70% target. CPU FP64 O/LSE + admitted fingerprint PASS
+before/after timing. One intervening attempt was blocked by another task,
+before any GPU work; it contributed no samples. No clocks/kernel/config
+changed. Raw evidence: /workspace/flash-attn-ppu17-perf-20260926.
+Interpretation/limits: dev/ppu17/docs/h800-causal-performance.md.
 
 H800 preflight (2026-09-26, physical device, not PPU1.7 simulation):
 NVIDIA H800 PCIe, SM90, 114 SM, 50 MiB L2; driver 595.71.05,
@@ -49,7 +55,8 @@ bytes are H800 launch metadata, NOT PPU1.7 capacities or performance claims.
 Evidence: dev/ppu17/results/h800-20260926; explanation:
 dev/ppu17/docs/h800-validation.md. Binary SHA256:
 a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320.
-H800 timing/MFU NOT_MEASURED; native PPU1.7 and simulator remain unverified.
+H800 timing is now recorded separately above; native PPU1.7 and simulator
+remain unverified. Do not repurpose the earlier single-call trace as timing.
 
 Rebase parent: f056429 (latest DrXuQian/v2.8.2, including upstream 664597d).
 Recovery branch: backup/ppu17-before-rebase-20260925 at a9e497a.

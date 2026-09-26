@@ -2,3 +2,7 @@ backend,scope,latency_us,verdict,reason
 ppu17,forward,,NOT_RUN,no-capable-local-SDK-or-device
 ppu17-simulation,forward,,NOT_RUN,simulation-model-not-available-locally
 h800-sm90,forward-correctness,,NOT_TIMED,22-of-22-CPU-FP64-cases-PASS-plus-one-kernel-trace
+h800-sm90-traced,causal-bf16-S2048-H32-Hkv2-D256-v1,168.810220,BELOW_70,useful-MFU-53.837413-percent-at-756.5-dense-TFLOPS
+h800-sm90-traced,causal-bf16-S2048-H32-Hkv2-D256-v3,163.354400,BELOW_70,useful-MFU-55.635511-percent-at-756.5-dense-TFLOPS
+h800-sm90-call-span,causal-bf16-S2048-H32-Hkv2-D256-v1,174.563198,BELOW_70,useful-MFU-52.063124-percent-includes-API-counter-and-gaps
+h800-sm90-call-span,causal-bf16-S2048-H32-Hkv2-D256-v3,182.928009,BELOW_70,useful-MFU-49.682416-percent-includes-API-counter-and-gaps
