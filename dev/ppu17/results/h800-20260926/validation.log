@@ -1,0 +1,45 @@
+[H800 control] START tail65-bf16-d64-causal
+[H800 control] PASS tail65-bf16-d64-causal max_abs=0.006847295
+[H800 control] START tail65-bf16-d64-full
+[H800 control] PASS tail65-bf16-d64-full max_abs=0.0031049024
+[H800 control] START tail65-fp16-d64-causal
+[H800 control] PASS tail65-fp16-d64-causal max_abs=0.0008752092
+[H800 control] START tail65-fp16-d64-full
+[H800 control] PASS tail65-fp16-d64-full max_abs=0.00045629795
+[H800 control] START tail65-bf16-d128-causal
+[H800 control] PASS tail65-bf16-d128-causal max_abs=0.0069675017
+[H800 control] START tail65-bf16-d128-full
+[H800 control] PASS tail65-bf16-d128-full max_abs=0.0038274391
+[H800 control] START tail65-fp16-d128-causal
+[H800 control] PASS tail65-fp16-d128-causal max_abs=0.0010511627
+[H800 control] START tail65-fp16-d128-full
+[H800 control] PASS tail65-fp16-d128-full max_abs=0.00033150437
+[H800 control] START tail65-bf16-d256-causal
+[H800 control] PASS tail65-bf16-d256-causal max_abs=0.0076232526
+[H800 control] START tail65-bf16-d256-full
+[H800 control] PASS tail65-bf16-d256-full max_abs=0.002709201
+[H800 control] START tail65-fp16-d256-causal
+[H800 control] PASS tail65-fp16-d256-causal max_abs=0.00087156432
+[H800 control] START tail65-fp16-d256-full
+[H800 control] PASS tail65-fp16-d256-full max_abs=0.0003993325
+[H800 control] START s2048-bf16-d256-causal
+[H800 control] PASS s2048-bf16-d256-causal max_abs=0.009159422
+[H800 control] START s2048-bf16-d256-full
+[H800 control] PASS s2048-bf16-d256-full max_abs=0.00092054044
+[H800 control] START s2048-fp16-d256-causal
+[H800 control] PASS s2048-fp16-d256-causal max_abs=0.0012677126
+[H800 control] START s2048-fp16-d256-full
+[H800 control] PASS s2048-fp16-d256-full max_abs=0.00012060648
+[H800 control] START batch2-tail129-bf16-causal
+[H800 control] PASS batch2-tail129-bf16-causal max_abs=0.0080263372
+[H800 control] START mha-tail127-fp16-causal
+[H800 control] PASS mha-tail127-fp16-causal max_abs=0.00079643921
+[H800 control] START s1-bf16-causal
+[H800 control] PASS s1-bf16-causal max_abs=0
+[H800 control] START batch2-tail129-bf16-full
+[H800 control] PASS batch2-tail129-bf16-full max_abs=0.0023575825
+[H800 control] START mha-tail127-fp16-full
+[H800 control] PASS mha-tail127-fp16-full max_abs=0.00029617756
+[H800 control] START s1-bf16-full
+[H800 control] PASS s1-bf16-full max_abs=0
+[H800 control] passed=22/22 complete=True

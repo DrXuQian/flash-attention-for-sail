@@ -1,0 +1,21 @@
+{
+  "source_commit": "e7ee8643ef77fbb389d67679ba319a4293633b97",
+  "backend_commit": "023e82d03e80b4d5982f664925e15499033df314",
+  "source_archive_sha256": "6debf900acec099ec99428428062cd718a013c4bdc761c287b7c008469cd3dda",
+  "backend_archive_sha256": "fbe2da46dc51a34ca84c827a93ab7893a0f3e1f5978b6fab437ab789c2ba401c",
+  "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+  "device": "NVIDIA H800 PCIe",
+  "device_uuid": "GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c",
+  "sm_count": 114,
+  "l2_cache_bytes": 52428800,
+  "driver": "595.71.05",
+  "cuda_compiler": "12.8.93",
+  "python": "3.12.3",
+  "torch": "2.8.0+cu128",
+  "cxx11_abi": true,
+  "hardware_correctness": "22/22 PASS",
+  "performance": "NOT_MEASURED",
+  "native_ppu17": "NOT_VERIFIED",
+  "ppu17_simulator": "NOT_RUN",
+  "scope": "shared SM90 FP16/BF16 fixed forward only"
+}

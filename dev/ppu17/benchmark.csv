@@ -1,3 +1,4 @@
 backend,scope,latency_us,verdict,reason
 ppu17,forward,,NOT_RUN,no-capable-local-SDK-or-device
 ppu17-simulation,forward,,NOT_RUN,simulation-model-not-available-locally
+h800-sm90,forward-correctness,,NOT_TIMED,22-of-22-CPU-FP64-cases-PASS-plus-one-kernel-trace

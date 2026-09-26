@@ -1,0 +1,53 @@
+{
+  "role": "Hopper-hardware-validation",
+  "target_cache_bytes": 52428800,
+  "cache_source": "cuda-device-properties",
+  "evidence_scope": "shared-SM90-forward; NOT native-PPU1.7 or model-performance",
+  "shape": [
+    1,
+    2048,
+    32,
+    256
+  ],
+  "kv_heads": 2,
+  "dtype": "fp16",
+  "causal": false,
+  "sm_count": 114,
+  "device_name": "NVIDIA H800 PCIe",
+  "torch_version": "2.8.0+cu128",
+  "torch_cuda": "12.8",
+  "input_seed": 170020,
+  "input_strides": [
+    [
+      16777216,
+      8192,
+      256,
+      1
+    ],
+    [
+      1048576,
+      512,
+      256,
+      1
+    ],
+    [
+      1048576,
+      512,
+      256,
+      1
+    ]
+  ],
+  "input_sha256": [
+    "dab53f1e7a95d1f4181af74b866461091f43d71503172c2a0c9dd075b78c1cbc",
+    "6fae539a6531930a8e78f9b5d3225bafef539f1755a3bbddced87b8133b45a82",
+    "2c8192cbb271f00db8cd83a9750575949cbabbef35c21ba00cbdac5bde981ae4"
+  ],
+  "logical_flops": 137438953472,
+  "attention_launches": 1,
+  "python_elapsed_time": "NOT_USED_AS_SIMULATION_TIME",
+  "extension": "/workspace/flash-attn-ppu17-control-e7ee864/python/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so",
+  "extension_sha256": "a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320",
+  "numerics": "CPU-FLOAT64-REFERENCE/PASS",
+  "output_sha256": "6ee56514b2baf7b07e88b318bca7759ec019ca947d50e35a673a569cf3ea27e4",
+  "max_abs": 0.00012060648004458274
+}

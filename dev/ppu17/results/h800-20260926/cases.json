@@ -1,0 +1,242 @@
+{
+  "source_commit": "e7ee864",
+  "backend_commit": "023e82d03e80b4d5982f664925e15499033df314",
+  "expected_cases": 22,
+  "protocol": "one-forward-per-process; CPU-FP64-reference; no-timing; idle-only",
+  "tolerances": {
+    "bf16": {
+      "atol": 0.02,
+      "rtol": 0.02
+    },
+    "fp16": {
+      "atol": 0.002,
+      "rtol": 0.002
+    },
+    "lse": {
+      "atol": 0.002,
+      "rtol": 0.002
+    }
+  },
+  "cases": [
+    {
+      "id": "tail65-bf16-d64-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 64,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "tail65-bf16-d64-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 64,
+      "dtype": "bf16",
+      "causal": false
+    },
+    {
+      "id": "tail65-fp16-d64-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 64,
+      "dtype": "fp16",
+      "causal": true
+    },
+    {
+      "id": "tail65-fp16-d64-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 64,
+      "dtype": "fp16",
+      "causal": false
+    },
+    {
+      "id": "tail65-bf16-d128-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "tail65-bf16-d128-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "bf16",
+      "causal": false
+    },
+    {
+      "id": "tail65-fp16-d128-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "fp16",
+      "causal": true
+    },
+    {
+      "id": "tail65-fp16-d128-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "fp16",
+      "causal": false
+    },
+    {
+      "id": "tail65-bf16-d256-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "tail65-bf16-d256-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "bf16",
+      "causal": false
+    },
+    {
+      "id": "tail65-fp16-d256-causal",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "fp16",
+      "causal": true
+    },
+    {
+      "id": "tail65-fp16-d256-full",
+      "batch": 1,
+      "seqlen": 65,
+      "heads": 4,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "fp16",
+      "causal": false
+    },
+    {
+      "id": "s2048-bf16-d256-causal",
+      "batch": 1,
+      "seqlen": 2048,
+      "heads": 32,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "s2048-bf16-d256-full",
+      "batch": 1,
+      "seqlen": 2048,
+      "heads": 32,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "bf16",
+      "causal": false
+    },
+    {
+      "id": "s2048-fp16-d256-causal",
+      "batch": 1,
+      "seqlen": 2048,
+      "heads": 32,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "fp16",
+      "causal": true
+    },
+    {
+      "id": "s2048-fp16-d256-full",
+      "batch": 1,
+      "seqlen": 2048,
+      "heads": 32,
+      "kv_heads": 2,
+      "head_dim": 256,
+      "dtype": "fp16",
+      "causal": false
+    },
+    {
+      "id": "batch2-tail129-bf16-causal",
+      "batch": 2,
+      "seqlen": 129,
+      "heads": 6,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "mha-tail127-fp16-causal",
+      "batch": 1,
+      "seqlen": 127,
+      "heads": 4,
+      "kv_heads": 4,
+      "head_dim": 128,
+      "dtype": "fp16",
+      "causal": true
+    },
+    {
+      "id": "s1-bf16-causal",
+      "batch": 1,
+      "seqlen": 1,
+      "heads": 2,
+      "kv_heads": 1,
+      "head_dim": 64,
+      "dtype": "bf16",
+      "causal": true
+    },
+    {
+      "id": "batch2-tail129-bf16-full",
+      "batch": 2,
+      "seqlen": 129,
+      "heads": 6,
+      "kv_heads": 2,
+      "head_dim": 128,
+      "dtype": "bf16",
+      "causal": false
+    },
+    {
+      "id": "mha-tail127-fp16-full",
+      "batch": 1,
+      "seqlen": 127,
+      "heads": 4,
+      "kv_heads": 4,
+      "head_dim": 128,
+      "dtype": "fp16",
+      "causal": false
+    },
+    {
+      "id": "s1-bf16-full",
+      "batch": 1,
+      "seqlen": 1,
+      "heads": 2,
+      "kv_heads": 1,
+      "head_dim": 64,
+      "dtype": "bf16",
+      "causal": false
+    }
+  ]
+}
