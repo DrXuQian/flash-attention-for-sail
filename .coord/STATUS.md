@@ -1,19 +1,25 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 07:18:21 UTC
-    working-on: 3/3 candidate SM90a cubins compile; H800 reference runs admitted only while idle
+    updated-at: 2026-09-26 07:35:42 UTC
+    working-on: three candidate extensions link/load; FlashInfer JIT then 2x2 measurements
     blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: d4f1fda (preregistered causal experiment)
+    last-commit: 950cf98 (opt-in candidate policy and real cubin checks)
     branch: ppu17-causal-tuning
     workspace: /workspace/flash-attn-ppu17-causal-tune-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 
 Causal experiment: four shared-policy cells + default compile PASS; wrong
-tile and host-counter mismatch negatives are red. 38 host / 3 CPU tests PASS.
-Three candidate causal bodies use168 regs, no spill; no default promotion.
-H800 cuDNN attempts r1/r2 refused BEFORE GPU work because another task was
-active. They are not performance samples. See experiments/causal-tuning/plan.
+tile/host-counter/trace-grid negatives are red. 39 host / 3 CPU tests PASS.
+All six default TUs/twelve bodies compile with identical instruction text;
+real host/internal linkage PASS. All three narrow Torch2.8 candidate extensions
+link/load on H800; causal bodies168regs/0spill. Numerics/timing still pending.
+First cuDNN S2048 CPU FP64 O/LSE PASS, kernel205.586us/44.21%; needs paired
+confirmation, not a default decision. Other attempts were refused prelaunch
+BUSY, or failed packaging/build-tool admission; none contribute timings.
+FlashInfer's exact pinned CUTLASS/CCCL/spdlog were absent from the shared
+reference, so use an isolated complete snapshot; no reference algorithm edit.
+See dev/ppu17/experiments/causal-tuning/docs/plan.md.
 
 S4096/8192/16384 A/B/B/A complete with immutable binaries and full CPU FP64
 O/LSE checks. Pooled port kernel MFU60.37/64.26/62.51%; official59.19/65.25/

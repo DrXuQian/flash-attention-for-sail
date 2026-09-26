@@ -85,6 +85,20 @@ static_assert(std::get<1>(tile_size_fwd_sm90(256,256,true,false,1)) == 128);
             with self.assertRaises(ValueError):
                 bench.inventory(trace(symbol, 1), arm, 2)
 
+    def test_actual_candidate_type_grid_and_host_copies_are_bound(self):
+        record = {"arm":"candidate", "source_identity":{"tile":[128,64],"scheduler":"single"},
+                  "shape":[1,2048,32,256],
+                  "kernel_name":"FlashAttnFwdSm90<cute::tuple<cute::C<128>, cute::C<64>, cute::C<256>>, SingleTileScheduler>",
+                  "kernel_arguments":{"grid":[16,32,1]}, "gpu_copy_memset_counts":{}}
+        bench.check_candidate_receipt(record)
+        plants = [("kernel_name", record["kernel_name"].replace("C<64>","C<80>")),
+                  ("kernel_name", record["kernel_name"].replace("SingleTileScheduler","DynamicPersistentTileScheduler")),
+                  ("kernel_arguments", {"grid":[114,1,1]}),
+                  ("gpu_copy_memset_counts", {"HtoD":450})]
+        for key,value in plants:
+            with self.assertRaises(ValueError):
+                bench.check_candidate_receipt({**record,key:value})
+
 
 if __name__ == "__main__":
     unittest.main()

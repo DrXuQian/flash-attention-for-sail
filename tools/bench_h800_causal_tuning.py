@@ -2,12 +2,16 @@
 """Bounded physical-H800 causal comparison; never run loops in the simulator."""
 import argparse
 from collections import Counter
+from contextlib import contextmanager
+from datetime import datetime, timezone
 import hashlib
 import importlib
 import json
 import math
 from pathlib import Path
+import re
 import statistics
+import subprocess
 import sys
 
 from bench_h800_official_fa3 import check_inputs, wait_before_first_launch
@@ -73,6 +77,26 @@ def oracle(host, cache):
                                       "cache_sha256": sha(cache)}
 
 
+def check_candidate_receipt(record):
+    """Bind requested axes to the actual instantiated body AND host behavior."""
+    if record["arm"] not in ("control", "candidate"):
+        return
+    config = {"tile": [128,80], "scheduler": "LPT"} if record["arm"] == "control" else record["source_identity"]
+    n = config["tile"][1]
+    compact = re.sub(r"\s+", "", record["kernel_name"])
+    shape = f"cute::tuple<cute::C<128>,cute::C<{n}>,cute::C<256>>"
+    if shape not in compact:
+        raise ValueError("generated kernel tile differs from requested candidate")
+    single = config["scheduler"] == "single"
+    if ("SingleTileScheduler" if single else "DynamicPersistentTileScheduler") not in compact:
+        raise ValueError("generated scheduler differs from requested candidate")
+    grid = [(record["shape"][1]+127)//128, 32, 1] if single else [114,1,1]
+    if record["kernel_arguments"].get("grid") != grid:
+        raise ValueError("actual grid differs from scheduler contract")
+    if single and record["gpu_copy_memset_counts"]:
+        raise ValueError("single-tile retained unused host counter initialization")
+
+
 def loaded_libraries():
     paths = {line.split()[-1] for line in Path("/proc/self/maps").read_text().splitlines()
              if "/" in line and ".so" in line}
@@ -80,11 +104,36 @@ def loaded_libraries():
             any(x in p for x in ("flashinfer", "cudnn", "flash_attn_3"))}
 
 
+@contextmanager
+def power_samples(out, record):
+    """Read-only NVML sampling; terminate only the child we created."""
+    path = out / "power.csv"
+    cmd = ["nvidia-smi", "--query-gpu=timestamp,uuid,power.draw,power.limit,clocks.current.sm,clocks_event_reasons.sw_power_cap",
+           "--format=csv", "--loop-ms=200"]
+    record["power_monitor"] = {"command": cmd, "start_utc": datetime.now(timezone.utc).isoformat(),
+                               "host_timezone": datetime.now().astimezone().isoformat(),
+                               "read_only": True, "interval_ms": 200}
+    with path.open("x") as log:
+        proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT)
+        try:
+            yield
+        finally:
+            failed = proc.poll()
+            if failed is None:
+                proc.terminate()
+            proc.wait(timeout=10)
+            record["power_monitor"].update(end_utc=datetime.now(timezone.utc).isoformat(),
+                                            sampler_exit_before_stop=failed)
+    record["power_monitor"]["sha256"] = sha(path)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--arm", choices=("control", "candidate", "flashinfer", "cudnn"), required=True)
     ap.add_argument("--label", required=True)
     ap.add_argument("--extension-dir", type=Path)
+    ap.add_argument("--flashinfer-source-root", type=Path,
+                    help="explicit uninstalled source tree; JIT reads it without editing its package")
     ap.add_argument("--expected-sha256")
     ap.add_argument("--seqlen", type=int, choices=(2048, 8192), required=True)
     ap.add_argument("--oracle-cache", type=Path, required=True)
@@ -122,6 +171,29 @@ def main():
     elif args.arm == "flashinfer":
         import flashinfer
         record.update(flashinfer_version=flashinfer.__version__, flashinfer_file=flashinfer.__file__)
+        if args.flashinfer_source_root:
+            # FlashInfer's JIT env supports path overrides (also used by its
+            # AOT scripts). The raw checkout lacks wheel data/ symlinks. Do NOT
+            # install/edit the other task's package or substitute a kernel.
+            from flashinfer.jit import env as jit_env
+            root = args.flashinfer_source_root.resolve()
+            if Path(flashinfer.__file__).resolve().parent.parent != root:
+                raise ValueError("FlashInfer Python and C++ source roots differ")
+            jit_env.FLASHINFER_INCLUDE_DIR = root / "include"
+            jit_env.FLASHINFER_CSRC_DIR = root / "csrc"
+            jit_env.CUTLASS_INCLUDE_DIRS = [root / "3rdparty/cutlass/include",
+                                           root / "3rdparty/cutlass/tools/util/include"]
+            jit_env.SPDLOG_INCLUDE_DIR = root / "3rdparty/spdlog/include"
+            jit_env.CCCL_INCLUDE_DIRS = [root / "3rdparty/cccl" / p
+                                        for p in ("cub", "libcudacxx/include", "thrust")]
+            required = [root / "csrc/single_prefill_sm90_customize_config.jinja",
+                        root / "include/flashinfer/attention/hopper/prefill_sm90.cuh",
+                        root / "3rdparty/cutlass/include/cutlass/cutlass.h"]
+            if any(not p.is_file() for p in required):
+                raise ValueError("incomplete explicit FlashInfer source/dependencies")
+            paths = [*root.glob("include/flashinfer/attention/hopper/*.cuh"),
+                     *root.glob("csrc/*single_prefill*"), root / "flashinfer/prefill.py"]
+            record["flashinfer_source_sha256"] = {str(p.relative_to(root)): sha(p) for p in paths}
     prop = torch.cuda.get_device_properties(0)
     if prop.name != "NVIDIA H800 PCIe" or prop.multi_processor_count != 114:
         raise ValueError("registered H800 device mismatch")
@@ -181,7 +253,7 @@ def main():
 
     flops = logical_flops(1, args.seqlen, 32, 256, True)
     record["useful_causal_flops"] = flops
-    with torch.inference_mode():
+    with power_samples(args.out, record), torch.inference_mode():
         validate(invoke())
         require_idle()
         print(f"[causal tuning] {args.label}/S{args.seqlen} CPU-FP64 O/LSE PASS", flush=True)
@@ -217,6 +289,7 @@ def main():
     trace = args.out / "kernel-timing-trace.json"
     prof.export_chrome_trace(str(trace))
     record.update(inventory(json.loads(trace.read_text()), args.arm, SAMPLES*CALLS))
+    check_candidate_receipt(record)
     durations = record["kernel_durations_us"]
     batches = [statistics.mean(durations[i:i+CALLS]) for i in range(0, len(durations), CALLS)]
     record["instrumented_kernel_only"] = summarize(batches, flops)

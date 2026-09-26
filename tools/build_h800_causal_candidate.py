@@ -25,6 +25,8 @@ def main():
     args = ap.parse_args()
     require_idle()
     backend = build.cutlass_root(args.backend)
+    if not shutil.which("ninja"):
+        raise RuntimeError("ninja unavailable on PATH; no candidate compiled")
     args.out.mkdir(parents=True, exist_ok=False)
     tmp = args.out / "tmp"
     tmp.mkdir()
