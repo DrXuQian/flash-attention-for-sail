@@ -6,3 +6,7 @@ h800-sm90-traced,causal-bf16-S2048-H32-Hkv2-D256-v1,168.810220,BELOW_70,useful-M
 h800-sm90-traced,causal-bf16-S2048-H32-Hkv2-D256-v3,163.354400,BELOW_70,useful-MFU-55.635511-percent-at-756.5-dense-TFLOPS
 h800-sm90-call-span,causal-bf16-S2048-H32-Hkv2-D256-v1,174.563198,BELOW_70,useful-MFU-52.063124-percent-includes-API-counter-and-gaps
 h800-sm90-call-span,causal-bf16-S2048-H32-Hkv2-D256-v3,182.928009,BELOW_70,useful-MFU-49.682416-percent-includes-API-counter-and-gaps
+h800-port-traced,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,161.029950,BELOW_70,useful-MFU-56.438604-percent-relative-speed-UNRESOLVED
+h800-official-fa3-traced,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,164.234290,BELOW_70,useful-MFU-55.337442-percent-relative-speed-UNRESOLVED
+h800-port-call-span,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,177.806082,BELOW_70,includes-CPU-counter-H2D-and-gaps-relative-speed-UNRESOLVED
+h800-official-fa3-call-span,official-AB-causal-bf16-S2048-H32-Hkv2-D256-pooled,173.628807,BELOW_70,includes-GPU-counter-fill-and-gaps-relative-speed-UNRESOLVED

@@ -4,7 +4,7 @@
 - source-commit: e7ee864 (hardware runner provenance; compute source remains a3d25ff)
 - worktree: /workspace/flash-attn-ppu17-source
 - branch: ppu17-hopper-source
-- working-on: H800 correctness and initial causal timing complete;70% useful MFU not reached
+- working-on: official FA3 same-H800/input A/B complete; both about55–56% useful MFU, no resolved port penalty
 - blocked-on: native PPU1.7 verification only (SDK2.1.1 cannot target it)
 - device-results: H800 22/22 numerical cases PASS; one traced target; fresh-process fingerprint STABLE
 - validation-results: six generated units / twelve live forward bodies compiled
@@ -14,6 +14,7 @@
 - evidence: /workspace/flash-attn-ppu17-rebase-20260925/final/source-compile.json
 - hardware-evidence: dev/ppu17/results/h800-20260926 (CPU FP64 reference, no timing)
 - hardware-performance: dev/ppu17/docs/h800-causal-performance.md (two independent runs; no kernel edit)
+- official-comparison: dev/ppu17/docs/h800-official-ab.md (A/B/B/A; same CPU fixture/oracle; both BELOW_70)
 - negative-evidence: /workspace/flash-attn-ppu17-rebase-20260925/negatives/negative-builds.json
 - recovery: backup/ppu17-before-rebase-20260925 at a9e497a
 - skill: /root/.codex/skills/ppu17-hopper-porting/SKILL.md

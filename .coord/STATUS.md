@@ -1,20 +1,31 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 04:49:00 UTC
-    working-on: official FA3 same-input plan and host negatives ready; H800 just became idle
-    blocked-on: official extension build pending; no new performance results yet
-    last-commit: 3e6e983 (two H800 baseline runs; admitted compute binary unchanged)
+    updated-at: 2026-09-26 05:11:21 UTC
+    working-on: official FA3 A/B/B/A complete; no resolved port penalty, both BELOW_70
+    blocked-on: none for this H800 comparison; native PPU1.7/model still unverified
+    last-commit: a87a28e (official A/B preregistration and fail-closed harness)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 
-Current task: user authorized an official FA3 A/B on the same H800 and input.
-Preserve the admitted binary; build official source separately with a pinned
-revision. Prepare locally while another remote task is active. Recheck idle
-admission before remote work; do not infer idle from gaps between GPU launches.
-Use the unchanged CPU FP64 oracle and effective causal FLOPs; no kernel edits,
-clock changes, simulator runs or new performance claims at this checkpoint.
+Completed task: official FA3 A/B on the same H800 and input, no kernel edits.
+Order A1/B1-r2/B2/A2, each200 warmups+9x50 calls. Pooled kernel-only medians:
+admitted port161.02995us/56.4386%, official164.23429us/55.3374%; ranges
+overlap, so relative speed UNRESOLVED. Both fail the unchanged70% threshold.
+Full-call event spans177.80608/173.62881us also overlap. All four runs pass
+the unchanged CPU FP64 O/LSE oracle and within-arm replay; cross-arm output
+AND LSE hashes are also identical on this fixture. H800 only, not PPU1.7.
+Official extension SHA256=c0611358efe2a1511843ef2638befce6932b1d5855225c7d7d89ebf8583ef585.
+Source a8aa52b1, official CUTLASS dc481792 (4.0.0); build-r2 completed with
+unmodified sources. First build attempt and official b1 attempt were refused
+by idle admission before compilation/GPU work respectively; B1-r2 began after
+the foreign parent exited. Target kernels both168 registers, zero stack/spill,
+grid114/block384/shared232448B. Static SASS counts3640/3672 are not a dynamic
+verdict. Official API uses one counter-fill kernel per call; port uses H2D.
+No clock/partition/power changes. GPU empty after final arm. Raw artifacts:
+/workspace/flash-attn-official-h800-ab-20260926 (local and remote).
+Summary and hashes: dev/ppu17/docs/h800-official-ab.md.
 
 Previous performance task: H800 only, priority BF16 causal shape unchanged.
 Numerator=68,753,031,168 useful causal FLOPs; fixed dense BF16 peak=756.5TFLOPS
