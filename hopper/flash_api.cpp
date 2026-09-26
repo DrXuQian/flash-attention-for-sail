@@ -980,6 +980,10 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     TORCH_CHECK(!pack_gqa_.value_or(false), "PPU1.7 packed GQA is not admitted; ordinary GQA is supported");
     TORCH_CHECK(!scheduler_metadata_, "PPU1.7 external scheduler metadata is not admitted");
     TORCH_CHECK(!qsa_allow_aiu, "PPU1.7 QSA and its AIU load contract are not admitted");
+#if defined(FLASHATTN_PPU17_CAUSAL_EXPERIMENT)
+    TORCH_CHECK(q.scalar_type() == at::ScalarType::BFloat16 && q.size(-1) == 256 && is_causal,
+                "causal experiment binary admits only BF16 D256 causal forward");
+#endif
 #endif
     bool is_sm8x = dprops->major >= 8;
     bool is_sm89 = (dprops->major == 8) && (dprops->minor == 9);
@@ -1412,9 +1416,12 @@ mha_fwd(at::Tensor q,   // (b, s_q, h, d) or (total_q, h, d) if there is cu_seql
     bool const scheduler_needs_semaphore = is_varlen || (!is_varlen && params.is_causal);
 #else
     // We don't use the persistent scheduler if Split and not Varlen
-    bool const scheduler_needs_semaphore = params.arch >= 90
+    bool const scheduler_needs_semaphore = (params.arch >= 90
         ? (((params.is_causal || params.is_local) && (params.num_splits == 1)) || is_varlen)
-        : ((params.is_causal && !is_varlen) || (is_varlen && params.num_splits > 1));
+        : ((params.is_causal && !is_varlen) || (is_varlen && params.num_splits > 1))) &&
+        !flash::ppu17_causal::single_tile(params.arch, params.d_rounded, params.dv_rounded,
+                                         params.is_e4m3 ? 1 : 2, params.is_causal, params.is_local,
+                                         is_varlen, params.num_splits > 1, params.pack_gqa);
 #endif
     bool qsa_without_scheduler_metadata = false;
 #if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)

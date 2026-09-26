@@ -1,13 +1,19 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 07:08:01 UTC
-    working-on: causal reference adapters and bounded N64/80 x LPT/single experiment; no default promotion
+    updated-at: 2026-09-26 07:18:21 UTC
+    working-on: 3/3 candidate SM90a cubins compile; H800 reference runs admitted only while idle
     blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: ed150c9 (completed immutable-binary sequence scaling)
+    last-commit: d4f1fda (preregistered causal experiment)
     branch: ppu17-causal-tuning
     workspace: /workspace/flash-attn-ppu17-causal-tune-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+
+Causal experiment: four shared-policy cells + default compile PASS; wrong
+tile and host-counter mismatch negatives are red. 38 host / 3 CPU tests PASS.
+Three candidate causal bodies use168 regs, no spill; no default promotion.
+H800 cuDNN attempts r1/r2 refused BEFORE GPU work because another task was
+active. They are not performance samples. See experiments/causal-tuning/plan.
 
 S4096/8192/16384 A/B/B/A complete with immutable binaries and full CPU FP64
 O/LSE checks. Pooled port kernel MFU60.37/64.26/62.51%; official59.19/65.25/

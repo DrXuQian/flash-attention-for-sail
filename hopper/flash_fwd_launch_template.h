@@ -156,7 +156,10 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
     // since we'll avoid launching a bunch of thread blocks that immediately exit.
     // On Sm80, noncausal persistent seems a bit slower.
 #ifndef FLASHATTENTION_DISABLE_SM90
-    static constexpr bool UsePersistentScheduler = Arch >= 90 ? !(Split && !Varlen) : ((Is_causal && !Varlen) || (Varlen && Split));
+    static constexpr bool UsePersistentScheduler =
+        (Arch >= 90 ? !(Split && !Varlen) : ((Is_causal && !Varlen) || (Varlen && Split))) &&
+        !flash::ppu17_causal::single_tile(Arch, kHeadDim, kHeadDimV, sizeof(Element),
+                                         Is_causal, Is_local, Varlen, Split, PackGQA);
     using Scheduler = std::conditional_t<!UsePersistentScheduler, SchedulerSingleTile, SchedulerPersistent>;
 #if defined(FLASHATTN_PPU17)
     using AttnKernel = flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<CollectiveMainloop, CollectiveEpilogue, Scheduler>>;

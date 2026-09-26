@@ -1,0 +1,9 @@
+{
+  "parent": "ed150c9a05a12242623dddb8d21a6a56e5738de5",
+  "port_backend": "023e82d03e80b4d5982f664925e15499033df314",
+  "flashinfer_source": "5d9f8c8d97fa53e22952ce8672f475d235f07478",
+  "flashinfer_entry": "single_prefill_with_kv_cache, backend=fa3, return_lse=True",
+  "cudnn_entry": "aten::_scaled_dot_product_cudnn_attention.default",
+  "cudnn_runtime": "Torch 2.8.0+cu128, cuDNN 91002; loaded-library hashes recorded at run time",
+  "scope": "physical H800 only; explicit backends, no fallback, same BF16 GQA input"
+}
