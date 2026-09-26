@@ -26,6 +26,24 @@ class OfficialABTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "same-input"):
                 ab.check_inputs(actual, ["q", "k", "v"])
 
+    def test_larger_sequence_cannot_reuse_wrong_shape_or_input(self):
+        reference = {"shape": [1, 4096, 32, 256], "kv_heads": 2, "dtype": "bf16",
+                     "causal": True, "input_sha256": ["q", "k", "v"]}
+        ab.check_sequence_inputs(4096, ["q", "k", "v"], reference)
+        with self.assertRaisesRegex(ValueError, "shape/type"):
+            ab.check_sequence_inputs(8192, ["q", "k", "v"], reference)
+        with self.assertRaisesRegex(ValueError, "same-input admission"):
+            ab.check_sequence_inputs(4096, ["q", "k", "other"], reference)
+        for key, value in (("kv_heads", 32), ("dtype", "fp16"), ("causal", False)):
+            with self.assertRaisesRegex(ValueError, "shape/type"):
+                ab.check_sequence_inputs(4096, ["q", "k", "v"], {**reference, key: value})
+
+    def test_causal_denominator_scales_quadratically_not_linearly(self):
+        expected = {2048: 68753031168, 4096: 274945015808,
+                    8192: 1099645845504, 16384: 4398314946560}
+        for length in ab.SEQUENCE_LENGTHS:
+            self.assertEqual(ab.logical_flops(1, length, 32, 256, True), expected[length])
+
     def test_official_counter_zero_is_separate_not_attention(self):
         trace = {"traceEvents": [event("FillFunctor<int>"), event("FlashAttnFwdSm90", 2)]}
         result = ab.parse_trace(trace, 1, "official")

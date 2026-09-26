@@ -18,6 +18,7 @@ from run_ppu17_forward import cpu_reference, logical_flops, validate_extension
 
 UPSTREAM = "a8aa52b1ab3e9ca574c8a33b3f35afc017ffa2e2"
 UPSTREAM_CUTLASS = "dc4817921edda44a549197ff3a9dcf5df0636e7b"
+SEQUENCE_LENGTHS = (2048, 4096, 8192, 16384)
 
 
 def check_identity(arm, actual_hash, expected_hash, admitted_hash):
@@ -32,6 +33,14 @@ def check_identity(arm, actual_hash, expected_hash, admitted_hash):
 def check_inputs(actual, admitted):
     if len(actual) != 3 or actual != admitted:
         raise ValueError("same-input admission failed")
+
+
+def check_sequence_inputs(seqlen, hashes, reference):
+    if (reference.get("shape") != [1, seqlen, 32, 256] or
+            reference.get("kv_heads") != 2 or reference.get("dtype") != "bf16" or
+            reference.get("causal") is not True):
+        raise ValueError("same-input reference shape/type mismatch")
+    check_inputs(hashes, reference["input_sha256"])
 
 
 def parse_trace(trace, expected, arm):
@@ -65,8 +74,13 @@ def main():
     ap.add_argument("--arm", choices=("control", "official"), required=True)
     ap.add_argument("--extension-dir", type=Path, required=True)
     ap.add_argument("--expected-sha256", required=True)
+    ap.add_argument("--seqlen", type=int, choices=SEQUENCE_LENGTHS, default=2048)
+    ap.add_argument("--same-input-as", type=Path,
+                    help="prior completed result for this length; required for new official lengths")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
+    if args.seqlen != 2048 and args.arm == "official" and args.same_input_as is None:
+        ap.error("larger official shapes require --same-input-as from the control")
     args.out.mkdir(parents=True, exist_ok=False)
     require_idle()
     record = {
@@ -94,19 +108,27 @@ def main():
     if prop.name != "NVIDIA H800 PCIe" or prop.multi_processor_count != 114:
         raise ValueError("peak and experiment registered only for inspected H800 PCIe")
     record.update(extension_path=extension.__file__, extension_sha256=binary_hash,
-                  shape=[1, 2048, 32, 256], kv_heads=2, dtype="bf16", causal=True,
+                  shape=[1, args.seqlen, 32, 256], kv_heads=2, dtype="bf16", causal=True,
                   sm_count=prop.multi_processor_count,
                   l2_cache_bytes=getattr(prop, "L2_cache_size", None),
                   torch_version=torch.__version__, torch_cuda=torch.version.cuda)
     gen = torch.Generator(device="cpu").manual_seed(170020)
     host = [torch.randn(shape, generator=gen, device="cpu").to(torch.bfloat16)
-            for shape in ((1, 2048, 32, 256), (1, 2048, 2, 256), (1, 2048, 2, 256))]
+            for shape in ((1, args.seqlen, 32, 256), (1, args.seqlen, 2, 256),
+                          (1, args.seqlen, 2, 256))]
     record["input_sha256"] = [digest(t) for t in host]
-    check_inputs(record["input_sha256"], admitted["input_sha256"])
+    record["input_seed"] = 170020
+    if args.seqlen == 2048:
+        check_inputs(record["input_sha256"], admitted["input_sha256"])
+    if args.same_input_as:
+        check_sequence_inputs(args.seqlen, record["input_sha256"],
+                              json.loads(args.same_input_as.read_text()))
+        record["same_input_reference_sha256"] = hashlib.sha256(args.same_input_as.read_bytes()).hexdigest()
+    print(f"[H800 official A/B] arm={args.arm} S={args.seqlen} full CPU-FP64 reference starting", flush=True)
     expected, expected_lse = cpu_reference(host, causal=True)
     require_idle()
     q, k, v = [t.to("cuda") for t in host]
-    flops = logical_flops(1, 2048, 32, 256, True)
+    flops = logical_flops(1, args.seqlen, 32, 256, True)
     record["useful_causal_flops"] = flops
     anchor = None
 
@@ -124,7 +146,7 @@ def main():
         hashes = [digest(out), digest(lse)]
         if anchor is not None and hashes != anchor:
             raise AssertionError("within-arm output/LSE replay changed")
-        if args.arm == "control" and hashes[0] != admitted["output_sha256"]:
+        if args.arm == "control" and args.seqlen == 2048 and hashes[0] != admitted["output_sha256"]:
             raise AssertionError("admitted control output changed")
         anchor = hashes
         record.update(output_sha256=hashes[0], lse_sha256=hashes[1],

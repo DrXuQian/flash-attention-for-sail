@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 05:11:21 UTC
-    working-on: official FA3 A/B/B/A complete; no resolved port penalty, both BELOW_70
-    blocked-on: none for this H800 comparison; native PPU1.7/model still unverified
-    last-commit: a87a28e (official A/B preregistration and fail-closed harness)
+    updated-at: 2026-09-26 05:24:23 UTC
+    working-on: user-requested S4096/8192/16384 scaling; immutable port/official binaries
+    blocked-on: H800 occupied by foreign benchmark parent; no GPU work started
+    last-commit: 113ba60 (completed S2048 official A/B)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
