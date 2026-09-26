@@ -1,11 +1,11 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 05:47:38 UTC
-    working-on: sequence scaling complete; 12/12 new runs PASS, results handoff
+    updated-at: 2026-09-26 07:08:01 UTC
+    working-on: causal reference adapters and bounded N64/80 x LPT/single experiment; no default promotion
     blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: b7d5192 (bounded prelaunch idle wait; all earlier timing checks retained)
-    branch: ppu17-hopper-source
-    workspace: /workspace/flash-attn-ppu17-source
+    last-commit: ed150c9 (completed immutable-binary sequence scaling)
+    branch: ppu17-causal-tuning
+    workspace: /workspace/flash-attn-ppu17-causal-tune-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 

@@ -1,0 +1,4 @@
+{"id":"N80-LPT","parent":"ed150c9","tile":[128,80],"scheduler":"dynamic-LPT","binary_sha256":"a78aff6c443238cd888f53dc692bf1e017b9191cff137427677ff1da84640320","state":"immutable-control"}
+{"id":"N64-LPT","parent":"N80-LPT","tile":[128,64],"scheduler":"dynamic-LPT","state":"registered-not-measured"}
+{"id":"N80-single","parent":"N80-LPT","tile":[128,80],"scheduler":"single-tile","state":"registered-not-measured"}
+{"id":"N64-single","parent":"N80-LPT","tile":[128,64],"scheduler":"single-tile","state":"registered-not-measured"}
