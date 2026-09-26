@@ -1,13 +1,25 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-25 09:35:28 UTC
-    working-on: rebase and compatibility closure complete; publishing feature-branch handoff
-    blocked-on: native PPU1.7 SDK/device only; simulation input build is separate
-    last-commit: a3d25ff (validated rebased source; this checkpoint is documentation-only)
+    updated-at: 2026-09-26 03:24:58 UTC
+    working-on: H800 read-only preflight complete; FlashAttention validation NOT STARTED
+    blocked-on: another H800 validation task is active; user requires no concurrent tasks
+    last-commit: 3d7c07c (unchanged validated source; this checkpoint is documentation-only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; no hardware performance result
+
+H800 preflight (2026-09-26, physical device, not PPU1.7 simulation):
+NVIDIA H800 PCIe, SM90, 114 SM, 50 MiB L2; driver 595.71.05,
+CUDA toolkit 12.8.93, Python 3.12.3, Torch 2.8.0+cu128, CXX11 ABI enabled.
+Two initial samples showed no GPU process and zero memory/utilization. A later
+sample caught another task's `single-launch` GPU process, so no FlashAttention
+build, forward validation or timing was started. A gap between that task's
+launches is not evidence that the task has finished. Respect idle-only admission
+for the entire validation; do not terminate other processes or change MIG,
+clocks, drivers, or system packages. H800 can validate the shared Hopper path,
+not native PPU1.7-specific behavior or the 20-SM / 32-MiB model's performance.
+No credentials are recorded in this checkout. Native PPU1.7 remains unverified.
 
 Rebase parent: f056429 (latest DrXuQian/v2.8.2, including upstream 664597d).
 Recovery branch: backup/ppu17-before-rebase-20260925 at a9e497a.
