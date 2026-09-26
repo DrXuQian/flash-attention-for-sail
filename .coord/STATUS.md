@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 08:09:12 UTC
+    updated-at: 2026-09-26 08:14:53 UTC
     working-on: causal 2x2 and same-input FlashInfer/cuDNN comparison complete; keep existing default
     blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: e11d1b3 (measured harness and opt-in candidate code)
+    last-commit: 9d1d5f4 (code/results; this metadata checkpoint follows)
     branch: ppu17-causal-tuning
     workspace: /workspace/flash-attn-ppu17-causal-tune-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA

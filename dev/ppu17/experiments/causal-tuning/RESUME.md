@@ -1,6 +1,7 @@
 # Causal tuning resume
 
-- updated-at: 2026-09-26 08:09:12 UTC
+- updated-at: 2026-09-26 08:14:53 UTC
+- result-commit: 9d1d5f4
 - parent: ed150c9
 - worktree: /workspace/flash-attn-ppu17-causal-tune-source
 - branch: ppu17-causal-tuning
