@@ -88,6 +88,27 @@ This uses a CPU float64 softmax-attention reference with predeclared tolerances.
 query rows on CPU to avoid allocating all heads' score matrices at once.
 It launches no GPU reference. Reference time is not simulated target time.
 
+## Physical Hopper correctness control
+
+The same CUDA SM90 build can be checked on an H800, using a matching
+Python/Torch environment. Admit the machine only when other compute tasks
+have finished; a momentary gap between their kernels is not an idle window.
+Run cases serially, with one forward per fresh process and a CPU reference.
+For the inspected H800 (114 SM, 50 MiB L2):
+
+```bash
+OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 python tools/run_ppu17_forward.py \
+    --extension-dir /workspace/fa17-h800/python --hardware-validation \
+    --seqlen 65 --heads 4 --kv-heads 2 --head-dim 256 --dtype bf16 \
+    --expected-sms 114 --verify --output /workspace/fa17-h800/tail-bf16-d256.json
+```
+
+Use the measured SM count on a different host. `--hardware-validation` records
+the physical cache property rather than borrowing the simulation model's
+32-MiB declaration. This control validates the shared Hopper forward path,
+not native PPU1.7 instructions, numerical behavior or model performance.
+It does not time the kernel or alter hardware partitioning/clocks.
+
 ## Local checks
 
 ```bash

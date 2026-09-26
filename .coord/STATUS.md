@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 03:24:58 UTC
-    working-on: H800 read-only preflight complete; FlashAttention validation NOT STARTED
-    blocked-on: another H800 validation task is active; user requires no concurrent tasks
-    last-commit: 3d7c07c (unchanged validated source; this checkpoint is documentation-only)
+    updated-at: 2026-09-26 03:30:01 UTC
+    working-on: preparing serial H800 correctness controls; physical evidence is separately labeled
+    blocked-on: another remote GDN task is compiling; no FA remote build or validation started
+    last-commit: 73cb72d (source and kernel bodies unchanged; runner provenance changes pending)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
@@ -20,6 +20,11 @@ for the entire validation; do not terminate other processes or change MIG,
 clocks, drivers, or system packages. H800 can validate the shared Hopper path,
 not native PPU1.7-specific behavior or the 20-SM / 32-MiB model's performance.
 No credentials are recorded in this checkout. Native PPU1.7 remains unverified.
+Local preparation after resume: runner hardware mode records measured L2 and
+runtime/input identities, without changing its single forward or fixed
+CPU-reference tolerances. 21 host contracts + 3 CPU-reference tests PASS.
+The exact backend snapshot for this control remains 023e82d, matching the
+source/rebase validation; unrelated newer CUTLASS work is not substituted.
 
 Rebase parent: f056429 (latest DrXuQian/v2.8.2, including upstream 664597d).
 Recovery branch: backup/ppu17-before-rebase-20260925 at a9e497a.

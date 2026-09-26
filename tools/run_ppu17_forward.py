@@ -28,6 +28,22 @@ def invoke_once(interface, q, k, v, *, causal):
     return interface._flash_attn_forward(q, k, v, causal=causal, num_splits=1, pack_gqa=False)
 
 
+def device_evidence(prop, *, hardware_validation):
+    if hardware_validation:
+        cache_bytes = getattr(prop, "L2_cache_size", None)
+        return {
+            "role": "Hopper-hardware-validation",
+            "target_cache_bytes": cache_bytes,
+            "cache_source": "cuda-device-properties" if cache_bytes else "UNAVAILABLE",
+            "evidence_scope": "shared-SM90-forward; NOT native-PPU1.7 or model-performance",
+        }
+    return {
+        "role": "PPU1.7-simulation-input",
+        "target_cache_bytes": 32 * 1024 * 1024,
+        "cache_source": "user-specified-simulation-model",
+    }
+
+
 def cpu_reference(host, *, causal, query_block=128):
     import torch
     if query_block <= 0 or len(host) != 3 or any(t.device.type != "cpu" for t in host):
@@ -66,6 +82,8 @@ def main():
     parser.add_argument("--noncausal", action="store_true")
     parser.add_argument("--expected-sms", type=int, default=20,
                         help="0 disables the device-count assertion; does not restrict hardware")
+    parser.add_argument("--hardware-validation", action="store_true",
+                        help="label physical Hopper correctness separately from PPU1.7 simulation")
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -91,9 +109,13 @@ def main():
     q, k, v = [tensor.to("cuda") for tensor in host]
     torch.cuda.synchronize()
     record = {
-        "role": "PPU1.7-simulation-input", "shape": list(shape_q), "kv_heads": args.kv_heads,
+        **device_evidence(prop, hardware_validation=args.hardware_validation),
+        "shape": list(shape_q), "kv_heads": args.kv_heads,
         "dtype": args.dtype, "causal": not args.noncausal, "sm_count": prop.multi_processor_count,
-        "target_cache_bytes": 32 * 1024 * 1024, "cache_source": "user-specified-simulation-model",
+        "device_name": prop.name, "torch_version": torch.__version__, "torch_cuda": torch.version.cuda,
+        "input_seed": 170020, "input_strides": [list(t.stride()) for t in host],
+        "input_sha256": [hashlib.sha256(t.contiguous().view(torch.uint8).numpy().tobytes()).hexdigest()
+                         for t in host],
         "logical_flops": logical_flops(args.batch, args.seqlen, args.heads, args.head_dim, not args.noncausal),
         "attention_launches": 1, "python_elapsed_time": "NOT_USED_AS_SIMULATION_TIME",
         "extension": extension.__file__,

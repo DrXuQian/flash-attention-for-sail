@@ -85,6 +85,21 @@ class Ppu17Contracts(unittest.TestCase):
         self.assertEqual(runner.logical_flops(1, 2048, 32, 256, True), 68753031168)
         self.assertEqual(runner.logical_flops(1, 2048, 32, 256, False), 137438953472)
 
+    def test_physical_hopper_is_not_the_ppu17_model(self):
+        prop = SimpleNamespace(L2_cache_size=50 * 1024 * 1024)
+        hardware = runner.device_evidence(prop, hardware_validation=True)
+        model = runner.device_evidence(prop, hardware_validation=False)
+        self.assertEqual(hardware["role"], "Hopper-hardware-validation")
+        self.assertEqual(hardware["target_cache_bytes"], 50 * 1024 * 1024)
+        self.assertEqual(hardware["cache_source"], "cuda-device-properties")
+        self.assertEqual(model["role"], "PPU1.7-simulation-input")
+        self.assertEqual(model["target_cache_bytes"], 32 * 1024 * 1024)
+
+    def test_missing_physical_cache_does_not_inherit_model_value(self):
+        record = runner.device_evidence(SimpleNamespace(), hardware_validation=True)
+        self.assertIsNone(record["target_cache_bytes"])
+        self.assertEqual(record["cache_source"], "UNAVAILABLE")
+
     def test_two_live_bodies_pass(self):
         self.assertEqual(check.inspect_ptx(ptx_fixture())["entries"], 2)
 
