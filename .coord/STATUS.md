@@ -1,13 +1,21 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 03:47:35 UTC
-    working-on: H800 control complete: 22/22 CPU-reference cases + one-kernel trace PASS; publishing evidence
+    updated-at: 2026-09-26 04:10:02 UTC
+    working-on: user authorized H800 causal timing; preregistered useful FLOPs and fixed 70-percent criterion
     blocked-on: none for H800 control; native PPU1.7 SDK/model still unavailable
-    last-commit: e7ee864 (hardware evidence label and input identity; compute source unchanged)
+    last-commit: 5fb1cc0 (22/22 H800 numerical control; compute source unchanged)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; no hardware performance result
+
+Current performance task: H800 only, priority BF16 causal shape unchanged.
+Numerator=68,753,031,168 useful causal FLOPs; fixed dense BF16 peak=756.5TFLOPS
+(OEM1513 rating includes structural sparsity); 70-percent threshold=129.833us.
+Keep uninstrumented complete-call event span separate from warmed CUPTI
+kernel-only duration. Preserve the admitted binary; no kernel/config edits.
+Contract: dev/ppu17/docs/h800-perf-plan.md. Timing remains NOT_RUN at this
+checkpoint; only proceed on an idle device with no other task parents.
 
 H800 preflight (2026-09-26, physical device, not PPU1.7 simulation):
 NVIDIA H800 PCIe, SM90, 114 SM, 50 MiB L2; driver 595.71.05,
