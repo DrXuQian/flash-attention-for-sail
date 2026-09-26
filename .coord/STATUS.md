@@ -1,15 +1,22 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 04:22:02 UTC
-    working-on: H800 causal baseline measured twice; useful kernel MFU 53.84/55.64 percent, BELOW_70
-    blocked-on: none for H800 control; native PPU1.7 SDK/model still unavailable
-    last-commit: e7a2157 (preregistered benchmark; admitted compute binary unchanged)
+    updated-at: 2026-09-26 04:49:00 UTC
+    working-on: official FA3 same-input plan and host negatives ready; H800 just became idle
+    blocked-on: official extension build pending; no new performance results yet
+    last-commit: 3e6e983 (two H800 baseline runs; admitted compute binary unchanged)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
 
-Current performance task: H800 only, priority BF16 causal shape unchanged.
+Current task: user authorized an official FA3 A/B on the same H800 and input.
+Preserve the admitted binary; build official source separately with a pinned
+revision. Prepare locally while another remote task is active. Recheck idle
+admission before remote work; do not infer idle from gaps between GPU launches.
+Use the unchanged CPU FP64 oracle and effective causal FLOPs; no kernel edits,
+clock changes, simulator runs or new performance claims at this checkpoint.
+
+Previous performance task: H800 only, priority BF16 causal shape unchanged.
 Numerator=68,753,031,168 useful causal FLOPs; fixed dense BF16 peak=756.5TFLOPS
 (OEM1513 rating includes structural sparsity); 70-percent threshold=129.833us.
 Keep uninstrumented complete-call event span separate from warmed CUPTI
