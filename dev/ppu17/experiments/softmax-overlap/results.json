@@ -1,0 +1,105 @@
+{
+  "scope": "local CUDA12.8 SM90a compile/control only; candidate PPU model NOT_RUN",
+  "source_manifest_sha256": "be6dd085c2469902cf2901c005bec366777f96da8ca83b169ee262b96e63dcbe",
+  "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+  "executable_sha256": {
+    "control": "261e012bbd770b932853d320e2dbff0584260f8d5ac099b1cc35c127050d7681",
+    "row-sum-token": "8cdd5b63e5c14a76e838aac587fa9423e448393ced2e327dae907274b31b893f"
+  },
+  "uploaded_report_sha256": "3cdd7babe0b51542f497b081350f3fab3b5899412fb31ad369fe537ea3254557",
+  "control_report": {
+    "layer": "PPU-simulation",
+    "exp2_before_wait0": 0,
+    "exp2_after_wait0": 90,
+    "wait_pcs": [
+      "0x00010000038be008",
+      "0x00010000038bf518",
+      "0x00010000038bf708",
+      "0x00010000038c0648"
+    ],
+    "compute_cycles": 247267,
+    "matrix_warp_executions": {
+      "m64n176k16": 172032,
+      "m64n128k16": 236544
+    },
+    "useful_mfu_percent": 74.21160122458718,
+    "peak_scope": "this 40-SM model only; report-derived 40*4096 FLOP/cycle",
+    "numerics": "NOT_IN_PERFSTATISTICS"
+  },
+  "native_control": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 19,
+    "exp2_after_wait0": 71,
+    "wait_pcs": [
+      "0x17f0",
+      "0x4350",
+      "0x4d70",
+      "0x6b80"
+    ],
+    "matrix_sites": {
+      "64x176x16": 16,
+      "64x128x16": 22
+    },
+    "static_instructions": 2624,
+    "local_sites": {
+      "STL": 3,
+      "LDL": 3
+    },
+    "old_P_words": 44,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "native_candidate": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 90,
+    "exp2_after_wait0": 0,
+    "wait_pcs": [
+      "0x17e0",
+      "0x4350",
+      "0x5b50",
+      "0x6bb0"
+    ],
+    "matrix_sites": {
+      "64x176x16": 16,
+      "64x128x16": 22
+    },
+    "static_instructions": 2632,
+    "local_sites": {
+      "STL": 3,
+      "LDL": 3
+    },
+    "old_P_words": 44,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "resources": {
+    "_ZN7cutlass13device_kernelIN5flash20enable_sm90_or_laterINS1_16FlashAttnFwdSm90INS1_25CollectiveMainloopFwdSm90ILi2EN4cute5tupleIJNS5_1CILi1EEES8_S8_EEENS6_IJNS7_ILi128EEENS7_ILi176EEESA_EEELi128ENS_6half_tEfNS_4arch4Sm90ELb0ELb0ELb0ELb0ELb0ELb0ELb0ELb1ELb1ELb0ELb0ELb0EEENS1_21CollectiveEpilogueFwdINS6_IJSA_SA_SB_EEES9_SD_SF_Li256ELb0ELb0ELb0ELb0ELb0ENS1_9QsaConfigEEENS1_29StaticPersistentTileSchedulerILb0EEEEEEEEEvNT_6ParamsE": {
+      "stack_bytes": 8,
+      "spill_store_bytes": 12,
+      "spill_load_bytes": 12,
+      "registers": 168
+    },
+    "_ZN7cutlass13device_kernelIN5flash20enable_sm90_or_laterINS1_16FlashAttnFwdSm90INS1_25CollectiveMainloopFwdSm90ILi2EN4cute5tupleIJNS5_1CILi1EEES8_S8_EEENS6_IJNS7_ILi128EEESA_SA_EEELi128ENS_6half_tEfNS_4arch4Sm90ELb1ELb0ELb0ELb0ELb0ELb0ELb0ELb1ELb1ELb0ELb0ELb0EEENS1_21CollectiveEpilogueFwdISB_S9_SC_SE_Li256ELb0ELb0ELb0ELb0ELb0ENS1_9QsaConfigEEENS1_30DynamicPersistentTileSchedulerILi256ELi32ELb0ELb0ELb1EEEEEEEEEvNT_6ParamsE": {
+      "stack_bytes": 0,
+      "spill_store_bytes": 0,
+      "spill_load_bytes": 0,
+      "registers": 168
+    }
+  },
+  "default_encoded_bodies_unchanged": "2/2",
+  "ineligible_causal_body_unchanged": true,
+  "local_tests": {
+    "pass": 56,
+    "skip": 3,
+    "fail": 0,
+    "skip_reasons": [
+      "Torch unavailable in this Python; standalone C++ CPU oracle is tested separately",
+      "Torch unavailable in this Python; standalone C++ CPU oracle is tested separately",
+      "Torch unavailable in this Python; standalone C++ CPU oracle is tested separately"
+    ]
+  },
+  "candidate_numerics": "NOT_RUN; CPU oracle tests do not execute the kernel",
+  "candidate_performance": "NOT_RUN",
+  "default_promotion": false,
+  "validation_script": "dev/ppu17/experiments/softmax-overlap/validate.py"
+}

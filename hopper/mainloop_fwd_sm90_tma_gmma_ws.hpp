@@ -24,6 +24,12 @@
 #include "utils.h"
 #include "sm90_pipeline_no_cluster.hpp"
 
+#if defined(FLASHATTN_PPU17_SOFTMAX_OVERLAP)
+#if !defined(FLASHATTN_PPU17) || (FLASHATTN_PPU17_SOFTMAX_OVERLAP != 0 && FLASHATTN_PPU17_SOFTMAX_OVERLAP != 1)
+#error "FLASHATTN_PPU17_SOFTMAX_OVERLAP requires the explicit PPU1.7 build and a value of 0 or 1"
+#endif
+#endif
+
 namespace flash {
 
 using namespace cute;
@@ -346,7 +352,21 @@ struct CollectiveMainloopFwdSm90 {
         SmemScale_t smem_scale;
     };
 
-    using TensorStorage = std::conditional_t<!Transpose_V, TensorStorageNoTranspose, TensorStorageTransposeV>;
+    using TensorStorageBase = std::conditional_t<!Transpose_V, TensorStorageNoTranspose, TensorStorageTransposeV>;
+#if defined(FLASHATTN_PPU17_SOFTMAX_OVERLAP) && FLASHATTN_PPU17_SOFTMAX_OVERLAP
+    static constexpr bool KeepSoftmaxOverlap = cute::is_same_v<Element, cutlass::half_t>
+        && !Is_causal && !Is_local && !Varlen && !Split && !PackGQA && !PagedKVNonTMA && !AppendKV
+        && MmaPV_is_RS && IntraWGOverlap && !HasQv && kStages == 2
+        && kBlockM == 128 && kBlockN == 176 && kHeadDim == 128 && kHeadDimV == 128;
+#else
+    static constexpr bool KeepSoftmaxOverlap = false;
+#endif
+    struct TensorStorageWithSoftmaxOverlap : TensorStorageBase {
+        // Opt-in compile experiment only. One private word per math thread;
+        // no reader/CTA barrier, and no alias with the live Q/K/V buffers.
+        cute::array_aligned<uint32_t, NumMmaThreads, 16> softmax_overlap;
+    };
+    using TensorStorage = std::conditional_t<KeepSoftmaxOverlap, TensorStorageWithSoftmaxOverlap, TensorStorageBase>;
 
     // These are tuned for speed. They don't affect correctness.
     static constexpr bool UseSchedulerBarrier = (IntraWGOverlap
@@ -1195,6 +1215,20 @@ struct CollectiveMainloopFwdSm90 {
                 if constexpr (LargeHeadDimV) { store_scales(scores_scale, smem_pipe_read_v.index()); }
                 softmax.template online_softmax</*Is_first=*/false, Check_inf>(tSrS);
                 if constexpr (!HasQv) {
+                    if constexpr (KeepSoftmaxOverlap) {
+                        // Empty operand fences disappeared at native lowering.
+                        // Publish a token dependent on BOTH completed row sums
+                        // before retiring PV: otherwise the compiler can sink
+                        // every EX2 past wait0 to reuse the old P registers.
+                        // This is an intentional volatile ordering anchor, not
+                        // a numerical flag. Cost: one XOR + shared store, no
+                        // readback. Keep old P/O live and V unreleased until
+                        // the unchanged completion wait below.
+                        CUTE_STATIC_ASSERT_V(size(softmax.row_sum) == Int<2>{});
+                        auto bits = recast<uint32_t>(softmax.row_sum);
+                        volatile uint32_t* ready = shared_storage.tensors.mainloop.softmax_overlap.data();
+                        ready[thread_idx] = bits(0) ^ bits(1);
+                    }
                     warpgroup_wait<0>();
                     pipeline_v.consumer_release(smem_pipe_read_v);  // release V
                 }

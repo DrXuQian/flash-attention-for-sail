@@ -44,6 +44,8 @@ def main():
     parser.add_argument("--out", type=Path, required=True, help="new artifact directory; existing directories are refused")
     parser.add_argument("--inspect-codegen", action="store_true",
                         help="optional local gate: also emit/check PTX and disassemble the ELF")
+    parser.add_argument("--softmax-overlap", action="store_true",
+                        help="opt-in PPU1.7 S1024 softmax/PV overlap experiment; default is unchanged control")
     args = parser.parse_args()
     print(f"[FA17 standalone build] validating CUTLASS root: {args.cutlass}", flush=True)
     backend = build.cutlass_root(args.cutlass)
@@ -62,6 +64,8 @@ def main():
     build.check_compiler(nvcc, out / "target", source_check=True)
     before = receipt(backend)
     flags = [*build.compile_flags(backend), f"-I{ROOT / 'hopper'}", f"-I{backend / 'include'}"]
+    if args.softmax_overlap:
+        flags += ["-DFLASHATTN_PPU17_SOFTMAX_OVERLAP=1"]
     exe = out / "flash_attn_ppu17_s1024_fp16"
     generated, app = out / "shipping_fp16_d128.o", out / "standalone.o"
     ptx = out / "shipping_fp16_d128.ptx"
@@ -82,7 +86,7 @@ def main():
             code = {"verdict": "PASS", **inspect_ptx(build.diagnostic_text(ptx.read_bytes()))}
         except ValueError as error:
             raise RuntimeError(f"PTX inspection failed: {ptx}: {error}") from error
-    run([nvcc, *flags, "-c", SHIPPING, "-o", generated], "shipping-object.log")
+    run([nvcc, *flags, "-Xptxas=-v", "-c", SHIPPING, "-o", generated], "shipping-object.log")
     run([nvcc, *flags, "-Xcompiler=-fopenmp",
          f'-DFA17_BUILD_SOURCE_SHA256="{before["source_manifest_sha256"]}"',
          "-c", APPLICATION, "-o", app], "application.log")
@@ -110,6 +114,7 @@ def main():
         "executable": str(exe), "sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
         "build_and_link": "PASS", "torch_dependency": "NONE",
         "device_numerics": "NOT_RUN", "performance": "NOT_RUN",
+        "softmax_overlap": "row-sum-token" if args.softmax_overlap else "control",
     }
     (out / "build.json").write_text(json.dumps(record, indent=2) + "\n")
     print(f"[FA17 standalone build] PASS: {exe}\nsha256={record['sha256']}\n"

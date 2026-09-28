@@ -1,0 +1,5 @@
+candidate,evidence,compute_cycles,useful_mfu_percent,numerics,decision
+control,user-perfstatistics,247267,74.211601,not_in_uploaded_report,BASELINE
+C01-operand-fences,CUDA12.8-SASS,,,NOT_RUN,REJECTED-INERT
+C02-private-row-sum,CUDA12.8-SASS,,,NOT_RUN,REJECTED-SPILL
+C03-row-sum-token,CUDA12.8-SASS,,,NOT_RUN,LOCAL-CODEGEN-PASS

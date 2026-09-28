@@ -1,13 +1,30 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 14:06:32 UTC
-    working-on: encoding fix/default direct build 3a0d479 complete; publishing handoff
-    blocked-on: none for tooling delivery; native PPU1.7/model unavailable
-    last-commit: 3a0d479 (validated tooling fix; this checkpoint is documentation only)
-    branch: ppu17-hopper-source
-    workspace: /workspace/flash-attn-ppu17-source
+    updated-at: 2026-09-28 22:33:04 UTC
+    working-on: C03 local admission complete; publishing opt-in simulation handoff
+    blocked-on: candidate PPU1.7 simulator/native toolchain unavailable locally
+    last-commit: 4b26264 (unchanged parent/control)
+    branch: ppu17-softmax-overlap
+    workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
-    model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+    model-target: current uploaded run 40 SM; historical 20-SM model is not this run
+
+Current experiment: dev/ppu17/experiments/softmax-overlap/docs/plan.md.
+Uploaded control perfstatistics has 247267 compute cycles / 74.21% useful MFU.
+No model/physical-device candidate execution is claimed. Preserve the original
+source worktree and control ELF. One target call per simulation process.
+
+C03 fresh real ELF link PASS. Control default machine words unchanged2/2;
+candidate causal body unchanged. CUDA native EX2 window19/90->90/90, matrix
+sites16QK+22PV fixed, old P44/O64 words not overwritten before completion.
+Registers168, stack8B, spill stores/loads12B remain equal to the parent.
+Static body2624->2632; +1KiB private shared payload and one XOR/store per math
+thread/steady step. Neither source ordering nor NVIDIA SASS is PPU timing.
+Local suite PASS56/SKIP3/FAIL0; missing Torch is the reason for3old Python CPU
+oracle skips; independent standalone C++ oracle/link and all10new gates pass.
+Results/negative controls: dev/ppu17/experiments/softmax-overlap/results.json.
+C01 inert and C02 added-spill variants are rejected, not retained in mainloop.
+Build/run command: that experiment's README.md. No default-route promotion.
 
 Encoding follow-up: local fixture reproduces UTF8 byte0x82 error at offset22
 in old version-header decoding. User's exact failing input is not yet known.

@@ -1,5 +1,6 @@
-// Torch-free host application; device code comes from the unchanged shipping
+// Torch-free host application; device code comes from the shipping
 // hopper/instantiations/flash_fwd_hdim128_fp16_sm90.cu translation unit.
+// An explicitly selected body experiment is printed in softmax_overlap.
 #include <cuda_runtime.h>
 #include <cutlass/numeric_types.h>
 #include "flash.h"
@@ -22,6 +23,11 @@
 namespace {
 using namespace fa17_standalone;
 using Half = cutlass::half_t;
+#if defined(FLASHATTN_PPU17_SOFTMAX_OVERLAP) && FLASHATTN_PPU17_SOFTMAX_OVERLAP
+constexpr char kOverlapVariant[] = "row-sum-token";
+#else
+constexpr char kOverlapVariant[] = "control";
+#endif
 
 void check(cudaError_t status, char const* operation) {
     if (status != cudaSuccess)
@@ -89,6 +95,7 @@ void describe() {
               << ",\"row_stride_elements\":" << p.q_row_stride << ",\"head_stride_elements\":" << p.q_head_stride
               << ",\"batch_stride_elements\":" << p.q_batch_stride << ",\"num_splits\":" << p.num_splits
               << ",\"logical_flops\":" << UINT64_C(4) * kShape.heads * kShape.seqlen * kShape.seqlen * kShape.dim
+              << ",\"softmax_overlap\":\"" << kOverlapVariant << "\""
               << ",\"backend\":\"" << FLASHATTN_PPU17_BACKEND_ID << "\",\"source_sha256\":\""
               << FA17_BUILD_SOURCE_SHA256 << "\"}\n";
 }
