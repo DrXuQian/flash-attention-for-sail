@@ -1,10 +1,10 @@
 # Resume
 
-- updated-at: 2026-09-28 23:48:27 UTC
+- updated-at: 2026-09-28 23:50:23 UTC
 - parent: 4b26264
 - branch: ppu17-softmax-overlap
 - working-on: C03 simulation rejected: +7.58047% cycles, 23 spilled private slots
-- last-commit: 9733223 (before this report/checker checkpoint; kernel accdefc)
+- last-commit: 66681ef (completed report/checker verdict; this checkpoint documentation only)
 - blocked-on: application numerical log and binary/model identity not uploaded
 - input-report: /workspace/fa17-softmax-overlap-20260929/c03-simulation-3158e2fa/perfstatistics.json
 - plan: docs/plan.md

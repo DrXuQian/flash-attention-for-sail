@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 23:48:27 UTC
-    working-on: C03 uploaded result diagnosed; reject slower/private-spilling candidate, record native byte ledger
+    updated-at: 2026-09-28 23:50:23 UTC
+    working-on: C03 rejected and byte-ledger/negative tests committed; original default retained
     blocked-on: application numerical log and binary/model hashes absent; no local PPU1.7 simulator
-    last-commit: 9733223 (before this report/checker checkpoint; kernel remains accdefc)
+    last-commit: 66681ef (completed report/checker verdict; this checkpoint is documentation only)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
