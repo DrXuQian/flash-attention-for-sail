@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 22:33:04 UTC
-    working-on: C03 local admission complete; publishing opt-in simulation handoff
+    updated-at: 2026-09-28 22:35:09 UTC
+    working-on: C03 local admission delivered; awaiting user's single-invocation model result
     blocked-on: candidate PPU1.7 simulator/native toolchain unavailable locally
-    last-commit: 4b26264 (unchanged parent/control)
+    last-commit: accdefc (validated opt-in implementation; this checkpoint is documentation only)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA

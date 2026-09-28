@@ -1,9 +1,10 @@
 # Resume
 
-- updated-at: 2026-09-28 22:33:04 UTC
+- updated-at: 2026-09-28 22:35:09 UTC
 - parent: 4b26264
 - branch: ppu17-softmax-overlap
-- working-on: local C03 admission complete; opt-in user simulator handoff
+- working-on: local C03 admission delivered; awaiting single-invocation model result
+- last-commit: accdefc (implementation and local evidence)
 - blocked-on: PPU1.7 simulator/native toolchain not available locally
 - input-report: /root/perfstatistics.json
 - plan: docs/plan.md
