@@ -1,6 +1,6 @@
 # Resume
 
-- current-task: Torch-free fixed-shape standalone completed locally on 2026-09-28; see handoff below
+- current-task: standalone encoding hardening and default direct build completed locally on 2026-09-28
 - migration-parent: ed150c9
 - migration-implementation: d228fa3e72783c7063e0729f07d78a52d0f90afa
 - migration-evidence: dev/ppu17/docs/cutlass43-migration.md and results/cutlass43-20260928/validation.json
@@ -41,6 +41,14 @@ PPU1.7 runtime result or model latency/MFU is claimed. That hardware has
 114 SM / 50 MiB L2, not the user's 20 SM / 32 MiB model. Runtime admission on
 the simulator remains unverified. Local runner checks now 21 host + 3 CPU PASS.
 # Standalone handoff — 2026-09-28
+
+Follow-up to user UTF8 error: ASCII version-macro parsing, binary tool logs,
+escaped diagnostic display, and explicit failing-step paths. Actual error
+exit remains a failure. PTX/disassembly now require `--inspect-codegen`; the
+default only compiles/links. Both modes rebuilt locally,49unique contracts
+PASS, direct-build kernel machine words unchanged2/2. The user's exact bad
+input is not known from the one-line report. Evidence: standalone results
+`build-encoding.json`. Device/model NOT_RUN.
 
 User requests no wheel installation for B1/S1024/H56/Hkv56/D128 FP16
 noncausal. `tools/build_ppu17_standalone.py` links the shipping generated

@@ -10,7 +10,6 @@ import json
 import os
 from pathlib import Path
 import shlex
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,7 +42,10 @@ def main():
     parser.add_argument("--cutlass", default=os.environ.get("CUTLASS_PPU17_ROOT"))
     parser.add_argument("--cuda-home", default=os.environ.get("CUDA_HOME", "/usr/local/cuda"))
     parser.add_argument("--out", type=Path, required=True, help="new artifact directory; existing directories are refused")
+    parser.add_argument("--inspect-codegen", action="store_true",
+                        help="optional local gate: also emit/check PTX and disassemble the ELF")
     args = parser.parse_args()
+    print(f"[FA17 standalone build] validating CUTLASS root: {args.cutlass}", flush=True)
     backend = build.cutlass_root(args.cutlass)
     cuda = Path(args.cuda_home).resolve()
     nvcc = cuda / "bin/nvcc"
@@ -56,6 +58,7 @@ def main():
     env = {**os.environ, "TMPDIR": str(temp)}
     env.pop("PPU_SDK", None)
     build.check_environment(env)
+    print(f"[FA17 standalone build] checking compiler target: {nvcc}; logs: {out / 'target'}", flush=True)
     build.check_compiler(nvcc, out / "target", source_check=True)
     before = receipt(backend)
     flags = [*build.compile_flags(backend), f"-I{ROOT / 'hopper'}", f"-I{backend / 'include'}"]
@@ -68,14 +71,17 @@ def main():
         command = [str(item) for item in command]
         commands.append(command)
         print("[FA17 standalone build] " + shlex.join(command), flush=True)
-        with (out / log).open("w") as handle:
-            result = subprocess.run(command, env=env, stdout=handle, stderr=subprocess.STDOUT)
-        if result.returncode:
-            raise RuntimeError(f"command failed ({result.returncode}); {out / log}\n"
-                               + (out / log).read_text()[-6000:])
+        return build.run_logged(command, out / log, env=env)
 
-    run([nvcc, *flags, "--ptx", SHIPPING, "-o", ptx], "shipping-ptx.log")
-    code = inspect_ptx(ptx.read_text())  # both shipping causal/noncausal bodies must be live
+    code = {"verdict": "SKIP", "reason": "--inspect-codegen not selected; compile/link only"}
+    if args.inspect_codegen:
+        run([nvcc, *flags, "--ptx", SHIPPING, "-o", ptx], "shipping-ptx.log")
+        # Preserve the PTX file unchanged. Non-UTF8 comments/paths may be
+        # displayed escaped; a damaged opcode still fails the live-body checks.
+        try:
+            code = {"verdict": "PASS", **inspect_ptx(build.diagnostic_text(ptx.read_bytes()))}
+        except ValueError as error:
+            raise RuntimeError(f"PTX inspection failed: {ptx}: {error}") from error
     run([nvcc, *flags, "-c", SHIPPING, "-o", generated], "shipping-object.log")
     run([nvcc, *flags, "-Xcompiler=-fopenmp",
          f'-DFA17_BUILD_SOURCE_SHA256="{before["source_manifest_sha256"]}"',
@@ -87,15 +93,19 @@ def main():
     link = [nvcc, "--cudart=shared", "-Xcompiler=-fopenmp", generated, app,
             f"-L{driver}", "-lcuda", f"-Xlinker=-rpath,{cuda / 'lib64'}", "-o", exe]
     run(link, "link.log")
-    run([cuda / "bin/cuobjdump", "--dump-sass", exe], "executable.sass")
-    run(["readelf", "-d", exe], "dependencies.log")
-    inspect_dependencies((out / "dependencies.log").read_text())
+    if args.inspect_codegen:
+        run([cuda / "bin/cuobjdump", "--dump-sass", exe], "executable.sass")
+    dependencies = run(["readelf", "-d", exe], "dependencies.log")
+    inspect_dependencies(build.diagnostic_text(dependencies))
+    compiler_version = run([nvcc, "--version"], "compiler-version.log")
     if receipt(backend) != before:
         raise RuntimeError("source/backend changed during compilation; mixed build refused")
     record = {
         "scope": "CUDA-SM90a simulation input; native PPU1.7 NOT VERIFIED",
         "cutlass": str(backend), "cutlass_version": build.cutlass_version(backend),
-        "compiler": subprocess.check_output([nvcc, "--version"], text=True),
+        "compiler": build.diagnostic_text(compiler_version),
+        "compiler_version_log": "compiler-version.log",
+        "compiler_version_log_sha256": hashlib.sha256(compiler_version).hexdigest(),
         "commands": commands, **before, "shipping_device_code": code,
         "executable": str(exe), "sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),
         "build_and_link": "PASS", "torch_dependency": "NONE",

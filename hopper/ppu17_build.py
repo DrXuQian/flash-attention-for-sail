@@ -51,12 +51,34 @@ def cutlass_version(root):
     version = root / "include/cutlass/version.h"
     if not version.is_file():
         raise ValueError(f"not a CUTLASS root: {root}")
-    text = version.read_text()
-    matches = [re.search(rf"#define CUTLASS_{part}\s+(\d+)", text)
+    # Vendor headers can contain non-UTF8 copyright/comments. Version macros
+    # are ASCII tokens: parse bytes, without guessing the comment encoding or
+    # dropping a malformed byte from a semantic token.
+    raw = version.read_bytes()
+    matches = [re.search(rb"(?m)^[ \t]*#[ \t]*define[ \t]+CUTLASS_" + part.encode("ascii") +
+                         rb"[ \t]+([0-9]+)(?=[ \t]*(?://|/\*|\r?$))", raw)
                for part in ("MAJOR", "MINOR", "PATCH")]
     if not all(matches):
         raise ValueError(f"malformed CUTLASS version header: {version}")
     return tuple(int(match[1]) for match in matches)
+
+
+def diagnostic_text(raw):
+    """Display arbitrary tool bytes without hiding them or masking exit codes."""
+    return raw.decode("utf-8", errors="backslashreplace")
+
+
+def run_logged(command, log, *, env=None):
+    """Keep verbatim bytes; a nonzero tool exit remains a hard failure."""
+    log = Path(log)
+    with log.open("wb") as handle:
+        result = subprocess.run([str(item) for item in command], env=env,
+                                stdout=handle, stderr=subprocess.STDOUT)
+    raw = log.read_bytes()
+    if result.returncode:
+        raise RuntimeError(f"{log.name}: command failed (rc={result.returncode}); raw log: {log}\n"
+                           + diagnostic_text(raw[-6000:]))
+    return raw
 
 
 def cutlass_root(value):
@@ -105,12 +127,10 @@ def check_compiler(compiler, output, *, source_check=False):
         flags += ["-DFLASHATTN_PPU17_SOURCE_CHECK=1"]
     cmd = [str(compiler), *flags, "-c", str(ROOT / "dev/ppu17/compiler_target.cu"),
            "-o", str(output / "compiler_target.o")]
-    result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            env={**os.environ, "TMPDIR": str(output)})
-    (output / "compiler-target.log").write_text(result.stdout)
-    if result.returncode:
-        raise RuntimeError("compiler failed the real SM90a/PPU1.7 target contract; "
-                           f"see {output / 'compiler-target.log'}\n{result.stdout[-4000:]}")
+    try:
+        run_logged(cmd, output / "compiler-target.log", env={**os.environ, "TMPDIR": str(output)})
+    except RuntimeError as error:
+        raise RuntimeError(f"compiler failed the real SM90a/PPU1.7 target contract; {error}") from error
     obj = output / "compiler_target.o"
     if not obj.is_file() or obj.stat().st_size == 0:
         raise RuntimeError("compiler returned success without a target object")

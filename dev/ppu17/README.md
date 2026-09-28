@@ -68,9 +68,16 @@ python tools/build_ppu17_standalone.py \
 
 Use the actual PPU CUTLASS3.6/4.3 root and CUDA12.8 installation. `--out` must
 be a new directory; an old binary is never reused after a failed build. The
-script runs the compiler-target check, checks both actual generated PTX
-bodies, assembles and **links a real ELF**, and records source/backend/binary
-hashes and full command/error logs in `build.json` and adjacent files.
+script runs the compiler-target check, compiles and **links a real ELF**, and
+records source/backend/binary hashes and full command/error logs in
+`build.json` and adjacent files. **PTX emission and disassembly are not
+required** and are off by default. `--inspect-codegen` adds those local
+checks, including both actual generated bodies; without it codegen inspection
+is recorded as SKIP, not PASS. The kernel/compile flags are identical either way.
+Vendor headers may contain non-UTF8 comments: version macros are parsed as
+ASCII bytes. Tool logs are saved byte-for-byte, with undecodable bytes escaped
+only for display. A compiler failure still reports its nonzero exit code and
+the exact raw log; an encoding error must not conceal the original failure.
 The CUDA SDK's `libcuda` stub is **link-only**; it is never added to runtime
 RPATH. Running requires the simulator's or device's real CUDA driver/runtime.
 This is SM90a simulation input, not native PPU1.7 compilation certification.
@@ -117,6 +124,10 @@ encoded instruction/control-word streams match the previously built 4.3
 library object. Removing the generated object is a real undefined-symbol link
 failure. Simulator/device correctness and timing are **NOT_RUN**. Hashes and
 scope: [standalone validation](results/standalone-20260928/validation.json).
+The encoding/default-direct follow-up rebuilt both modes and passed49unique
+local contracts (plus the same8standalone checks on the inspected build).
+Default mode issued no PTX/disassembly commands. Non-UTF8 error bytes no longer
+mask compiler failures. See [build-encoding evidence](results/standalone-20260928/build-encoding.json).
 
 ## Scope
 

@@ -1,0 +1,32 @@
+{
+  "date_utc": "2026-09-28",
+  "source_parent": "dea5949",
+  "scope": "build tooling only; no production CUDA or flags changed",
+  "reported_error": "utf-8 cannot decode byte 0x82 at position 22",
+  "user_failure_boundary": "UNKNOWN: the supplied one-line error does not identify the file or subprocess",
+  "local_reproduction": "same byte and offset in a vendor version-header comment; old UTF8 read fails, ASCII version macro parsing succeeds",
+  "raw_diagnostic_policy": "preserve exact bytes; escape invalid UTF8 for display only; nonzero exit remains FAIL",
+  "source_manifest_sha256": "bc34979282d366c2413b3c1067a13dd6178f1f1f6a2ae3386f137340e907ede7",
+  "artifact_root": "/workspace/flash-attn-ppu17-causal-tune-20260926/standalone-encoding-20260928",
+  "compiler": "CUDA12.8.93",
+  "cutlass": "PPU4.3.0 0eb6a3b218977892e2b6cd30d59880c440e54fd6",
+  "default_build": {
+    "real_compile_link": "PASS",
+    "ptx_or_disassembly_commands": 0,
+    "codegen_inspection": "SKIP: --inspect-codegen not selected",
+    "elf_sha256": "9ca265bde74e2b7c51918cbc95183b468f1dc0aad7bf0d04235c125a9a3e8407",
+    "standalone_host_tests": "8/8 PASS",
+    "encoded_kernel_words_vs_previous_standalone": "2/2 identical, including control words (separate local check)"
+  },
+  "opt_in_inspected_build": {
+    "real_compile_link": "PASS",
+    "codegen_inspection": "PASS: both shipping bodies have WGMMA/TMA read/write; ELF disassembled",
+    "elf_sha256": "ead83aad88b33f130b45fd2b786e422514ec84a93513b2c8630d84273a4f13ac",
+    "standalone_host_tests": "8/8 PASS"
+  },
+  "unique_local_contracts": {"encoding": 8, "standalone": 8, "source": 26, "timing": 4, "CPU_reference": 3, "PASS": 49, "FAIL": 0},
+  "negative_controls": ["bad byte within version macro remains rejected", "nonUTF8 compiler error rc17 remains FAIL with exact raw log", "exit zero without object remains rejected", "damaged WGMMA opcode remains rejected", "missing shipping object still fails real link"],
+  "native_ppu17": "SKIP: capable native SDK/model unavailable",
+  "device_numerics": "NOT_RUN",
+  "performance": "NOT_RUN"
+}

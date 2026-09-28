@@ -75,12 +75,25 @@ class StandaloneContracts(unittest.TestCase):
         command = [item for item in links[0] if item != str(out / "shipping_fp16_d128.o")]
         self.assertEqual(len(command), len(links[0]) - 1)
         command[-1] = str(out / "negative-missing-generated")
-        result = subprocess.run(command, text=True, capture_output=True,
+        result = subprocess.run(command, capture_output=True,
                                 env={**os.environ, "TMPDIR": str(out / "compiler-tmp")})
-        (out / "negative-missing-generated.log").write_text(result.stdout + result.stderr)
+        (out / "negative-missing-generated.log").write_bytes(result.stdout + result.stderr)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("run_mha_fwd_", result.stderr)
-        self.assertIn("undefined reference", result.stderr)
+        self.assertIn(b"run_mha_fwd_", result.stderr)
+        self.assertIn(b"undefined reference", result.stderr)
+
+    @unittest.skipUnless(os.environ.get("FA17_STANDALONE_EXE"), "built ELF not supplied; build-plan check unavailable")
+    def test_ptx_and_disassembly_are_optional_and_not_silently_passed(self):
+        out = Path(os.environ["FA17_STANDALONE_EXE"]).resolve().parent
+        record = json.loads((out / "build.json").read_text())
+        inspected = record["shipping_device_code"]["verdict"] == "PASS"
+        self.assertEqual(any("--ptx" in command for command in record["commands"]), inspected)
+        self.assertEqual(any("--dump-sass" in command for command in record["commands"]), inspected)
+        if inspected:
+            self.assertEqual(record["shipping_device_code"]["entries"], 2)
+        else:
+            self.assertEqual(record["shipping_device_code"]["verdict"], "SKIP")
+            self.assertIn("not selected", record["shipping_device_code"]["reason"])
 
 
 if __name__ == "__main__":
