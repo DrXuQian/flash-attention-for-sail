@@ -16,20 +16,25 @@ HOPPER = Path(__file__).resolve().parent
 ROOT = HOPPER.parent
 HEAD_DIMS = (64, 128, 256)
 DTYPES = ("bf16", "fp16")
+SUPPORTED_CUTLASS = ((3, 6, 0), (4, 3, 0))
 DISABLED = (
     "BACKWARD", "SPLIT", "PAGEDKV", "APPENDKV", "LOCAL", "SOFTCAP",
     "PACKGQA", "FP8", "VARLEN", "CLUSTER", "HDIM96", "HDIM192", "SM8x", "SM86",
 )
 
 
-def compile_flags():
-    return [
+def compile_flags(backend=None):
+    flags = [
         "-std=c++17", "-O3", "-DNDEBUG", "-gencode=arch=compute_90a,code=sm_90a", "--use_fast_math",
         "--expt-relaxed-constexpr", "--expt-extended-lambda", "-lineinfo",
         "-DFLASHATTN_PPU17=1", "-DACOMPUTE_VERSION=10700",
         "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
         *(f"-DFLASHATTENTION_DISABLE_{feature}" for feature in DISABLED),
     ]
+    if backend is not None:
+        major, minor, patch = cutlass_version(backend)
+        flags += [f"-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION={major * 100 + minor * 10 + patch}"]
+    return flags
 
 
 def source_files():
@@ -41,18 +46,26 @@ def source_files():
     return sources
 
 
-def cutlass_root(value):
-    if not value:
-        raise ValueError("set CUTLASS_PPU17_ROOT to the PPU CUTLASS 3.6.0 tree")
-    root = Path(value).resolve()
+def cutlass_version(root):
+    root = Path(root)
     version = root / "include/cutlass/version.h"
     if not version.is_file():
         raise ValueError(f"not a CUTLASS root: {root}")
     text = version.read_text()
-    actual = tuple(int(re.search(rf"#define CUTLASS_{part}\s+(\d+)", text)[1])
-                   for part in ("MAJOR", "MINOR", "PATCH"))
-    if actual != (3, 6, 0):
-        raise ValueError(f"expected CUTLASS 3.6.0, got {actual}")
+    matches = [re.search(rf"#define CUTLASS_{part}\s+(\d+)", text)
+               for part in ("MAJOR", "MINOR", "PATCH")]
+    if not all(matches):
+        raise ValueError(f"malformed CUTLASS version header: {version}")
+    return tuple(int(match[1]) for match in matches)
+
+
+def cutlass_root(value):
+    if not value:
+        raise ValueError("set CUTLASS_PPU17_ROOT to a PPU CUTLASS 3.6.0 or 4.3.0 tree")
+    root = Path(value).resolve()
+    actual = cutlass_version(root)
+    if actual not in SUPPORTED_CUTLASS:
+        raise ValueError(f"expected PPU CUTLASS 3.6.0 or 4.3.0, got {actual}")
     for header in ("ppu/ppu_include_10700.hpp", "cute/arch/mma_sm90_gmma.hpp",
                    "cute/atom/copy_traits_sm90_tma.hpp"):
         if not (root / "include" / header).is_file():
@@ -128,10 +141,14 @@ def setup_extension():
                            source_check=simulation)
             super().build_extensions()
 
-    macros = [flag for flag in compile_flags() if flag.startswith("-D")]
+    flags = compile_flags(backend)
+    macros = [flag for flag in flags if flag.startswith("-D")]
+    backend_version = ".".join(map(str, cutlass_version(backend)))
+    print(f"[PPU1.7 backend] cutlass={backend_version} root={backend} "
+          f"mode={'simulation' if simulation else 'native'}", flush=True)
     setup(
         name="flash_attn_3",
-        version="3.0.0b1+ppu17" + (".simulation" if simulation else ""),
+        version="3.0.0b1+ppu17.cutlass" + backend_version + (".simulation" if simulation else ""),
         packages=["flash_attn_3"],
         package_dir={"flash_attn_3": str(HOPPER)},
         ext_modules=[CUDAExtension(
@@ -140,7 +157,7 @@ def setup_extension():
                      *(str(p) for p in source_files())],
             include_dirs=[str(HOPPER), str(backend / "include")],
             extra_compile_args={"cxx": ["-O3", "-std=c++17", *macros],
-                                "nvcc": compile_flags()},
+                                "nvcc": flags},
             libraries=["cuda"],
         )],
         cmdclass={"build_ext": PPU17BuildExtension},

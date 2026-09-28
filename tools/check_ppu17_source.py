@@ -60,6 +60,47 @@ def check_undefined_symbols(symbols):
         raise ValueError(f"generated definition missing at internal link: {missing}")
 
 
+def inspect_barrier_ptx(text):
+    # The compile-only receipt has two stages, each with FULL=1 and EMPTY=2.
+    # Read the actual operands, not mere occurrences of constants elsewhere.
+    constants = {}
+    counts = []
+    for line in text.splitlines():
+        line = line.split("//", 1)[0]
+        # A register overwritten by a nonconstant instruction is unknown.
+        destination = re.search(r"\b[a-z][\w.]*\s+(%r\d+),", line)
+        if destination:
+            constants.pop(destination[1], None)
+        mov = re.search(r"\bmov\.u32\s+(%\w+),\s*(\d+);", line)
+        if mov:
+            constants[mov[1]] = int(mov[2])
+        init = re.search(r"mbarrier\.init\.shared::cta\.b64\s+\[[^]]+\],\s*(%\w+|\d+);", line)
+        if init:
+            operand = init[1]
+            counts.append(constants.get(operand) if operand.startswith("%") else int(operand))
+    if sorted(counts, key=lambda x: -1 if x is None else x) != [1, 1, 2, 2]:
+        raise ValueError(f"wrong/unresolved FULL/EMPTY arrival counts in compiled receipt: {counts}")
+    if "mbarrier.arrive.shared::cluster.b64" not in text:
+        raise ValueError("compiled receipt lost consumer release")
+    return {"stage_full_empty_counts": counts, "verdict": "PASS"}
+
+
+def check_cutlass_compatibility(nvcc, flags, env, out):
+    source = ROOT / "dev/ppu17/cutlass_compatibility.cu"
+    ptx, obj = out / "cutlass-compatibility.ptx", out / "cutlass-compatibility.o"
+    with (out / "cutlass-compatibility.log").open("w") as log:
+        for mode, target in (("--ptx", ptx), ("-c", obj)):
+            cmd = [nvcc, *flags, mode, str(source), "-o", str(target)]
+            log.write(json.dumps(cmd) + "\n")
+            log.flush()
+            subprocess.run(cmd, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+    return {**inspect_barrier_ptx(ptx.read_text()),
+            "output_store_types": "6/6 SM90_U32x4_STSM_N",
+            "consumer_cohorts_enumerated": 7,
+            "ptx_sha256": hashlib.sha256(ptx.read_bytes()).hexdigest(),
+            "object_sha256": hashlib.sha256(obj.read_bytes()).hexdigest()}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cutlass", required=True)
@@ -78,8 +119,9 @@ def main():
     tmp.mkdir(exist_ok=True)
     build.check_compiler(args.nvcc, out / "target", source_check=True)
     env = {**os.environ, "TMPDIR": str(tmp)}
-    flags = [*build.compile_flags(), f"-I{ROOT / 'hopper'}", f"-I{backend / 'include'}"]
+    flags = [*build.compile_flags(backend), f"-I{ROOT / 'hopper'}", f"-I{backend / 'include'}"]
     receipt = source_receipt(backend)
+    compatibility = check_cutlass_compatibility(args.nvcc, flags, env, out)
 
     def compile_one(source):
         ptx = out / (source.stem + ".ptx")
@@ -110,8 +152,9 @@ def main():
     if receipt != source_receipt(backend):
         raise RuntimeError("source/backend changed during compilation; mixed-revision evidence is invalid")
     result = {"scope": "CUDA-SM90a source compatibility, NOT native PPU1.7", "compiler": version,
-              "cutlass": str(backend), **receipt, "cells": rows,
+              "cutlass": str(backend), "cutlass_version": build.cutlass_version(backend), **receipt, "cells": rows,
               "host_api_and_internal_link": host,
+              "cutlass_compatibility": compatibility,
               "native_ppu17": "SKIP: capable SDK unavailable; not inferred from CUDA compilation",
               "device_numerics": "NOT_RUN", "performance": "NOT_RUN"}
     (out / "source-compile.json").write_text(json.dumps(result, indent=2) + "\n")

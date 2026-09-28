@@ -1,0 +1,421 @@
+{
+  "schema": 1,
+  "scope": "PPU1.7 SM90 forward CUTLASS4.3 source compatibility, not device verification",
+  "source_parent": "ed150c9a05a12242623dddb8d21a6a56e5738de5",
+  "artifact_root": "/workspace/flash-attn-ppu17-causal-tune-20260926/cutlass43-20260928",
+  "host_tests": {
+    "source_contracts": 26,
+    "cpu_reference": 3,
+    "hardware_timing_contracts": 4,
+    "fail": 0
+  },
+  "backends": {
+    "release36": {
+      "cutlass_version": [
+        3,
+        6,
+        0
+      ],
+      "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+      "source_manifest_sha256": "7b2f16d92b48bee4f00a5a1feccdee606c3f0dcf953e4c2e586b245477b5fd7c",
+      "backend_include_sha256": "74e45070ca91823df90ee04bddf40ad27db75e3596929f395c00088ef49dc9c3",
+      "host_api_and_internal_link": {
+        "verdict": "PASS",
+        "scope": "real Torch API object + all generated definitions; relocatable link",
+        "linked_sha256": "2de9c0731e0f0fa9c2a65856461692d29ba6aeb81cd15a81bc93cdc0e1f9cde7",
+        "torch_headers": "/root/autodl-tmp/sageattention-build-envs/torch29/lib/python3.12/site-packages/torch/include",
+        "python_headers": "/root/miniconda3/include/python3.10",
+        "torch_load_and_runtime": "NOT_RUN"
+      },
+      "cutlass_compatibility": {
+        "stage_full_empty_counts": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "verdict": "PASS",
+        "output_store_types": "6/6 SM90_U32x4_STSM_N",
+        "consumer_cohorts_enumerated": 7,
+        "ptx_sha256": "33136df7af9cfd21c5ca68ee6fe06b465bc2a79f0288a3cc7a2d390b234db2ec",
+        "object_sha256": "32a1e8869709aa1fdfe7ba80dcf111da6dcb1489f4712940989f555a71559d08"
+      },
+      "native_ppu17": "SKIP: capable SDK unavailable; not inferred from CUDA compilation",
+      "device_numerics": "NOT_RUN",
+      "performance": "NOT_RUN",
+      "cells": [
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim64_bf16_sm90.cu",
+          "source_sha256": "9698f45a2c30a154eeb006e2885715a8e58f73712f60e420ddfa5389794818d3",
+          "ptx_sha256": "ac5dab02b2761cfa02c7c7e27e011897cd3839fe44df86437761e4a71569eebd",
+          "object_sha256": "8c0bc3cd056ac8d1acb020bb9bfdf4fd26dfbbe13a383b3cd4933b83843ded38",
+          "entries": 2,
+          "wgmma": 68,
+          "tma_load": 18,
+          "tma_store": 2,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim64_fp16_sm90.cu",
+          "source_sha256": "f707791209dbb0d97b0dd29ce66e09ae5a1bf2f8ea67037935a7379cc1db1eda",
+          "ptx_sha256": "acea1ebde318d757d42369bdc81ba35d09de4b5331c3b7054dbdc306b6a5b9ef",
+          "object_sha256": "0f229d78834d7df1bdba58dd13ac1cc3766d5b046561accd2768dfdc449d16b1",
+          "entries": 2,
+          "wgmma": 68,
+          "tma_load": 18,
+          "tma_store": 2,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim128_bf16_sm90.cu",
+          "source_sha256": "ce503314d09d85696492d7a4699c65edce3df61c10de8274c9feadb9841f7e67",
+          "ptx_sha256": "5e0bbc183d0d6c3adc53e1a054f2f4ca3e4c0cdb3b8948df78ecdfe063f9121d",
+          "object_sha256": "f36695d0499eb0484bad26bfeab51bbec7056b7008f215d3361c251e81d1b1a2",
+          "entries": 2,
+          "wgmma": 86,
+          "tma_load": 36,
+          "tma_store": 4,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim128_fp16_sm90.cu",
+          "source_sha256": "2d943f5729d2371622bc78879ee4b5b33a5ebbbd66fbaf8fe26c6d20e80ccf59",
+          "ptx_sha256": "a108395fd3faf38bb2dd8b38599dbaf09a5d19b523528df39357f70e5c111f52",
+          "object_sha256": "78f12383c5331155687da7b37823dd9e971b3b44011c5cc36277d5aadc56b248",
+          "entries": 2,
+          "wgmma": 86,
+          "tma_load": 36,
+          "tma_store": 4,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim256_bf16_sm90.cu",
+          "source_sha256": "f5a18eb6e2965c02e1a436af343e5e564484b378482f0c70743dfae2b77d523b",
+          "ptx_sha256": "d9c2306c56a8f309b8f347a62e871dc428bb6b472c4dc16fd490b2b724172232",
+          "object_sha256": "64b7e86be7c9e7d782eeef38d2bcd31f7c9fffe64d90c1c4fae9475040bb7870",
+          "entries": 2,
+          "wgmma": 105,
+          "tma_load": 72,
+          "tma_store": 8,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim256_fp16_sm90.cu",
+          "source_sha256": "bd9ade7d36bb9ebe79c7804aedb25e7736cd070f3460a47131ba51bd43e40487",
+          "ptx_sha256": "3a903d95a6d7a8db8ee8988356766d8a24793b3570627a67a46e3c155df115b1",
+          "object_sha256": "8c98b2e0e0ba9ee4c06d84d068d1afd1c0203325b2866250753af0cc8a8a9a1e",
+          "entries": 2,
+          "wgmma": 105,
+          "tma_load": 72,
+          "tma_store": 8,
+          "verdict": "SOURCE_COMPILE_PASS"
+        }
+      ],
+      "target_link_negative_controls": [
+        {
+          "plant": "cuda-is-not-native",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "plant": "sm80-is-not-sm90a",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "control": "boundary-positive",
+          "verdict": "PASS"
+        },
+        {
+          "plant": "legacy-macro",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "plant": "missing-hdim256-bf16",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "control": "legacy-sdk-target-fallback",
+          "verdict": "SKIP",
+          "reason": "--legacy-nvcc not provided"
+        }
+      ]
+    },
+    "release43": {
+      "cutlass_version": [
+        4,
+        3,
+        0
+      ],
+      "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+      "source_manifest_sha256": "7b2f16d92b48bee4f00a5a1feccdee606c3f0dcf953e4c2e586b245477b5fd7c",
+      "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+      "host_api_and_internal_link": {
+        "verdict": "PASS",
+        "scope": "real Torch API object + all generated definitions; relocatable link",
+        "linked_sha256": "81ddc94007c9c007eb48d50ac2d53ecba2ce0d2310ae5ec04803e6f4dc410964",
+        "torch_headers": "/root/autodl-tmp/sageattention-build-envs/torch29/lib/python3.12/site-packages/torch/include",
+        "python_headers": "/root/miniconda3/include/python3.10",
+        "torch_load_and_runtime": "NOT_RUN"
+      },
+      "cutlass_compatibility": {
+        "stage_full_empty_counts": [
+          1,
+          2,
+          1,
+          2
+        ],
+        "verdict": "PASS",
+        "output_store_types": "6/6 SM90_U32x4_STSM_N",
+        "consumer_cohorts_enumerated": 7,
+        "ptx_sha256": "677e01ad2cd9ea1823081d21eea560a07f1e8040649c82c56cbf40b6abb77211",
+        "object_sha256": "da4483c94baf7d1855a958fc1e5d44dff25d408d19c88595559941d1cbdd8d9f"
+      },
+      "native_ppu17": "SKIP: capable SDK unavailable; not inferred from CUDA compilation",
+      "device_numerics": "NOT_RUN",
+      "performance": "NOT_RUN",
+      "cells": [
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim64_bf16_sm90.cu",
+          "source_sha256": "9698f45a2c30a154eeb006e2885715a8e58f73712f60e420ddfa5389794818d3",
+          "ptx_sha256": "36dd9c5e757805fa9b6ae72278ce3170914339887721a83dba3e94d876748d2a",
+          "object_sha256": "a2d8a19cd93c0ec56d3a252f90953d724492b9fa1db55a76040ba1e3b3183c86",
+          "entries": 2,
+          "wgmma": 68,
+          "tma_load": 18,
+          "tma_store": 2,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim64_fp16_sm90.cu",
+          "source_sha256": "f707791209dbb0d97b0dd29ce66e09ae5a1bf2f8ea67037935a7379cc1db1eda",
+          "ptx_sha256": "b52c07b9b360590b479315b08043c031279a90ed5866a61e08a0250ef148260e",
+          "object_sha256": "4d15f6c74bca07737a87bed78e2860ca3be604533f12a98da581aacb1a910433",
+          "entries": 2,
+          "wgmma": 68,
+          "tma_load": 18,
+          "tma_store": 2,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim128_bf16_sm90.cu",
+          "source_sha256": "ce503314d09d85696492d7a4699c65edce3df61c10de8274c9feadb9841f7e67",
+          "ptx_sha256": "249839d004a53bcd5a7f2034b6635a36e6a95533c5675f2029044095761ffc5f",
+          "object_sha256": "ae3d6ba03eb68a45886738740a8a8bd7f1df667dffdc833b8468e91001f89741",
+          "entries": 2,
+          "wgmma": 86,
+          "tma_load": 36,
+          "tma_store": 4,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim128_fp16_sm90.cu",
+          "source_sha256": "2d943f5729d2371622bc78879ee4b5b33a5ebbbd66fbaf8fe26c6d20e80ccf59",
+          "ptx_sha256": "b9e92858e15c362a518a9335f3a246901b3d9902b619c0284881ff85c3ce9321",
+          "object_sha256": "e2b9d5ed86351366a7b5efa9e6a4248d286084685ff9d5ec15f4606a65dd4524",
+          "entries": 2,
+          "wgmma": 86,
+          "tma_load": 36,
+          "tma_store": 4,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim256_bf16_sm90.cu",
+          "source_sha256": "f5a18eb6e2965c02e1a436af343e5e564484b378482f0c70743dfae2b77d523b",
+          "ptx_sha256": "f36d3a0d8bca5cfbef8962edcc3815a90f8ad03dacdcd73ae27a2e31cff23349",
+          "object_sha256": "71beced7725bca72248495a79c97679af489151a652e5d09eb2ab64e1f075d05",
+          "entries": 2,
+          "wgmma": 105,
+          "tma_load": 72,
+          "tma_store": 8,
+          "verdict": "SOURCE_COMPILE_PASS"
+        },
+        {
+          "source": "hopper/instantiations/flash_fwd_hdim256_fp16_sm90.cu",
+          "source_sha256": "bd9ade7d36bb9ebe79c7804aedb25e7736cd070f3460a47131ba51bd43e40487",
+          "ptx_sha256": "d51638fe770360ed1677ad40de3aaef81805f6c7c7fb9e67115aa82cc1082b17",
+          "object_sha256": "296bc131585ba6aa783c8e9efd007599c20caabe706546d7e07425236d78ded0",
+          "entries": 2,
+          "wgmma": 105,
+          "tma_load": 72,
+          "tma_store": 8,
+          "verdict": "SOURCE_COMPILE_PASS"
+        }
+      ],
+      "target_link_negative_controls": [
+        {
+          "plant": "cuda-is-not-native",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "plant": "sm80-is-not-sm90a",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "control": "boundary-positive",
+          "verdict": "PASS"
+        },
+        {
+          "plant": "legacy-macro",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "plant": "missing-hdim256-bf16",
+          "verdict": "EXPECTED_RED"
+        },
+        {
+          "control": "legacy-sdk-target-fallback",
+          "verdict": "SKIP",
+          "reason": "--legacy-nvcc not provided"
+        }
+      ]
+    }
+  },
+  "cutlass43_mutations": {
+    "positive": {
+      "stage_full_empty_counts": [
+        1,
+        2,
+        1,
+        2
+      ],
+      "verdict": "PASS",
+      "output_store_types": "6/6 SM90_U32x4_STSM_N",
+      "consumer_cohorts_enumerated": 7,
+      "ptx_sha256": "677e01ad2cd9ea1823081d21eea560a07f1e8040649c82c56cbf40b6abb77211",
+      "object_sha256": "dd9c12cb46aec7b6f323468798138dac05d046860d8adc86dbc6c5a4c27c623b"
+    },
+    "plants": [
+      {
+        "plant": "old-two-argument-selector",
+        "verdict": "EXPECTED_RED",
+        "changed_header": "epilogue_fwd.hpp",
+        "mutant_sha256": "9a57ffa1ad3941616097e195254ecec6e6432a83ad2eaee36b5d21feaaadf96c"
+      },
+      {
+        "plant": "per-thread-pipeline",
+        "verdict": "EXPECTED_RED",
+        "changed_header": "sm90_pipeline_no_cluster.hpp",
+        "mutant_sha256": "20074d04bd02829e0cada6e8f318481fad74d453f907daabd29587a27e8763a3"
+      },
+      {
+        "plant": "wrong-arrival-stride",
+        "verdict": "EXPECTED_RED",
+        "changed_header": "sm90_pipeline_no_cluster.hpp",
+        "mutant_sha256": "f30bd20b90311df81c75b2c5668ba326367312bf36cadafd6333ddbfc5d3771d"
+      },
+      {
+        "plant": "mixed-include-version",
+        "verdict": "EXPECTED_RED"
+      }
+    ]
+  },
+  "cutlass36_machine_identity": {
+    "scope": "CUTLASS3.6, CUDA12.8; encoded SASS including control words, excluding debug metadata",
+    "old": "/workspace/flash-attn-ppu17-rebase-20260925/final",
+    "new": "/workspace/flash-attn-ppu17-causal-tune-20260926/cutlass43-20260928/release36",
+    "same": 12,
+    "total": 12,
+    "kernels": [
+      {
+        "unit": "flash_fwd_hdim128_bf16_sm90.o",
+        "words": 5328,
+        "sha256": "9a4c40ad51b814b58bd7f22116671af9574e440fc2f312f76cb87385a2564d4b",
+        "same_machine_words": true,
+        "symbol_sha256": "a5ef89b54b68ce3d783481104897f94c7c72c28007a1e5f7298711b77bbe3a2f"
+      },
+      {
+        "unit": "flash_fwd_hdim128_bf16_sm90.o",
+        "words": 6688,
+        "sha256": "8eadb991a762fbd8bf63c68f3368af19976bbaf8ce97619362cc77f7b7cf6991",
+        "same_machine_words": true,
+        "symbol_sha256": "50efc30164329c3e1de2d5b05cfef1a124ff2ece96c707dda15c7c3ea542c7a8"
+      },
+      {
+        "unit": "flash_fwd_hdim128_fp16_sm90.o",
+        "words": 5328,
+        "sha256": "c65d105000d79ae7cf69cd1ec2a66fadea2e63ce6a42620730fefa28f6fb5ad8",
+        "same_machine_words": true,
+        "symbol_sha256": "cb1ac09acc1ea603cb2556bcc6f1ca1fc0383c6a1639a9fa4188ed2bcbfbfbca"
+      },
+      {
+        "unit": "flash_fwd_hdim128_fp16_sm90.o",
+        "words": 6688,
+        "sha256": "b8aaf3d2a13cc6f2ab5d30c82bb8cb801f70a4ecb8892b12cdaf9c9968141241",
+        "same_machine_words": true,
+        "symbol_sha256": "496ca2dc42cac161d53ea9c733ed5b455b3ad3cb95d96bffcc78100072ff46cd"
+      },
+      {
+        "unit": "flash_fwd_hdim256_bf16_sm90.o",
+        "words": 5520,
+        "sha256": "2b280ed1ed5193c5cdb1421a1ea831be928a7cd77ab9400a26b0d6e02132a87d",
+        "same_machine_words": true,
+        "symbol_sha256": "19a6764f0b0b25d732a1ea6ac1881ce64f62759ca369d1e06d08690877e13c76"
+      },
+      {
+        "unit": "flash_fwd_hdim256_bf16_sm90.o",
+        "words": 7280,
+        "sha256": "05cb8df5f8e1eb0d498d042c0422936faea5c2f0b3b12e6e3de0554457f047aa",
+        "same_machine_words": true,
+        "symbol_sha256": "c382ebd51f0afeda57fd6abc05ecaa047a93b4e15009a954c46bbf2e5262d31c"
+      },
+      {
+        "unit": "flash_fwd_hdim256_fp16_sm90.o",
+        "words": 5520,
+        "sha256": "2e9d5220ee13145e7959daadeece5b6847a8de20030713c1f16ff12c712c7004",
+        "same_machine_words": true,
+        "symbol_sha256": "679b91969c915c9b6860db2aa47139732321b58a37c498b2465645440f357909"
+      },
+      {
+        "unit": "flash_fwd_hdim256_fp16_sm90.o",
+        "words": 7280,
+        "sha256": "dc0f4b60dd3bcd52c27413815ce72d9067427e89c5fcb381576b1088ca98f6d4",
+        "same_machine_words": true,
+        "symbol_sha256": "2c827916bf461714d1a67ea1c32d33d3403b6db4e7e5581b4b449a6c980136d4"
+      },
+      {
+        "unit": "flash_fwd_hdim64_bf16_sm90.o",
+        "words": 5104,
+        "sha256": "0e9d615652842892d65394bec981b297f324853beea62a90c21e5ff13e993672",
+        "same_machine_words": true,
+        "symbol_sha256": "fffcf0bf8617728c9b02660a8771a48502f39b024a59eda5f2fa9e6b221145c8"
+      },
+      {
+        "unit": "flash_fwd_hdim64_bf16_sm90.o",
+        "words": 5872,
+        "sha256": "6eae857ffa4a369f42c10ae14966172228705f302d94aba631a3aa24864bf351",
+        "same_machine_words": true,
+        "symbol_sha256": "89e8d4bd431f4755a554d547f4684ae861db6d5dc85c948425c6bf67d3b2673d"
+      },
+      {
+        "unit": "flash_fwd_hdim64_fp16_sm90.o",
+        "words": 5104,
+        "sha256": "c060c98ff0c8e64fbb881723076a07e9349170d7e22ee9ed1a838fff6ed364b2",
+        "same_machine_words": true,
+        "symbol_sha256": "908d8c3267f5aa77c5d6aa45ca518ee0b69f27b0802ce5f8ec19777020a73cad"
+      },
+      {
+        "unit": "flash_fwd_hdim64_fp16_sm90.o",
+        "words": 5872,
+        "sha256": "af331296392a42a8b992b8d7b643821835427e1f124f0c9ac4a05fd067cfe01f",
+        "same_machine_words": true,
+        "symbol_sha256": "97125a56ac7c2c90ebdcf913e64b6858356e8c0fad31eff73b9ebb0eef435e19"
+      }
+    ]
+  },
+  "package43_import": {
+    "verdict": "PASS",
+    "python": "3.12.14",
+    "torch": "2.9.0+cu128",
+    "torch_cuda": "12.8",
+    "library": "/workspace/flash-attn-ppu17-causal-tune-20260926/cutlass43-20260928/package43/lib.linux-x86_64-cpython-312/flash_attn_3/_C.cpython-312-x86_64-linux-gnu.so",
+    "library_sha256": "bc5276a912ee30a78d82aadd7babb81054d8269e4635d6c87350837c3c79f48d",
+    "identity": "cutlass43-sm90-forward-v1",
+    "interface": "/workspace/flash-attn-ppu17-causal-tune-20260926/cutlass43-20260928/package43/lib.linux-x86_64-cpython-312/flash_attn_3/flash_attn_interface.py",
+    "wrong_expected_backend": "EXPECTED_RED",
+    "device_executed": false,
+    "driver_library_source": "CUDA12.8 compat libcuda (user-space only); no GPU device nodes"
+  },
+  "package43_link_receipt_sha256": "a8b1cef110fdcae44c9284a2ea46ad8c99b693b4670835c63bf4d2ff52400ccb",
+  "native_ppu17": "SKIP: capable SDK/model unavailable",
+  "device_numerics": "NOT_RUN",
+  "performance": "NOT_RUN"
+}

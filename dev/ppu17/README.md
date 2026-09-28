@@ -4,7 +4,49 @@ This is an explicit backend of `flash_attn_3`, not a new attention algorithm.
 The default `flash_attn` (FA2) import and PPU1.0/1.5 AIU path do not change.
 `USE_PPU` in the original fork means the **legacy AIU algorithm**; it must not
 be defined for this SM90 backend. `FLASHATTN_PPU17` selects the CUDA-compatible
-runtime and PPU CUTLASS3.6 headers, with `ACOMPUTE_VERSION=10700`.
+runtime and the explicitly selected PPU CUTLASS3.6.0 or 4.3.0 headers, with
+`ACOMPUTE_VERSION=10700`. Architecture does not select a dependency API.
+
+## CUTLASS4.3 installation
+
+Use branch `ppu17-hopper-source` of `DrXuQian/flash-attention-for-sail`.
+`CUTLASS_PPU17_ROOT` must name the **PPU fork**, including
+`include/ppu/ppu_include_10700.hpp`, not an unmodified NVIDIA CUTLASS checkout.
+The 4.3 source checked for this migration is the `v4.3.0_ppu_dev` archive
+`0eb6a3b218977892e2b6cd30d59880c440e54fd6`.
+
+For a CUDA SM90a input accepted by the performance simulator, or for an H800
+control, build in an environment with CUDA-compatible PyTorch and CUDA12.8:
+
+```bash
+cd hopper
+env -u PPU_SDK \
+  FLASH_ATTENTION_PPU_ARCH=10700 \
+  FLASH_ATTENTION_PPU17_COMPILE_MODE=simulation \
+  CUTLASS_PPU17_ROOT=/path/to/ppu-cutlass-4.3.0 \
+  CUDA_HOME=/usr/local/cuda-12.8 MAX_JOBS=4 \
+  python -m pip install . --no-build-isolation --no-deps
+
+python -c 'import torch; import flash_attn_3._C as ext; print(ext.ppu17_backend)'
+```
+
+The identity must be `cutlass43-sm90-forward-v1`. The compatible 3.6 path
+retains `cutlass36-sm90-forward-v1`; the package version also records the
+selected dependency. Pass `--expected-cutlass 4.3.0` to
+`tools/run_ppu17_forward.py` to reject a stale installed 3.6 extension.
+Do **not** create an empty `PPU_SDK/targets/.../include` to bypass a build
+failure: `hopper/ppu_build.py` is the legacy PPU1.0/1.5 builder. The 10700
+entry must enter `ppu17_build.py` instead.
+
+This is not native PPU1.7 certification. Native compilation still requires
+`FLASH_ATTENTION_PPU17_COMPILE_MODE=native` and a capable `PPU_SDK` as below.
+The migration changes the epilogue API and no-cluster pipeline selection,
+not attention arithmetic, scheduling, shapes or feature admission. In 4.3
+the FA wrapper keeps **both** EMPTY barrier count and release predicate at
+one arrival per consumer warpgroup; using the backend's per-thread default
+would change this policy. The compile-time expected-version guard rejects
+3.6/4.3 header mixing. See [migration validation](docs/cutlass43-migration.md)
+for the checks and their evidence boundaries.
 
 ## Scope
 
@@ -127,6 +169,9 @@ python tools/check_ppu17_source.py --cutlass /root/cutlass3-3.6.0 \
     --out /workspace/fa17-source-check
 python tools/check_ppu17_negative_builds.py \
     --objects /workspace/fa17-source-check --out /workspace/fa17-negative-check
+python tools/check_ppu17_cutlass43_negatives.py \
+    --cutlass /path/to/ppu-cutlass-4.3.0 \
+    --out /workspace/fa17-cutlass43-negatives
 ```
 
 The source-check command instantiates all six generated source units, separately
@@ -145,9 +190,11 @@ numerical or performance evidence.
 - Select existing SM90 generated units; select `Sm90`, not `PPU0010/0015`.
 - Keep the real WGMMA helper and TMA output store enabled (both were compiled
   out under the legacy umbrella `USE_PPU`). Use native SM90 named barriers.
-- CUTLASS3.6 epilogue store selector has two arguments, not three.
-- Its original TMA pipeline already signals once per consumer warpgroup for
-  a 1x1x1 cluster, so use it rather than FA's workaround for a newer API.
+- CUTLASS3.6 epilogue store selector has two arguments; 4.3 takes the output
+  tile as a third argument. All six admitted output types retain the same atom.
+- The selected PPU3.6 TMA pipeline already signals once per consumer warpgroup
+  for cluster1. PPU4.3 needs FA's matched initialization/release wrapper to
+  preserve that policy instead of the newer per-thread default.
 - Use `KernelHardwareInfo::sm_count`, without changing the legacy `cu_count`.
 - Keep host/device stream types coherent and reject unsupported API options
   before any launch. No blanket architecture macro redefinition or header stubs.

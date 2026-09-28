@@ -18,6 +18,7 @@
 #include "named_barrier.hpp"
 #include "pack_gqa.h"
 #include "utils.h"
+#include "ppu17_cutlass_compat.h"
 
 namespace flash {
 
@@ -108,7 +109,7 @@ struct CollectiveEpilogueFwd {
     using CopyOpR2S = std::conditional_t<
         ArchTag::kMinComputeCapability >= 90,
         // cute::SM90_U32x4_STSM_N if Element size is 2 bytes (fp16, bf16)
-#if defined(FLASHATTN_PPU17)
+#if defined(FLASHATTN_PPU17) && CUTLASS_VERSION == 360
         decltype(cutlass::epilogue::collective::detail::sm90_get_smem_store_op_for_accumulator<StrideO, Element>()),
 #else
         decltype(cutlass::epilogue::collective::detail::sm90_get_smem_store_op_for_accumulator<StrideO, Element, EpilogueTile_MN>()),

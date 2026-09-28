@@ -18,9 +18,13 @@ def logical_flops(batch, seqlen, heads, dim, causal):
     return 4 * batch * heads * dim * pairs
 
 
-def validate_extension(extension):
-    if getattr(extension, "ppu17_backend", None) != "cutlass36-sm90-forward-v1":
+def validate_extension(extension, expected_cutlass=None):
+    versions = {"cutlass36-sm90-forward-v1": "3.6.0", "cutlass43-sm90-forward-v1": "4.3.0"}
+    identity = getattr(extension, "ppu17_backend", None)
+    if identity not in versions:
         raise RuntimeError("wrong/stale FA extension: missing PPU1.7 forward build identity")
+    if expected_cutlass is not None and versions[identity] != expected_cutlass:
+        raise RuntimeError(f"wrong CUTLASS backend: expected {expected_cutlass}, loaded {versions[identity]}")
 
 
 def invoke_once(interface, q, k, v, *, causal):
@@ -73,6 +77,8 @@ def cpu_reference(host, *, causal, query_block=128):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--extension-dir", type=Path)
+    parser.add_argument("--expected-cutlass", choices=("3.6.0", "4.3.0"),
+                        help="reject an installed extension built against the other admitted backend")
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--seqlen", type=int, default=2048)
     parser.add_argument("--heads", type=int, default=32)
@@ -93,7 +99,7 @@ def main():
         sys.path.insert(0, str(args.extension_dir.resolve()))
     import torch
     extension = importlib.import_module("flash_attn_3._C")
-    validate_extension(extension)
+    validate_extension(extension, args.expected_cutlass)
     # The package interface is kept separate from FA2; never silently fall back.
     interface = importlib.import_module("flash_attn_3.flash_attn_interface")
     prop = torch.cuda.get_device_properties(0)
@@ -119,6 +125,7 @@ def main():
         "logical_flops": logical_flops(args.batch, args.seqlen, args.heads, args.head_dim, not args.noncausal),
         "attention_launches": 1, "python_elapsed_time": "NOT_USED_AS_SIMULATION_TIME",
         "extension": extension.__file__,
+        "backend_identity": extension.ppu17_backend,
         "extension_sha256": hashlib.sha256(Path(extension.__file__).read_bytes()).hexdigest(),
         "numerics": "NOT_CHECKED" if not args.verify else "PENDING",
     }

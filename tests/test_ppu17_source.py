@@ -81,6 +81,25 @@ class Ppu17Contracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             build.cutlass_root(ROOT / "hopper")
 
+    def test_admitted_backend_versions_and_compiler_binding(self):
+        for version, expected in (((3, 6, 0), 360), ((4, 3, 0), 430)):
+            with self.subTest(version=version), patch.object(build, "cutlass_version", return_value=version), \
+                 patch.object(Path, "is_file", return_value=True):
+                backend = build.cutlass_root("/selected-backend")
+                self.assertIn(f"-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION={expected}",
+                              build.compile_flags(backend))
+
+    def test_newer_unvalidated_version_is_not_automatically_admitted(self):
+        with patch.object(build, "cutlass_version", return_value=(4, 4, 0)):
+            with self.assertRaisesRegex(ValueError, "expected PPU CUTLASS"):
+                build.cutlass_root("/selected-backend")
+
+    def test_nvidia_only_cutlass_is_not_a_ppu_backend(self):
+        with patch.object(build, "cutlass_version", return_value=(4, 3, 0)), \
+             patch.object(Path, "is_file", return_value=False):
+            with self.assertRaisesRegex(ValueError, "missing PPU1.7 backend header"):
+                build.cutlass_root("/selected-backend")
+
     def test_causal_workload_denominator(self):
         self.assertEqual(runner.logical_flops(1, 2048, 32, 256, True), 68753031168)
         self.assertEqual(runner.logical_flops(1, 2048, 32, 256, False), 137438953472)
@@ -102,6 +121,17 @@ class Ppu17Contracts(unittest.TestCase):
 
     def test_two_live_bodies_pass(self):
         self.assertEqual(check.inspect_ptx(ptx_fixture())["entries"], 2)
+
+    def test_barrier_receipt_counts_real_operands_not_incidental_constants(self):
+        text = ("mov.u32 %r0, 1;\nmov.u32 %r1, 2;\n" +
+                "\n".join(f"mbarrier.init.shared::cta.b64 [%addr], %r{r};" for r in (0, 1, 0, 1)) +
+                "\nmbarrier.arrive.shared::cluster.b64 _, [%addr];")
+        check.inspect_barrier_ptx(text)
+        for mutant in (text.replace("%r1, 2", "%r1, 256"), text.replace("%r1, 2", "%r1, %unknown"),
+                       text.replace("%r1, 2;", "%r1, 2;\nmov.u32 %r1, %unknown;"),
+                       text.replace("mbarrier.arrive", "removed.arrive")):
+            with self.assertRaises(ValueError):
+                check.inspect_barrier_ptx(mutant)
 
     def test_one_empty_body_is_red_even_with_other_body_valid(self):
         planted = ptx_fixture().replace("wgmma.mma_async.sync.aligned.test;", "", 1)
@@ -129,8 +159,13 @@ class Ppu17Contracts(unittest.TestCase):
 
     def test_stale_extension_identity_fails_before_invocation(self):
         runner.validate_extension(SimpleNamespace(ppu17_backend="cutlass36-sm90-forward-v1"))
+        runner.validate_extension(SimpleNamespace(ppu17_backend="cutlass43-sm90-forward-v1"), "4.3.0")
         with self.assertRaisesRegex(RuntimeError, "stale"):
             runner.validate_extension(SimpleNamespace())
+
+    def test_installed_old_backend_cannot_masquerade_as_43(self):
+        with self.assertRaisesRegex(RuntimeError, "expected 4.3.0, loaded 3.6.0"):
+            runner.validate_extension(SimpleNamespace(ppu17_backend="cutlass36-sm90-forward-v1"), "4.3.0")
 
     def test_forward_is_invoked_once_with_single_kernel_features(self):
         interface = Mock()

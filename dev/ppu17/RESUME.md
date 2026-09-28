@@ -1,10 +1,21 @@
 # Resume
 
+- current-task: CUTLASS4.3 migration completed locally on 2026-09-28
+- migration-parent: ed150c9
+- migration-evidence: dev/ppu17/docs/cutlass43-migration.md and results/cutlass43-20260928/validation.json
+- migration-results: both backends 6/6 units + 12 bodies + host/internal link;
+  33 local tests PASS; 4 new compile mutations EXPECTED_RED; full 4.3 package
+  link/import PASS on Python3.12/Torch2.9; 3.6 encoded kernel words unchanged12/12
+- migration-boundary: no new device/simulator numeric or timing result;
+  native PPU1.7 capable SDK/model remains unavailable
+
+Prior 3.6 hardware baseline (not reattributed to the new 4.3 binary):
+
 - parent: f056429 (rebased from f600591 on 2026-09-25)
 - source-commit: e7ee864 (hardware runner provenance; compute source remains a3d25ff)
 - worktree: /workspace/flash-attn-ppu17-source
 - branch: ppu17-hopper-source
-- working-on: sequence scaling complete; median64–65% at8K, about62% at16K; power cap observed
+- working-on: prior sequence-scaling baseline complete; median64–65% at8K, about62% at16K; power cap observed
 - blocked-on: native PPU1.7 verification only (SDK2.1.1 cannot target it)
 - device-results: H800 22/22 numerical cases PASS; one traced target; fresh-process fingerprint STABLE
 - validation-results: six generated units / twelve live forward bodies compiled

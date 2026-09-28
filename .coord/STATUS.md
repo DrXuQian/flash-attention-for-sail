@@ -1,13 +1,27 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-26 05:47:38 UTC
-    working-on: sequence scaling complete; 12/12 new runs PASS, results handoff
-    blocked-on: none for H800; native PPU1.7/model remains unverified
-    last-commit: b7d5192 (bounded prelaunch idle wait; all earlier timing checks retained)
+    updated-at: 2026-09-28 07:49:11 UTC
+    working-on: CUTLASS4.3 adaptation and local validation complete; committing and publishing
+    blocked-on: none for source/build delivery; native PPU1.7/model remains unavailable
+    last-commit: ed150c9 (parent before CUTLASS4.3 compatibility)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+
+CUTLASS4.3 complete: release43 AND release36 pass 6/6 units / 12 live bodies,
+assembly and real host/internal link. All 12 CUTLASS3.6 encoded kernel streams
+including control words match the old admitted build. 33 local tests PASS;
+four real header/include mutations EXPECTED_RED; four existing target/link
+plants EXPECTED_RED on each backend. Optional old-SDK negative not rerun.
+Real 4.3 Python3.12/Torch2.9 package compiled and linked, imported as
+cutlass43-sm90-forward-v1; actual wrong-backend admission rejected. Initial
+link needed the installed CUDA compat library search path, not a kernel fix.
+No GPU device nodes and no device/simulator invocation. Raw artifacts:
+/workspace/flash-attn-ppu17-causal-tune-20260926/cutlass43-20260928.
+Committed evidence: dev/ppu17/docs/cutlass43-migration.md and
+dev/ppu17/results/cutlass43-20260928/validation.json. The older performance
+results below remain specific to their 3.6 binary, not the new backend.
 
 S4096/8192/16384 A/B/B/A complete with immutable binaries and full CPU FP64
 O/LSE checks. Pooled port kernel MFU60.37/64.26/62.51%; official59.19/65.25/

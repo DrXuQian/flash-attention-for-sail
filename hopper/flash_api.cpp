@@ -9,6 +9,7 @@
 
 #include <torch/nn/functional/padding.h>
 #include "ppu_torch_compat.h"
+#include "ppu17_cutlass_compat.h"
 #include <c10/cuda/CUDAGuard.h>
 #include <cutlass/numeric_types.h>
 #include "flash.h"
@@ -38,7 +39,7 @@ PyObject* PyInit__C(void)
     };
     PyObject* module = PyModule_Create(&module_def);
 #if defined(FLASHATTN_PPU17)
-    if (module && PyModule_AddStringConstant(module, "ppu17_backend", "cutlass36-sm90-forward-v1") < 0) {
+    if (module && PyModule_AddStringConstant(module, "ppu17_backend", FLASHATTN_PPU17_BACKEND_ID) < 0) {
         Py_DECREF(module);
         return nullptr;
     }
