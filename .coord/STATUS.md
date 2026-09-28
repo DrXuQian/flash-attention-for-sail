@@ -1,13 +1,24 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 13:38:16 UTC
-    working-on: standalone implementation 490f4bb complete; publishing build and single-invocation handoff
-    blocked-on: none for standalone delivery; native PPU1.7/model unavailable, device numerics/performance NOT_RUN
-    last-commit: 490f4bb (validated standalone implementation; this checkpoint is documentation only)
+    updated-at: 2026-09-28 14:06:32 UTC
+    working-on: encoding fix/default direct build 3a0d479 complete; publishing handoff
+    blocked-on: none for tooling delivery; native PPU1.7/model unavailable
+    last-commit: 3a0d479 (validated tooling fix; this checkpoint is documentation only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+
+Encoding follow-up: local fixture reproduces UTF8 byte0x82 error at offset22
+in old version-header decoding. User's exact failing input is not yet known.
+49 unique local tests pass: comments may be non-UTF8, damaged version/opcode tokens
+remain rejected, raw diagnostics preserved, rc17 remains failure and rc0
+without an object remains failure. Default build only compiles/links;
+--inspect-codegen enables optional PTX/disassembly and records SKIP otherwise.
+No kernel/CUDA flags changed. Fresh direct AND inspected ELF builds PASS;
+8 standalone host checks pass on each. Direct build has no PTX/disassembly
+commands; its encoded native kernel words match the earlier standalone2/2.
+Evidence: dev/ppu17/results/standalone-20260928/build-encoding.json.
 
 Standalone: real CUTLASS4.3/CUDA12.8 ELF built without Torch/Python libraries.
 Shipping generated FP16/D128 unit unchanged; both encoded SM90a kernel bodies
