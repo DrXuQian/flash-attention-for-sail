@@ -106,6 +106,9 @@ def inspect_report(report):
     rows = sorted(p["instruction_statistics"]["source_view_data"]["data"], key=lambda r: int(r["pc"], 16))
     require(sum(r["executed"] for r in rows) == p["instruction_statistics"]["executed_instructions"],
             "per-PC instruction denominator does not close")
+    require(sum(n for _, n in p["instruction_statistics"]["inst_histogram_data"])
+            == p["instruction_statistics"]["executed_instructions"],
+            "opcode instruction denominator does not close")
     inst = [r["inst"] for r in rows]
     result, before, after = window(inst, r"s\.wait\s+gmma_commit_grp\(([0-7])\)", r"\bv\.exp2\.f32\b")
     waits = result.pop("waits")
@@ -121,12 +124,44 @@ def inspect_report(report):
     require(counts == {"m64n176k16": 172032, "m64n128k16": 236544},
             f"executed matrix denominator changed: {counts}")
     result["wait_pcs"] = [rows[i]["pc"] for i in waits]
+    result["wait_sync_warp_cycles"] = [rows[i]["stall_reasons"]["sync"] for i in waits]
     cycles = p["ppu_overview"]["compute_cycles"]
     return {"layer": "PPU-simulation", **result, "compute_cycles": cycles,
             "matrix_warp_executions": dict(counts),
+            "executed_instructions": p["instruction_statistics"]["executed_instructions"],
+            "private_traffic": inspect_private_traffic(rows, p["memory_statistics"]),
             "useful_mfu_percent": 100 * 30064771072 / (cycles * 163840),
             "peak_scope": "this 40-SM model only; report-derived 40*4096 FLOP/cycle",
             "numerics": "NOT_IN_PERFSTATISTICS"}
+
+
+def inspect_private_traffic(rows, memory):
+    """Account for this lowering's lane-private scratch, not HBM transactions.
+
+    The S1024 body loads all Q/K/V via TMA. Its C03 lowering additionally uses
+    [slot + (vreg + %tid) * 4] @sreg-pair for private temporaries. The encoded
+    slot is NOT a byte offset. All such accesses have the full 32-lane math
+    cohort; close the read-byte total against the independent memory counter.
+    Unknown scalar loads are not silently called zero-spill.
+    """
+    slots = {}
+    for row in rows:
+        op = row["inst"]
+        match = re.fullmatch(
+            r"vmem\.(ld|st)\.b32 vreg\d+, \[(0x[0-9a-f]+) \+ "
+            r"\(vreg\d+ \+ %tid\) \* 0x4\] @sreg\[\d+:\d+\]", op)
+        if not match:
+            require(not op.startswith("vmem.ld."), "unclassified scalar read: " + op)
+            continue  # output/LSE stores and TMA have different roles
+        access, slot = match.groups()
+        entry = slots.setdefault(slot, {"ld_warp_executions": 0, "st_warp_executions": 0})
+        entry[access + "_warp_executions"] += row["executed"]
+    reads = 32 * 4 * sum(s["ld_warp_executions"] for s in slots.values())
+    writes = 32 * 4 * sum(s["st_warp_executions"] for s in slots.values())
+    require(reads == memory["vmem_inst_read_bytes"], "private read-byte denominator does not close")
+    require(writes <= memory["vmem_inst_write_bytes"], "private writes exceed total scalar stores")
+    return {"read_bytes": reads, "write_bytes": writes, "slot_count": len(slots),
+            "slots": dict(sorted(slots.items())), "scope": "lane-private traffic, not HBM bytes"}
 
 
 def main():
@@ -134,6 +169,8 @@ def main():
     p.add_argument("kind", choices=("ptx", "sass", "report"))
     p.add_argument("input", type=Path)
     p.add_argument("--require-before", type=int, help="explicit static EX2 count required before wait0")
+    p.add_argument("--max-private-bytes", type=int,
+                   help="PPU report only: explicit read+write budget from its measured control")
     a = p.parse_args()
     raw = a.input.read_bytes()
     if a.kind == "report":
@@ -144,6 +181,13 @@ def main():
     if a.require_before is not None:
         require(result["exp2_before_wait0"] == a.require_before,
                 f"overlap postcondition: expected {a.require_before}, got {result['exp2_before_wait0']}")
+    if a.max_private_bytes is not None:
+        require(a.kind == "report" and a.max_private_bytes >= 0,
+                "private-traffic budget requires a PPU report and a nonnegative limit")
+        traffic = result["private_traffic"]
+        require(traffic["read_bytes"] + traffic["write_bytes"] <= a.max_private_bytes,
+                f"private traffic exceeds control budget: {traffic['read_bytes']} read + "
+                f"{traffic['write_bytes']} write > {a.max_private_bytes} bytes")
     print(json.dumps(result, indent=2))
 
 

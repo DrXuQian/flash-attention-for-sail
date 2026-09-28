@@ -1,18 +1,28 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 22:35:09 UTC
-    working-on: C03 local admission delivered; awaiting user's single-invocation model result
-    blocked-on: candidate PPU1.7 simulator/native toolchain unavailable locally
-    last-commit: accdefc (validated opt-in implementation; this checkpoint is documentation only)
+    updated-at: 2026-09-28 23:48:27 UTC
+    working-on: C03 uploaded result diagnosed; reject slower/private-spilling candidate, record native byte ledger
+    blocked-on: application numerical log and binary/model hashes absent; no local PPU1.7 simulator
+    last-commit: 9733223 (before this report/checker checkpoint; kernel remains accdefc)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: current uploaded run 40 SM; historical 20-SM model is not this run
 
 Current experiment: dev/ppu17/experiments/softmax-overlap/docs/plan.md.
-Uploaded control perfstatistics has 247267 compute cycles / 74.21% useful MFU.
-No model/physical-device candidate execution is claimed. Preserve the original
-source worktree and control ELF. One target call per simulation process.
+Uploaded control: 247267 cycles / 74.21% useful MFU. Uploaded C03: 266011
+cycles / 68.98%, slower7.58047%, REJECTED. All90 steady EX2 really precede
+wait0; the wait's sync stall drops to0. But PPU lowering spills23 logical
+private slots:35323904B reads +18964480B writes, exactly closed from PCs to
+memory counters. CUDA's unchanged12B spill metadata did not predict this.
+No kernel/default route changed during this diagnosis. Application CPU O/LSE
+PASS is not present in perfstatistics; do not invent it. Preserve both ELFs.
+Detailed verdict: dev/ppu17/experiments/softmax-overlap/docs/simulation-verdict.md.
+Current complete local suite:58 PASS /4 SKIP /0 FAIL. Three skips are missing
+Torch; one is the original full baseline report overwritten by this upload.
+Real C03 passes the90/90 overlap check but fails the no-new-private-traffic
+gate as required. Removing one private read while keeping both instruction
+totals consistent still fails the independent memory-byte denominator.
 
 C03 fresh real ELF link PASS. Control default machine words unchanged2/2;
 candidate causal body unchanged. CUDA native EX2 window19/90->90/90, matrix

@@ -78,6 +78,49 @@ class SoftmaxOverlapGate(unittest.TestCase):
         self.assertIn('kOverlapVariant', app)
         self.assertIn('completed_invocations=1', app)
 
+    def test_private_slot_byte_accounting(self):
+        rows = [{"inst": "vmem.ld.b32 vreg3, [0x805 + (vreg2 + %tid) * 0x4] @sreg[108:109]", "executed": 7},
+                {"inst": "vmem.st.b32 vreg9, [0x805 + (vreg2 + %tid) * 0x4] @sreg[108:109]", "executed": 3},
+                {"inst": "vmem.st.b32 vreg3, [0x0] @vreg[4:5]", "executed": 4}]
+        memory = {"vmem_inst_read_bytes": 896, "vmem_inst_write_bytes": 512}
+        result = gate.inspect_private_traffic(rows, memory)
+        self.assertEqual((result["read_bytes"], result["write_bytes"], result["slot_count"]), (896, 384, 1))
+        bad = copy.deepcopy(rows)
+        bad[0]["executed"] -= 1
+        with self.assertRaisesRegex(ValueError, "read-byte denominator"):
+            gate.inspect_private_traffic(bad, memory)
+
+    def test_unknown_private_read_must_not_be_hidden(self):
+        rows = [{"inst": "vmem.ld.b32 vreg3, [0x0] @vreg[4:5]", "executed": 1}]
+        with self.assertRaisesRegex(ValueError, "unclassified scalar read"):
+            gate.inspect_private_traffic(rows, {"vmem_inst_read_bytes": 128, "vmem_inst_write_bytes": 0})
+
+    @unittest.skipUnless(os.environ.get("FA17_OVERLAP_CANDIDATE_REPORT"), "PPU C03 report not supplied")
+    def test_real_candidate_overlap_is_not_no_spill(self):
+        import subprocess
+        report_path = Path(os.environ["FA17_OVERLAP_CANDIDATE_REPORT"])
+        raw = json.loads(report_path.read_bytes())
+        result = gate.inspect_report(raw)
+        self.assertEqual(result["exp2_before_wait0"], 90)
+        self.assertEqual(result["private_traffic"]["slot_count"], 23)
+        self.assertEqual(result["private_traffic"]["read_bytes"], 35323904)
+        self.assertEqual(result["private_traffic"]["write_bytes"], 18964480)
+        rejected = subprocess.run([sys.executable, str(ROOT / "tools/check_ppu17_softmax_overlap.py"),
+                                   "report", str(report_path), "--require-before", "90",
+                                   "--max-private-bytes", "0"], capture_output=True, text=True)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("private traffic exceeds control budget", rejected.stderr)
+        # Keep aggregate counts internally consistent: removing one executed
+        # private read must still fail the independent memory-byte denominator.
+        bad = copy.deepcopy(raw)
+        inst = bad["ppu"][0]["instruction_statistics"]
+        row = next(r for r in inst["source_view_data"]["data"] if r["inst"].startswith("vmem.ld.b32"))
+        row["executed"] -= 1
+        inst["executed_instructions"] -= 1
+        next(pair for pair in inst["inst_histogram_data"] if pair[0] == "vmem.ld.b32")[1] -= 1
+        with self.assertRaisesRegex(ValueError, "read-byte denominator"):
+            gate.inspect_report(bad)
+
     @unittest.skipUnless(os.environ.get("FA17_OVERLAP_SASS"), "compiled candidate not supplied")
     def test_real_candidate_and_old_P_negative(self):
         path = Path(os.environ["FA17_OVERLAP_SASS"])

@@ -2,7 +2,11 @@
 
 Fixed workload: B1/Sq1024/Sk1024/H56/Hkv56/D128, FP16 noncausal BSHD,
 40-SM model, tile128x176, two stages, 384 CTA threads. Default is unchanged.
-This is **not yet a PPU performance winner**. The local native control is
+**C03 is rejected: the uploaded PPU simulation is 7.58% slower and introduces
+54.29 MB of lane-private traffic.** See [the verdict](docs/simulation-verdict.md).
+Its 90/90 EX2 overlap is real, but not beneficial in this implementation.
+Do not enable it for performance. The original default is unchanged.
+The local native control is
 CUDA12.8 SM90a code, not an HGGC/native-PPU admission certificate.
 
 ## Why this change
@@ -29,7 +33,7 @@ an explicit cost, not a correctness flag or an inter-thread message.
   is compiled only for ordinary FP16, noncausal128x176/D128/two-stage mainloop.
   The standalone harness admits only the fixed S1024 case; no routing promotion.
 
-## Build and run
+## Reproducing the rejected candidate (not a performance recommendation)
 
 From this branch of flash-attention-for-sail, using the same CUTLASS4.3 backend
 and CUDA compiler as the baseline (replace only paths if installed elsewhere):
@@ -100,7 +104,7 @@ target229376 cycles corresponds to80% useful MFU. No expected speedup is claimed
 Python oracle tests (Torch unavailable in the active interpreter); standalone
 C++ CPU oracle, host ELF paths and the real missing-generated-unit link negative
 pass. Neither oracle self-tests nor codegen gates execute the candidate kernel.
-Native control/candidate:168reported registers,8B stack,12B spill stores/loads;
+NVIDIA native control/candidate:168reported registers,8B stack,12B spill stores/loads;
 EX2 overlap19->90, static instructions2624->2632. Both default body encodings
 match parent4b26264; ineligible causal encoding also matches with the flag on.
 
@@ -111,6 +115,12 @@ python dev/ppu17/experiments/softmax-overlap/validate.py \
   --parent-sass /workspace/flash-attn-ppu17-causal-tune-20260926/standalone-encoding-20260928/inspected/executable.sass \
   --control /workspace/fa17-softmax-overlap-20260929/control \
   --candidate /workspace/fa17-softmax-overlap-20260929/candidate \
-  --report /root/perfstatistics.json \
+  --report /path/to/archived-control-perfstatistics.json \
   --out /workspace/fa17-softmax-overlap-20260929/validation.json
 ```
+
+The old raw control upload was overwritten by C03; only the baseline extracted
+evidence remains locally. The preceding historical full replay now needs that
+original control report. Do not substitute the C03 report to label it control.
+Current report/negative tests use `FA17_OVERLAP_CANDIDATE_REPORT`; one missing
+baseline-report test is explicitly SKIP, not PASS.
