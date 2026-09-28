@@ -2,6 +2,7 @@
 
 - current-task: CUTLASS4.3 migration completed locally on 2026-09-28
 - migration-parent: ed150c9
+- migration-implementation: d228fa3e72783c7063e0729f07d78a52d0f90afa
 - migration-evidence: dev/ppu17/docs/cutlass43-migration.md and results/cutlass43-20260928/validation.json
 - migration-results: both backends 6/6 units + 12 bodies + host/internal link;
   33 local tests PASS; 4 new compile mutations EXPECTED_RED; full 4.3 package

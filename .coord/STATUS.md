@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 07:49:11 UTC
-    working-on: CUTLASS4.3 adaptation and local validation complete; committing and publishing
+    updated-at: 2026-09-28 07:51:56 UTC
+    working-on: CUTLASS4.3 implementation d228fa3 complete; publishing handoff checkpoint
     blocked-on: none for source/build delivery; native PPU1.7/model remains unavailable
-    last-commit: ed150c9 (parent before CUTLASS4.3 compatibility)
+    last-commit: d228fa3 (validated implementation; this checkpoint changes documentation only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
