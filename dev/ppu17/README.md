@@ -48,6 +48,76 @@ would change this policy. The compile-time expected-version guard rejects
 3.6/4.3 header mixing. See [migration validation](docs/cutlass43-migration.md)
 for the checks and their evidence boundaries.
 
+## No installation: standalone FP16 S1024 executable
+
+For **B1 / Sq=Sk=1024 / Hq=Hkv=56 / Dq=Dv=128 / FP16 / noncausal**,
+build a plain executable instead of a Python wheel. No Torch development
+headers, pip, Python ABI or installed `flash_attn_3` are required. The build
+orchestrator uses Python's standard library; the executable does not use Python.
+It links the **unchanged shipping FP16/D128 generated unit**, not a copied
+attention implementation. Collective, tiling and scheduler are unchanged.
+
+From the repository root:
+
+```bash
+python tools/build_ppu17_standalone.py \
+  --cutlass /workspace/flash-attention-for-sail/csrc/cutlass3 \
+  --cuda-home /usr/local/cuda-12.8 \
+  --out /workspace/fa17-standalone-s1024
+```
+
+Use the actual PPU CUTLASS3.6/4.3 root and CUDA12.8 installation. `--out` must
+be a new directory; an old binary is never reused after a failed build. The
+script runs the compiler-target check, checks both actual generated PTX
+bodies, assembles and **links a real ELF**, and records source/backend/binary
+hashes and full command/error logs in `build.json` and adjacent files.
+The CUDA SDK's `libcuda` stub is **link-only**; it is never added to runtime
+RPATH. Running requires the simulator's or device's real CUDA driver/runtime.
+This is SM90a simulation input, not native PPU1.7 compilation certification.
+
+Application command to give your simulation tool:
+
+```bash
+/workspace/fa17-standalone-s1024/flash_attn_ppu17_s1024_fp16 --verify
+```
+
+One attention invocation, no warmup/repeat/timing loop, no GPU initializer or
+reference kernels. Q/K/V and poisoned O/LSE are prepared on CPU and copied.
+The fixed layout is BSHD (strides7340032/7168/128/1); output LSE is BHS.
+Default admission requires20runtime SMs; `--expected-sms N` changes the
+**assertion**, not the device or launch-grid partition. The scheduler still
+uses the measured runtime SM count. `--verify` compares **all** O/LSE against
+an independent CPU FP64 reference with fixed atol=rtol=0.002. CPU work/copies
+must not be counted as simulated kernel time. Omitting `--verify` retains
+finite/unwritten checks but prints `numerics=NOT_CHECKED`, never correctness
+PASS. No latency/MFU is inferred from host elapsed time.
+
+The input fixture uses distinct, deterministic FP16-exact dyadics, **not** the
+Python runner's normal-distribution fixture: do not label their timings or
+output fingerprints as same-input A/B. Useful work is30,064,771,072FLOPs.
+The actual simulation trace must still confirm one attention kernel.
+
+CPU-only checks (do not invoke CUDA):
+
+```bash
+/workspace/fa17-standalone-s1024/flash_attn_ppu17_s1024_fp16 --describe
+/workspace/fa17-standalone-s1024/flash_attn_ppu17_s1024_fp16 --host-self-test
+FA17_STANDALONE_EXE=/workspace/fa17-standalone-s1024/flash_attn_ppu17_s1024_fp16 \
+  python tests/test_ppu17_standalone.py
+```
+
+The host checks cover uniform-score and nonuniform closed-form references,
+the actual Params constructor, FP16 input encoding, and negative controls for
+the last output, NaN, a shortened denominator, unexpected runtime dependencies
+and a forbidden repeated-launch option. These do not certify device numerics.
+
+Local delivery result (2026-09-28, CUDA12.8.93 + PPU CUTLASS4.3): actual
+ELF compile/link PASS, **40 local contracts PASS**, and both shipping kernel
+encoded instruction/control-word streams match the previously built 4.3
+library object. Removing the generated object is a real undefined-symbol link
+failure. Simulator/device correctness and timing are **NOT_RUN**. Hashes and
+scope: [standalone validation](results/standalone-20260928/validation.json).
+
 ## Scope
 
 - FP16/BF16, forward only, fixed-length BSHD, Dq=Dk=Dv in {64,128,256}.

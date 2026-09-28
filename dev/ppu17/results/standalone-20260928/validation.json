@@ -1,0 +1,33 @@
+{
+  "date_utc": "2026-09-28",
+  "source_parent": "d487a35",
+  "scope": "Torch-free fixed-shape executable; CUDA-SM90a simulator input, not native PPU1.7 certification",
+  "shape": {"B": 1, "Sq": 1024, "Sk": 1024, "Hq": 56, "Hkv": 56, "Dq": 128, "Dv": 128, "dtype": "fp16", "causal": false, "layout": "BSHD"},
+  "cutlass": "v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6",
+  "compiler": "CUDA12.8.93",
+  "source_manifest_sha256": "331cb280965be31b59d7db6c382977191463ca0c7b915b181c5e186d4bc5a1cb",
+  "artifact_root": "/workspace/flash-attn-ppu17-causal-tune-20260926/standalone-20260928-v1",
+  "executable": "flash_attn_ppu17_s1024_fp16",
+  "executable_sha256": "74db0013d95f4f84f5e83a53a86d28bd67853eb0f834a526bbd54132323a022c",
+  "build_and_real_link": "PASS",
+  "runtime_dependencies": ["libcudart.so.12", "libstdc++.so.6", "libm.so.6", "libgomp.so.1", "libgcc_s.so.1", "libc.so.6"],
+  "torch_python_dependencies": "NONE",
+  "shipping_unit": "hopper/instantiations/flash_fwd_hdim128_fp16_sm90.cu",
+  "native_code_identity": {
+    "baseline": "cutlass43-20260928/release43/flash_fwd_hdim128_fp16_sm90.o",
+    "method": "cuobjdump --dump-sass; compare per-symbol encoded instruction and control words, excluding debug metadata",
+    "total_kernel_bodies": 2,
+    "identical_kernel_bodies": 2,
+    "machine_words": [5248, 6512],
+    "code_sha256": ["0c90a35767e1cdcbfe1960ebfe740a397983c0d5a8c6654bfa53d4c8d28b26a9", "247cbea4b01b229c21ff95f07d7203abb20fb43b63f0b67ffc45113ec072ccd1"]
+  },
+  "standalone_host_contracts": {"PASS": 7, "SKIP": 0, "FAIL": 0},
+  "existing_source_contracts": {"PASS": 26, "FAIL": 0},
+  "existing_timing_contracts": {"PASS": 4, "FAIL": 0},
+  "existing_cpu_reference_contracts": {"PASS": 3, "FAIL": 0},
+  "total_local_contracts": {"PASS": 40, "SKIP": 0, "FAIL": 0},
+  "negative_controls": ["last output corrupt -> bad=1", "NaN output -> nonfinite=1", "short denominator -> exception", "repeated-launch option -> rejection before CUDA", "Torch/Python/legacy runtime dependencies -> rejection", "omit actual generated object -> undefined run_mha_fwd_ link failure"],
+  "device_numerics": "NOT_RUN",
+  "simulation_launch_count": "source permits one target invocation; actual trace NOT_RUN",
+  "performance": "NOT_RUN"
+}

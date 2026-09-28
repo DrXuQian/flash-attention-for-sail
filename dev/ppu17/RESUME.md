@@ -1,6 +1,6 @@
 # Resume
 
-- current-task: CUTLASS4.3 migration completed locally on 2026-09-28
+- current-task: Torch-free fixed-shape standalone completed locally on 2026-09-28; see handoff below
 - migration-parent: ed150c9
 - migration-implementation: d228fa3e72783c7063e0729f07d78a52d0f90afa
 - migration-evidence: dev/ppu17/docs/cutlass43-migration.md and results/cutlass43-20260928/validation.json
@@ -40,3 +40,18 @@ versus a129.833us threshold for70%. Full-call spans are separate. No native
 PPU1.7 runtime result or model latency/MFU is claimed. That hardware has
 114 SM / 50 MiB L2, not the user's 20 SM / 32 MiB model. Runtime admission on
 the simulator remains unverified. Local runner checks now 21 host + 3 CPU PASS.
+# Standalone handoff — 2026-09-28
+
+User requests no wheel installation for B1/S1024/H56/Hkv56/D128 FP16
+noncausal. `tools/build_ppu17_standalone.py` links the shipping generated
+FP16/D128 unit with a plain C++ host application. No production kernel edits.
+Build command and single-invocation simulation command: README, "No
+installation: standalone FP16 S1024 executable".
+
+Local CUTLASS4.3/CUDA12.8 real ELF link PASS, two native encoded kernel bodies
+identical to release43 (including control words), seven new contracts PASS.
+CPU-only self-test/describe succeed on the actual executable. Real missing
+generated unit fails at link with `run_mha_fwd_` undefined; not an environment
+SKIP. Actual simulator/device O/LSE and performance remain NOT_RUN.
+Evidence: `results/standalone-20260928/validation.json`.
+Artifacts: `/workspace/flash-attn-ppu17-causal-tune-20260926/standalone-20260928-v1`.
