@@ -1,13 +1,24 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 07:51:56 UTC
-    working-on: CUTLASS4.3 implementation d228fa3 complete; publishing handoff checkpoint
-    blocked-on: none for source/build delivery; native PPU1.7/model remains unavailable
-    last-commit: d228fa3 (validated implementation; this checkpoint changes documentation only)
+    updated-at: 2026-09-28 13:38:16 UTC
+    working-on: standalone implementation 490f4bb complete; publishing build and single-invocation handoff
+    blocked-on: none for standalone delivery; native PPU1.7/model unavailable, device numerics/performance NOT_RUN
+    last-commit: 490f4bb (validated standalone implementation; this checkpoint is documentation only)
     branch: ppu17-hopper-source
     workspace: /workspace/flash-attn-ppu17-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: 20 SM / 32 MiB LLC; PPU1.7 model performance remains unmeasured
+
+Standalone: real CUTLASS4.3/CUDA12.8 ELF built without Torch/Python libraries.
+Shipping generated FP16/D128 unit unchanged; both encoded SM90a kernel bodies
+(including control words) match the admitted release43 object, 2/2.
+40 local contracts pass (7 standalone + 26 source + 4 timing + 3 CPU oracle),
+including real missing-generated-unit link
+failure and oracle last-output/NaN/extent negatives. Default one invocation;
+--verify adds full CPU FP64 O/LSE only. No GPU jobs were run.
+ELF SHA256=74db0013d95f4f84f5e83a53a86d28bd67853eb0f834a526bbd54132323a022c.
+Artifacts: /workspace/flash-attn-ppu17-causal-tune-20260926/standalone-20260928-v1.
+No production collective, tiling, scheduler or generated-unit modifications.
 
 CUTLASS4.3 complete: release43 AND release36 pass 6/6 units / 12 live bodies,
 assembly and real host/internal link. All 12 CUTLASS3.6 encoded kernel streams
