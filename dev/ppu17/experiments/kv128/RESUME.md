@@ -1,6 +1,7 @@
 # C07 resume
 
-- updated-at: 2026-09-29 03:21:01 UTC
+- updated-at: 2026-09-29 03:24:06 UTC
+- implementation: 536d86c
 - branch: ppu17-softmax-overlap
 - parent: 454298e
 - worktree: /workspace/flash-attn-ppu17-softmax-overlap-source

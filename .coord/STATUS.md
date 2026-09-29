@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 03:21:01 UTC
-    working-on: C07 KV128 local gates complete; preparing single-invocation simulation handoff
+    updated-at: 2026-09-29 03:24:06 UTC
+    working-on: C07 KV128 committed, single-invocation simulation handoff ready
     blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
-    last-commit: 454298e (partial-overlap rejection and clean-source checkpoint)
+    last-commit: 536d86c (C07 implementation and complete local evidence; this checkpoint is documentation-only)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
