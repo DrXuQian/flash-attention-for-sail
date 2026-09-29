@@ -1,0 +1,193 @@
+{
+  "scope": "CUDA12.8 compile/control and CPU layout only; no candidate simulated",
+  "default_encoded_bodies_unchanged": "2/2",
+  "candidate_count": 3,
+  "admitted_candidates": 0,
+  "candidates": [
+    {
+      "candidate": "C04",
+      "decision": "REJECTED",
+      "reasons": [
+        "SCHEDULE"
+      ],
+      "ptx_before_after": [
+        90,
+        0
+      ],
+      "sass_before_after": [
+        75,
+        15
+      ],
+      "sass": {
+        "layer": "NVIDIA-SASS/compile-control",
+        "exp2_before_wait0": 75,
+        "exp2_after_wait0": 15,
+        "wait_pcs": [
+          "0x17e0",
+          "0x4350",
+          "0x5910",
+          "0x6ba0"
+        ],
+        "matrix_sites": {
+          "64x176x16": 16,
+          "64x128x16": 22
+        },
+        "static_instructions": 2632,
+        "local_sites": {
+          "STL": 3,
+          "LDL": 3
+        },
+        "old_P_words": 44,
+        "live_O_words": 64,
+        "early_old_P_or_O_writes": 0
+      },
+      "resource_increase": {},
+      "resources": {
+        "stack_bytes": 8,
+        "spill_store_bytes": 12,
+        "spill_load_bytes": 12,
+        "registers": 168
+      },
+      "source_sha256": "562714c3be814d83fa9f320aff68e19442eaffd6af9ddf2ca9bd8741796ece08",
+      "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+      "executable_sha256": "3cf1fe4260d0a0cfd532bfd38ced1532a49e0894fc2d311a5d53420f02715c76",
+      "model_numerics_performance": "NOT_RUN"
+    },
+    {
+      "candidate": "C05",
+      "decision": "REJECTED",
+      "reasons": [
+        "SCHEDULE"
+      ],
+      "ptx_before_after": [
+        45,
+        45
+      ],
+      "sass_before_after": [
+        76,
+        14
+      ],
+      "sass": {
+        "layer": "NVIDIA-SASS/compile-control",
+        "exp2_before_wait0": 76,
+        "exp2_after_wait0": 14,
+        "wait_pcs": [
+          "0x17f0",
+          "0x4340",
+          "0x5920",
+          "0x6b80"
+        ],
+        "matrix_sites": {
+          "64x176x16": 16,
+          "64x128x16": 22
+        },
+        "static_instructions": 2632,
+        "local_sites": {
+          "STL": 3,
+          "LDL": 3
+        },
+        "old_P_words": 44,
+        "live_O_words": 64,
+        "early_old_P_or_O_writes": 0
+      },
+      "resource_increase": {},
+      "resources": {
+        "stack_bytes": 8,
+        "spill_store_bytes": 12,
+        "spill_load_bytes": 12,
+        "registers": 168
+      },
+      "source_sha256": "c4b4b38e46ce6f6ff4529de079f269fbfcee5626c32d5f01b08cc9bbe306a97b",
+      "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+      "executable_sha256": "e3a8ab6a174c290d8483f84f67811ffbd9a7e4f4cac7f38624f1e9cf4f86577b",
+      "model_numerics_performance": "NOT_RUN"
+    },
+    {
+      "candidate": "C06",
+      "decision": "REJECTED",
+      "reasons": [
+        "ADDED-RESOURCE/SPILL"
+      ],
+      "ptx_before_after": [
+        45,
+        45
+      ],
+      "sass_before_after": [
+        45,
+        45
+      ],
+      "sass": {
+        "layer": "NVIDIA-SASS/compile-control",
+        "exp2_before_wait0": 45,
+        "exp2_after_wait0": 45,
+        "wait_pcs": [
+          "0x17d0",
+          "0x4310",
+          "0x4f90",
+          "0x6b80"
+        ],
+        "matrix_sites": {
+          "64x176x16": 16,
+          "64x128x16": 22
+        },
+        "static_instructions": 2624,
+        "local_sites": {
+          "STL": 6,
+          "LDL": 6
+        },
+        "old_P_words": 44,
+        "live_O_words": 64,
+        "early_old_P_or_O_writes": 0
+      },
+      "resource_increase": {
+        "stack_bytes": [
+          8,
+          24
+        ],
+        "spill_store_bytes": [
+          12,
+          40
+        ],
+        "spill_load_bytes": [
+          12,
+          40
+        ]
+      },
+      "resources": {
+        "stack_bytes": 24,
+        "spill_store_bytes": 40,
+        "spill_load_bytes": 40,
+        "registers": 168
+      },
+      "source_sha256": "0bdffedeb850f7b5630fe4c4834f8be73d360bfce9a82e170e0b2810776a3257",
+      "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+      "executable_sha256": "71512084698bef73b7110be9027106f163f709eeaeac7313c16ec2a320c90fac",
+      "model_numerics_performance": "NOT_RUN"
+    }
+  ],
+  "actual_layout_checks": [
+    {
+      "plant": null,
+      "returncode": 0,
+      "output": "[FA17 partial layout] PASS: actual collective 256 threads x 2 rows x 44 scores; 22528 QK cells exact-once; row0/row1 disjoint; 512 private word owners"
+    },
+    {
+      "plant": "row",
+      "returncode": 1,
+      "output": "[FA17 partial layout] FAIL: actual row layout differs from logical coordinate anchor"
+    },
+    {
+      "plant": "token",
+      "returncode": 1,
+      "output": "[FA17 partial layout] FAIL: private token has multiple/missing owners"
+    },
+    {
+      "plant": "coverage",
+      "returncode": 1,
+      "output": "[FA17 partial layout] FAIL: fragment coverage is not exact-once"
+    }
+  ],
+  "rejected_source_patch_sha256": "6a78eef169fb2a5fedf9f8f370cbf8ec409bd4dafc2ebbd5ae4b5d254708e971",
+  "layout_source_sha256": "d6bddcc80fabb220a19d6f6b9d11386f48397594cb5a8009728017548b8b6405",
+  "retained_default": "original control; no new flags or softmax implementation left active"
+}

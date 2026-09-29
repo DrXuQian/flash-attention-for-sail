@@ -1,15 +1,21 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-28 23:50:23 UTC
-    working-on: C03 rejected and byte-ledger/negative tests committed; original default retained
-    blocked-on: application numerical log and binary/model hashes absent; no local PPU1.7 simulator
-    last-commit: 66681ef (completed report/checker verdict; this checkpoint is documentation only)
+    updated-at: 2026-09-29 03:06:05 UTC
+    working-on: C04/C05/C06 rejected locally; live implementation edits removed, replay evidence retained
+    blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
+    last-commit: fc4947d (parent of this partial-overlap evidence checkpoint)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: current uploaded run 40 SM; historical 20-SM model is not this run
 
 Current experiment: dev/ppu17/experiments/softmax-overlap/docs/plan.md.
+Partial-overlap follow-up: C04/C05 native75/15 and76/14 fail45/45; C06 hits
+45/45 but spills12->40B, rejected before simulation. Real layout22528cells
+and512private words exact-once,3plants red. Default encoded streams2/2 match;
+all five experimental live source/build edits restored. Artifacts and exact
+C06 replay patch retained; see docs/partial-verdict.md. Next distinct axis
+is KV tile128 using the ORIGINAL softmax/pipeline, not these rejected changes.
 Uploaded control: 247267 cycles / 74.21% useful MFU. Uploaded C03: 266011
 cycles / 68.98%, slower7.58047%, REJECTED. All90 steady EX2 really precede
 wait0; the wait's sync stall drops to0. But PPU lowering spills23 logical

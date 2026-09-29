@@ -9,6 +9,12 @@ Do not enable it for performance. The original default is unchanged.
 The local native control is
 CUDA12.8 SM90a code, not an HGGC/native-PPU admission certificate.
 
+The subsequent partial-overlap attempts C04–C06 were also rejected locally:
+75/15 and76/14 instead of45/45, then45/45 with spill12→40B.
+[Follow-up verdict](docs/partial-verdict.md). Their live implementation/build
+changes are removed; only the replay patch and evidence remain. No simulation
+run is requested for these candidates.
+
 ## Why this change
 
 The user report (SHA256 in `docs/plan.md`) executes zero of the recurring90 EX2

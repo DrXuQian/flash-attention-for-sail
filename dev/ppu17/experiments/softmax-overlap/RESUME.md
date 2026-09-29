@@ -1,10 +1,10 @@
 # Resume
 
-- updated-at: 2026-09-28 23:50:23 UTC
+- updated-at: 2026-09-29 03:06:05 UTC
 - parent: 4b26264
 - branch: ppu17-softmax-overlap
-- working-on: C03 simulation rejected: +7.58047% cycles, 23 spilled private slots
-- last-commit: 66681ef (completed report/checker verdict; this checkpoint documentation only)
+- working-on: partial-overlap cycle closed, C04/C05 schedule rejects and C06 added-spill reject
+- last-commit: fc4947d (C03 verdict checkpoint)
 - blocked-on: application numerical log and binary/model identity not uploaded
 - input-report: /workspace/fa17-softmax-overlap-20260929/c03-simulation-3158e2fa/perfstatistics.json
 - plan: docs/plan.md
@@ -12,7 +12,9 @@
 - local-results: simulation-result.json (58 PASS / 4 SKIP / 0 FAIL); historical compile checkpoint in results.json
 - actual-candidate-elf: /workspace/fa17-softmax-overlap-20260929/candidate/flash_attn_ppu17_s1024_fp16
 - control: /workspace/fa17-softmax-overlap-20260929/control
-- next: retain original default; reduce softmax temporary live range before any new overlap candidate
+- next: separate opt-in KV tile128 experiment; retain original softmax/pipeline
+- follow-up-plan: docs/partial-plan.md
+- follow-up-verdict: docs/partial-verdict.md; all five live source/build files restored to parent
 - candidate-device-numerics: NOT_PROVIDED in uploaded report
 - candidate-model-performance: 266011 cycles / 68.9824% useful MFU; REJECTED
 - evidence: docs/simulation-verdict.md; simulation-result.json
