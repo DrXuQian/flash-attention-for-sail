@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 07:23:06 UTC
+    updated-at: 2026-09-29 07:23:57 UTC
     working-on: W01 local complete:67 PASS/4 SKIP/0 FAIL; exact body built and single-call handoff ready
     blocked-on: native PPU1.7 SDK/model unavailable locally
-    last-commit: d19d27a (C07 parent)
+    last-commit: 4ee8db7 (tested W01 implementation; this checkpoint changes documentation only)
     branch: ppu17-wg-scheduling
     workspace: /workspace/flash-attn-ppu17-wg-scheduling-source
 
