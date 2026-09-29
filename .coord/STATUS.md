@@ -1,13 +1,21 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 07:23:57 UTC
-    working-on: W01 local complete:67 PASS/4 SKIP/0 FAIL; exact body built and single-call handoff ready
-    blocked-on: native PPU1.7 SDK/model unavailable locally
-    last-commit: 4ee8db7 (tested W01 implementation; this checkpoint changes documentation only)
+    updated-at: 2026-09-29 08:22:41 UTC
+    working-on: W01 user-reported240325cycles; near-tie to C07 240412; no kernel/default changes
+    blocked-on: current raw reports/binary/model binding and W01 numerical verdict not supplied
+    last-commit: b1ee1c6 (preceding handoff; implementation4ee8db7)
     branch: ppu17-wg-scheduling
     workspace: /workspace/flash-attn-ppu17-wg-scheduling-source
 
 Current plan: dev/ppu17/experiments/wg-scheduling/docs/plan.md.
+New observation:87cycles lower (-0.0361879%), useful MFU76.3553% on the
+same40-SM denominator. The registered fewer-cycles condition is numerically
+satisfied;80% was an aspiration and is not reached. Do not invent a new
+threshold or call this noise without a model-resolution contract. Full
+admission remains pending; no default promotion or further kernel edit.
+Native barrier removal and any shift to TMA/GMMA waits need the current
+report. Local /root/perfstatistics.json is still old C03 hash3158e2fa,
+not C07 or W01. Numerical confirmation for Q64 does not admit W01.
 Local final ELF f47d49f3827e7e61c9b43c5c3daa017e879049e09f9efa405695ce40bf6fb746.
 Both C07 disabled-flag bodies unchanged2/2; candidate causal unchanged.
 CUDA static sites2344->2336; pingpong named-barrier sites3->0, data sites7->7,

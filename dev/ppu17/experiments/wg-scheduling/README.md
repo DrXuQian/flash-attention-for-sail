@@ -2,7 +2,30 @@
 
 Branch `ppu17-wg-scheduling`, C07 parent `d19d27a`. One optional scheduling
 policy change, **not** a Q64/tail/cache/exp experiment. No default promotion.
-Native PPU1.7 performance and numerical results are pending.
+Native PPU1.7 has a user-reported cycle result below; numerical and raw-report
+evidence for this run is still pending.
+
+## W01 observation:240325cycles, near-tie rather than the hoped-for gain
+
+On2026-09-29 the user reports240325cycles after the W01 handoff. Relative to
+the earlier reported C07 value240412, this is87cycles less (-0.0361879%),
+or1.000362x. At the same40-SM denominator useful MFU is76.3553%, versus
+76.3276%. The229376cycle/80% aspiration is not reached.
+
+The registered fewer-cycles comparison is numerically satisfied. Do NOT add
+a new minimum-speedup threshold after observing this result, and do not call
+the87cycles measurement noise without the simulator's determinism/resolution
+contract. This is a tiny reported decrease, not evidence of a substantial
+throughput bottleneck removed. No default promotion: CPU O/LSE, binary/model
+identity and native no-new-spill evidence for W01 have not been supplied.
+
+Local CUDA proves that the intended optional barrier sites are removed, not
+that the PPU model executed that lowering. If native removal is confirmed,
+similar total cycles can mean either the optional barriers were not on the
+critical path or their waits moved to TMA/GMMA readiness/completion. Only the
+current report can distinguish these; the old266011cycle C03 report cannot.
+No additional kernel changes, repeats or cache/exp composition follow from
+this observation. Preserve C07 and W01 as separate controls.
 
 Local final validation: **67 PASS /4 SKIP /0 FAIL**. Three skipped Python
 oracle tests need unavailable Torch; the fourth needs the overwritten old
