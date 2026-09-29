@@ -1,0 +1,153 @@
+{
+  "scope": "local CUDA12.8 SM90a control + CPU; native PPU numerics/performance NOT_RUN",
+  "parent": "d19d27a",
+  "source_manifest_sha256": "1198b0d9fe118190c9f78a2ce2533b02107690c44414e28b78f2c2581c374397",
+  "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+  "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+  "executable_sha256": {
+    "pingpong": "425c8d4e41ea725bc74e55c049d2853e7f0e7c69c0d93c9a5b010ebc685b9fb0",
+    "independent": "f47d49f3827e7e61c9b43c5c3daa017e879049e09f9efa405695ce40bf6fb746"
+  },
+  "artifact_sha256": {
+    "control": {
+      "build.json": "796309149a8803e24651860db79b2bc8a9930117e03c8b3f7974cfc70dc1e159",
+      "shipping_fp16_d128.ptx": "9399971bc93b2204c59f45f7d6060959b4708d7e5c16265f077ba3817b076bb0",
+      "executable.sass": "097be49e9337ce3712f38b663c87d96c8b8aa7e6d3b6aacfdc8faa578432904e",
+      "shipping-object.log": "4578f8bfa31ddaf1058f581293beffa4f344318db35c9d826cf39fde8b893c8a"
+    },
+    "candidate": {
+      "build.json": "a74fa2de91d1702803ec53cca7360db86ac6b99ab9c1dd8e3018e7a9e05d74b9",
+      "shipping_fp16_d128.ptx": "4f37ad387e4fffa6d2dd9eb46ff4d0e4b735710c132cf7d25e76dcdedc90bdab",
+      "executable.sass": "d6371927dc4218b08cf9ba3667df72a7def787c758bff86d530e41432a4ae9f0",
+      "shipping-object.log": "6fcd09eca63c601fc3764b284dd093be3f90576b5450457b772f1a7f46453b85"
+    }
+  },
+  "control_native": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 13,
+    "exp2_after_wait0": 53,
+    "wait_pcs": [
+      "0x15f0",
+      "0x3900",
+      "0x40b0",
+      "0x59a0"
+    ],
+    "matrix_sites": {
+      "64x128x16": 32
+    },
+    "static_instructions": 2344,
+    "local_sites": {
+      "STL": 3,
+      "LDL": 3
+    },
+    "old_P_words": 32,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "candidate_codegen": {
+    "native_cuda": {
+      "layer": "NVIDIA-SASS/compile-control",
+      "exp2_before_wait0": 23,
+      "exp2_after_wait0": 43,
+      "wait_pcs": [
+        "0x16a0",
+        "0x3910",
+        "0x4390",
+        "0x5980"
+      ],
+      "matrix_sites": {
+        "64x128x16": 32
+      },
+      "static_instructions": 2336,
+      "local_sites": {
+        "STL": 3,
+        "LDL": 3
+      },
+      "old_P_words": 32,
+      "live_O_words": 64,
+      "early_old_P_or_O_writes": 0
+    },
+    "ptx": {
+      "layer": "PTX/source",
+      "waits": [
+        1504,
+        3418,
+        3843,
+        4772
+      ],
+      "exp2_before_wait0": 66,
+      "exp2_after_wait0": 0,
+      "matrix_sites": {
+        "m64n128k16": 32
+      }
+    },
+    "data_barrier_sites": {
+      "BAR.SYNC.DEFER_BLOCKING 0x0 ;": 1,
+      "BAR.ARV 0x8, 0x120 ;": 2,
+      "BAR.SYNC.DEFER_BLOCKING 0x8, 0x120 ;": 1,
+      "BAR.SYNC.DEFER_BLOCKING 0x1, 0x100 ;": 1,
+      "BAR.ARV 0x1, 0x120 ;": 1,
+      "BAR.SYNC.DEFER_BLOCKING 0x1, 0x120 ;": 1
+    }
+  },
+  "resources": {
+    "_ZN7cutlass13device_kernelIN5flash20enable_sm90_or_laterINS1_16FlashAttnFwdSm90INS1_25CollectiveMainloopFwdSm90ILi2EN4cute5tupleIJNS5_1CILi1EEES8_S8_EEENS6_IJNS7_ILi128EEESA_SA_EEELi128ENS_6half_tEfNS_4arch4Sm90ELb0ELb0ELb0ELb0ELb0ELb0ELb0ELb1ELb1ELb0ELb0ELb0EEENS1_21CollectiveEpilogueFwdISB_S9_SC_SE_Li256ELb0ELb0ELb0ELb0ELb0ENS1_9QsaConfigEEENS1_29StaticPersistentTileSchedulerILb0EEEEEEEEEvNT_6ParamsE": {
+      "stack_bytes": 8,
+      "spill_store_bytes": 12,
+      "spill_load_bytes": 12,
+      "registers": 168
+    },
+    "_ZN7cutlass13device_kernelIN5flash20enable_sm90_or_laterINS1_16FlashAttnFwdSm90INS1_25CollectiveMainloopFwdSm90ILi2EN4cute5tupleIJNS5_1CILi1EEES8_S8_EEENS6_IJNS7_ILi128EEESA_SA_EEELi128ENS_6half_tEfNS_4arch4Sm90ELb1ELb0ELb0ELb0ELb0ELb0ELb0ELb1ELb1ELb0ELb0ELb0EEENS1_21CollectiveEpilogueFwdISB_S9_SC_SE_Li256ELb0ELb0ELb0ELb0ELb0ENS1_9QsaConfigEEENS1_30DynamicPersistentTileSchedulerILi256ELi32ELb0ELb0ELb1EEEEEEEEEvNT_6ParamsE": {
+      "stack_bytes": 0,
+      "spill_store_bytes": 0,
+      "spill_load_bytes": 0,
+      "registers": 168
+    }
+  },
+  "removed_pingpong_sites": {
+    "@!P0 BAR.ARV 0x9, 0x100 ;": 1,
+    "BAR.SYNC.DEFER_BLOCKING R9, 0x100 ;": 1,
+    "BAR.ARV R9, 0x100 ;": 1
+  },
+  "default_encoded_bodies_unchanged": "2/2",
+  "causal_body_unchanged": true,
+  "fixed_source": [
+    "hopper/softmax.h",
+    "hopper/epilogue_fwd.hpp",
+    "hopper/flash_fwd_kernel_sm90.h",
+    "hopper/flash_fwd_launch_template.h",
+    "hopper/tile_scheduler.hpp",
+    "hopper/tile_size.h",
+    "hopper/sm90_pipeline_no_cluster.hpp"
+  ],
+  "actual_policy": {
+    "control": "[WG policy] PASS independent=0 math_threads=256 producer_threads=32 CTA_threads=384 QueryEmpty=288 KV_release_arrivals=2 shared_bytes=166912 KV_wait_WG0=1 KV_wait_WG1=0 device=NOT_RUN",
+    "independent": "[WG policy] PASS independent=1 math_threads=256 producer_threads=32 CTA_threads=384 QueryEmpty=288 KV_release_arrivals=2 shared_bytes=166912 KV_wait_WG0=1 KV_wait_WG1=1 device=NOT_RUN",
+    "leader-only-negative": "EXPECTED_RED: actual WG1 readiness assertion"
+  },
+  "codegen_negatives": [
+    "missing-matrix",
+    "missing-wait",
+    "missing-query-barrier",
+    "pingpong-restored"
+  ],
+  "validation_sources_sha256": {
+    "dev/ppu17/experiments/wg-scheduling/validate.py": "5b156f314660554ddeee453631945f676d00ad32a44bc9cccf87a12659b032be",
+    "dev/ppu17/experiments/wg-scheduling/policy.cu": "d6df1baf4b24a4e4492925db37c18b4185db38417478b8bff267195d49943079",
+    "tests/test_ppu17_wg_scheduling.py": "5cb70d19f9c23463ec0426013c39f7ea586d707072ab155d3d50ce62888037b3"
+  },
+  "local_tests": {
+    "pass": 67,
+    "skip": 4,
+    "fail": 0,
+    "skip_reasons": [
+      "Torch unavailable; independent standalone C++ CPU oracle is tested separately",
+      "Torch unavailable; independent standalone C++ CPU oracle is tested separately",
+      "Torch unavailable; independent standalone C++ CPU oracle is tested separately",
+      "PPU baseline report not supplied"
+    ]
+  },
+  "device_numerics": "NOT_RUN",
+  "performance": "NOT_RUN",
+  "default_promotion": false
+}

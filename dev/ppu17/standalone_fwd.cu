@@ -6,6 +6,7 @@
 #include "flash.h"
 #include "tile_size.h"
 #include "ppu17_cutlass_compat.h"
+#include "ppu17_wg_scheduling.h"
 #include "standalone_reference.hpp"
 
 #include <cstdlib>
@@ -96,6 +97,7 @@ void describe() {
               << ",\"batch_stride_elements\":" << p.q_batch_stride << ",\"num_splits\":" << p.num_splits
               << ",\"logical_flops\":" << UINT64_C(4) * kShape.heads * kShape.seqlen * kShape.seqlen * kShape.dim
               << ",\"softmax_overlap\":\"" << kOverlapVariant << "\""
+              << ",\"wg_scheduling\":\"" << (flash::kPpu17IndependentWG ? "independent" : "pingpong") << "\""
               << ",\"backend\":\"" << FLASHATTN_PPU17_BACKEND_ID << "\",\"source_sha256\":\""
               << FA17_BUILD_SOURCE_SHA256 << "\"}\n";
 }

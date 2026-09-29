@@ -23,6 +23,7 @@
 #include "rotary.h"
 #include "utils.h"
 #include "sm90_pipeline_no_cluster.hpp"
+#include "ppu17_wg_scheduling.h"
 
 #if defined(FLASHATTN_PPU17_SOFTMAX_OVERLAP)
 #if !defined(FLASHATTN_PPU17) || (FLASHATTN_PPU17_SOFTMAX_OVERLAP != 0 && FLASHATTN_PPU17_SOFTMAX_OVERLAP != 1)
@@ -368,11 +369,24 @@ struct CollectiveMainloopFwdSm90 {
     };
     using TensorStorage = std::conditional_t<KeepSoftmaxOverlap, TensorStorageWithSoftmaxOverlap, TensorStorageBase>;
 
-    // These are tuned for speed. They don't affect correctness.
-    static constexpr bool UseSchedulerBarrier = (IntraWGOverlap
+    // These are tuned for speed. They don't affect correctness provided that
+    // each WG checks K/V readiness when the alternating-issue barrier is off.
+    // Keep all other specializations (including causal and BF16) unchanged.
+    static constexpr bool IndependentWarpGroups = kPpu17IndependentWG
+        && cute::is_same_v<Element, cutlass::half_t>
+        && kBlockM == 128 && kBlockN == 128 && kHeadDim == 128 && kHeadDimV == 128
+        && kStages == 2 && CUTE_STATIC_V(size(ClusterShape{})) == 1
+        && !Is_causal && !Is_local && !Has_softcap && !Varlen && !PagedKVNonTMA
+        && !AppendKV && !HasQv && !PackGQA && !Split && !V_colmajor
+        && MmaPV_is_RS && IntraWGOverlap;
+    static constexpr bool UseSchedulerBarrier = !IndependentWarpGroups && (IntraWGOverlap
         ? (NumMmaWarpGroups >= 2) && (!Is_FP8 ? kHeadDim <= 128 : kHeadDim >= 128)
         : NumMmaWarpGroups == 2)
         && !LargeHeadDimV;
+    CUTLASS_HOST_DEVICE
+    static constexpr bool requires_kv_wait(int warp_group_idx) {
+        return !UseSchedulerBarrier || warp_group_idx == 0;
+    }
     static constexpr bool RescaleOBeforeGemm = kHeadDim > 128 && (!Is_FP8 || V_colmajor) && IntraWGOverlap;
 
     // Host side kernel arguments
@@ -1192,12 +1206,12 @@ struct CollectiveMainloopFwdSm90 {
                 PipelineState smem_pipe_read_v(smem_pipe_read.index(), smem_pipe_read.phase(), smem_pipe_read.count());
                 ++smem_pipe_read;
                 Tensor tSrS = partition_fragment_C(tiled_mma_qk, select<0, 1>(TileShape_MNK{}));
-                if (!UseSchedulerBarrier || warp_group_idx == 0) { consumer_wait(pipeline_k, smem_pipe_read); }
+                if (requires_kv_wait(warp_group_idx)) { consumer_wait(pipeline_k, smem_pipe_read); }
                 warp_scheduler_barrier_sync();
                 flash::gemm</*zero_init=*/true, /*wg_wait=*/-1>(tiled_mma_qk, tSrQ, tSrK(_, _, _, smem_pipe_read.index()), tSrS);
                 if constexpr (RescaleOBeforeGemm) { softmax.rescale_o(tOrO, scores_scale); }
                 if constexpr(!HasQv) {
-                    if (!UseSchedulerBarrier || warp_group_idx == 0) { consumer_wait(pipeline_v, smem_pipe_read_v); }
+                    if (requires_kv_wait(warp_group_idx)) { consumer_wait(pipeline_v, smem_pipe_read_v); }
                 }
                 flash::gemm</*zero_init=*/false, /*wg_wait=*/-1>(tiled_mma_pv, cute::conditional_return<MmaPV_is_RS>(tOrP, tOsP), tOrV(_, _, _, smem_pipe_read_v.index()), tOrO);
                 warp_scheduler_barrier_arrive();

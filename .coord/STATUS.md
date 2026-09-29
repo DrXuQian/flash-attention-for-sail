@@ -1,5 +1,31 @@
 # PPU1.7 Hopper source integration
 
+    updated-at: 2026-09-29 07:23:06 UTC
+    working-on: W01 local complete:67 PASS/4 SKIP/0 FAIL; exact body built and single-call handoff ready
+    blocked-on: native PPU1.7 SDK/model unavailable locally
+    last-commit: d19d27a (C07 parent)
+    branch: ppu17-wg-scheduling
+    workspace: /workspace/flash-attn-ppu17-wg-scheduling-source
+
+Current plan: dev/ppu17/experiments/wg-scheduling/docs/plan.md.
+Local final ELF f47d49f3827e7e61c9b43c5c3daa017e879049e09f9efa405695ce40bf6fb746.
+Both C07 disabled-flag bodies unchanged2/2; candidate causal unchanged.
+CUDA static sites2344->2336; pingpong named-barrier sites3->0, data sites7->7,
+GMMA wait sites4->4, matrix sites32->32. CUDA168regs/8stack/12+12spill fixed.
+WG1 leader-only readiness mutation fails the actual collective assertion;
+omitted MMA/wait/QueryEmpty and restored-pingpong codegen negatives all red.
+Full final suite67PASS/4SKIP/0FAIL:3Torch unavailable,1overwritten old raw
+baseline report unavailable. Standalone C++ CPU oracle/self-tests pass.
+No GPU or simulator executed locally; no native PPU performance claim.
+Evidence and direct build/application commands:
+dev/ppu17/experiments/wg-scheduling/README.md and results.json.
+Disable only optional math-WG pingpong. Preserve all data readiness and
+operand retirement, grid40, two math WGs, Q128/KV128 and original exp.
+Q64 is not part of this branch: user reports402013cycles and confirms correct;
+it loses to C07's240412cycles and is not promoted. Reports remain unbound.
+
+## Previous checkpoint
+
     updated-at: 2026-09-29 03:24:06 UTC
     working-on: C07 KV128 committed, single-invocation simulation handoff ready
     blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
