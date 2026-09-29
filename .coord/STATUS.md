@@ -1,9 +1,9 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 05:22:20 UTC
-    working-on: tail experiment local complete:68 PASS/4 SKIP/0 FAIL; T01 single-invocation handoff ready
-    blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
-    last-commit: 7e41b5de4726ce36e5b30428331946734b86562f (tested implementation; subsequent checkpoint is documentation/archive formatting only)
+    updated-at: 2026-09-29 05:49:31 UTC
+    working-on: T01 user-reported402013cycles; do not promote (+67.22% versus reported C07); no kernel changes
+    blocked-on: current command/binary/model/report identities and CPU O/LSE result not supplied; native PPU1.7 model unavailable locally
+    last-commit: 6490d3e (preceding committed checkpoint; implementation7e41b5d)
     branch: ppu17-tail-qsplit
     workspace: /workspace/flash-attn-ppu17-tail-qsplit-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
@@ -11,6 +11,15 @@
 
 Current experiment: dev/ppu17/experiments/tail-qsplit/docs/plan.md.
 User requires tail and exp optimization independently. Exp/softmax untouched.
+User now reports402013cycles after the T01 handoff:161601more than C07,
++67.22%; candidate must not be promoted. Attribution to T01 is provisional
+until command/report identities arrive. Numerical verdict not supplied.
+The initial report of a long run is not proof of deadlock. Source audit finds
+bounded task loops (at most23 per CTA), QueryEmpty160=128math+32producer,
+and no two-math-WG scheduler barrier in the one-WG specialization. These
+checks do not establish native PPU liveness or explain the slowdown.
+Q128 has two math WGs; Q64 has one and doubles KV task fills. This is not a
+clean tail-only change or evidence against a separate cache experiment.
 C07 user reports240412cycles; full report/CPU result/identity not yet uploaded.
 Actual `/root/perfstatistics.json` is still the old266011cycle C03 loser.
 T01 final ELF24dc2a0e: actual M64 collective,255regs/0stack/0spill on CUDA.
@@ -22,7 +31,8 @@ M64 is a scaling control with doubled K/V task fills, not a claimed speedup.
 Complete final tier68PASS/4SKIP/0FAIL (3missing Torch;1old raw report missing).
 Default encoded bodies2/2 unchanged; opt-in causal unchanged; actual7340032
 output cells exact-once for each inventory and5plants per inventory red.
-No device or model execution. Final replay/results and single-call commands:
+No local device or model execution; reported cycles are user evidence only.
+Final replay/results and single-call commands:
 dev/ppu17/experiments/tail-qsplit/README.md.
 
 Previous experiment: dev/ppu17/experiments/kv128/docs/plan.md.

@@ -3,6 +3,25 @@
 Branch `ppu17-tail-qsplit`, parent `d19d27a`. No exp, softmax, mainloop or
 epilogue arithmetic changes. **No performance winner/default promotion yet.**
 
+## User-reported T01 result — do not promote
+
+On 2026-09-29 the user reported **402013 cycles** after the Q64 handoff,
+versus the earlier C07 report of **240412 cycles**: +161601 cycles / +67.22%.
+This is a user-message observation, provisionally attributed to T01; the
+command, binary/model identities, full report and CPU O/LSE verdict have not
+been supplied. It is sufficient to withhold this candidate, not to certify
+numerics or assign a measured stall cause. Keep C07 as the comparison path;
+neither experiment has been promoted to the default.
+
+With the same40-SM denominator, the reported cycles imply45.65% useful MFU
+versus76.33%. T01 changes more than tail balance: Q tasks448->896, math
+warpgroups per CTA2->1, and K/V task fills double. Q128 already uses two
+warpgroups for its two64-row pieces; one Q64 task is not guaranteed to take
+half as long. These source facts give mechanisms to investigate, not a
+quantitative attribution of the161601 extra cycles. Do not diagnose cache
+misses, exp cost or a barrier deadlock from the cycle number alone. No further
+cache or exp changes are composed with this losing candidate.
+
 The mixed440-full +16-half implementation was compiled, not merely modeled,
 and rejected by the registered resource gate: CUDA spill12->32B in each
 direction, stack8->16B. Its live kernel/launcher changes have been removed;
@@ -29,7 +48,7 @@ whether64-row work is sufficiently cheap before retrying mixed granularity.
 | CUDA registers / stack / spill stores / loads |168/8/12/12|255/0/0/0|
 | Static CUDA instruction sites |2344|2264|
 | Matrix instruction shape / math |m64n128k16|unchanged|
-| PPU cycles |240412, user-reported only|NOT_RUN|
+| PPU cycles |240412, user-reported only|402013, user-reported; T01 identity pending|
 
 255regs/thread is not a reduction from168. The CTA has fewer threads, and
 the role budgets differ. Do not infer extra resident CTAs from these numbers.
@@ -104,4 +123,6 @@ Local artifact root: `/workspace/fa17-tail-qsplit-20260929`. The validated
 executable is `t01-final/flash_attn_ppu17_s1024_fp16`. Local replay is
 `validate.py --help`; [results.json](results.json) binds source/backend/ELF and
 the complete suite's PASS/SKIP/FAIL counts. Rejected source is preserved, not
-left in an active collective. Native PPU numerics/performance remain NOT_RUN.
+left in an active collective. Native PPU numerics remain unverified;
+performance now has the unbound user-message observation above, not a locally
+replayed or fully identity-bound result.
