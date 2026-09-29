@@ -61,6 +61,8 @@ class StandaloneContracts(unittest.TestCase):
                         batch_stride_elements=7340032, num_splits=1, logical_flops=30064771072)
         build_record = json.loads((Path(exe).parent / "build.json").read_text())
         expected["tile_n"] = build_record.get("kv_tile", 176)
+        if build_record.get("q_tail_mode") == "m64":
+            expected["tile_m"] = 64
         self.assertIn(expected["tile_n"], (128, 176))
         self.assertEqual({key: record[key] for key in expected}, expected)
         self.assertIn("device=NOT_RUN", subprocess.check_output([exe, "--host-self-test"], text=True))

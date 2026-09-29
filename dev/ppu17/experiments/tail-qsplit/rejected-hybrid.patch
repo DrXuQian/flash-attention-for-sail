@@ -1,0 +1,569 @@
+diff --git a/dev/ppu17/standalone_fwd.cu b/dev/ppu17/standalone_fwd.cu
+index d6fad02..7507aea 100644
+--- a/dev/ppu17/standalone_fwd.cu
++++ b/dev/ppu17/standalone_fwd.cu
+@@ -28,6 +28,11 @@ constexpr char kOverlapVariant[] = "row-sum-token";
+ #else
+ constexpr char kOverlapVariant[] = "control";
+ #endif
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE)
++constexpr const char* kTailVariant = FLASHATTN_PPU17_Q_TAIL_MODE == 1 ? "m64" : "hybrid";
++#else
++constexpr char kTailVariant[] = "control";
++#endif
+ 
+ void check(cudaError_t status, char const* operation) {
+     if (status != cudaSuccess)
+@@ -96,6 +101,7 @@ void describe() {
+               << ",\"batch_stride_elements\":" << p.q_batch_stride << ",\"num_splits\":" << p.num_splits
+               << ",\"logical_flops\":" << UINT64_C(4) * kShape.heads * kShape.seqlen * kShape.seqlen * kShape.dim
+               << ",\"softmax_overlap\":\"" << kOverlapVariant << "\""
++              << ",\"q_tail_mode\":\"" << kTailVariant << "\""
+               << ",\"backend\":\"" << FLASHATTN_PPU17_BACKEND_ID << "\",\"source_sha256\":\""
+               << FA17_BUILD_SOURCE_SHA256 << "\"}\n";
+ }
+diff --git a/hopper/flash_fwd_kernel_sm90.h b/hopper/flash_fwd_kernel_sm90.h
+index dc15b2d..d4b9112 100644
+--- a/hopper/flash_fwd_kernel_sm90.h
++++ b/hopper/flash_fwd_kernel_sm90.h
+@@ -182,10 +182,15 @@ public:
+         return dim3(MaxThreadsPerBlock, 1, 1);
+     }
+ 
++    template<int InitializationThreads = 0>
+     CUTLASS_DEVICE
+     void
+     operator()(Params const& params, char* smem_buf) {
+ 
++        static_assert(InitializationThreads == 0 ||
++                      InitializationThreads == MaxThreadsPerBlock,
++                      "initialization cohort must equal the real collective CTA");
++
+         static constexpr int NumMmaThreads = NumMmaWarpGroups * cutlass::NumThreadsPerWarpGroup;
+         static constexpr int MmaThreadOffset = NumLoadWarpGroups * cutlass::NumThreadsPerWarpGroup;
+         static constexpr int kBlockM = get<0>(TileShape_MNK_PV{});
+@@ -307,6 +312,11 @@ public:
+         if constexpr (size(ClusterShape{}) > 1) {
+             cute::cluster_arrive_relaxed();
+             cute::cluster_wait();
++        } else if constexpr (InitializationThreads != 0) {
++            // A smaller collective may run after a larger CTA has drained.
++            // Count its participants explicitly; inactive warpgroups do not
++            // arrive at this phase's initialization barrier.
++            asm volatile("bar.sync 0, %0;" :: "n"(InitializationThreads) : "memory");
+         } else {
+             __syncthreads();
+         }
+diff --git a/hopper/flash_fwd_launch_template.h b/hopper/flash_fwd_launch_template.h
+index 6683de7..038db4d 100644
+--- a/hopper/flash_fwd_launch_template.h
++++ b/hopper/flash_fwd_launch_template.h
+@@ -35,6 +35,9 @@
+ #include "mainloop_fwd_sm80.hpp"
+ #endif
+ #include "epilogue_fwd.hpp"
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 2
++#include "ppu17_tail_qsplit.hpp"
++#endif
+ 
+ using namespace cute;
+ 
+@@ -159,7 +162,17 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+     static constexpr bool UsePersistentScheduler = Arch >= 90 ? !(Split && !Varlen) : ((Is_causal && !Varlen) || (Varlen && Split));
+     using Scheduler = std::conditional_t<!UsePersistentScheduler, SchedulerSingleTile, SchedulerPersistent>;
+ #if defined(FLASHATTN_PPU17)
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 2
++    static constexpr bool TailQSplit = !Is_causal && !Is_local && !Has_softcap &&
++        !Varlen && !PagedKVNonTMA && !AppendKV && !HasQv && !PackGQA && !Split &&
++        !V_colmajor && kHeadDim == 128 && kHeadDimV == 128 && ClusterM == 1 &&
++        std::is_same_v<Element, cutlass::half_t>;
++    using AttnKernel = flash::enable_sm90_or_later<std::conditional_t<TailQSplit,
++        flash::Ppu17TailQSplitKernel<CollectiveMainloop, CollectiveEpilogue, Scheduler>,
++        flash::FlashAttnFwdSm90<CollectiveMainloop, CollectiveEpilogue, Scheduler>>>;
++#else
+     using AttnKernel = flash::enable_sm90_or_later<flash::FlashAttnFwdSm90<CollectiveMainloop, CollectiveEpilogue, Scheduler>>;
++#endif
+ #else
+     using AttnKernel = std::conditional_t<
+         Arch >= 90,
+@@ -201,7 +214,10 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+             make_stride(params.vnew_row_stride, _1{}, params.vnew_head_stride, !is_varlen_k_new ? params.vnew_batch_stride : 0),
+             make_stride(_1{}, params.v_dim_stride, params.vnew_head_stride, !is_varlen_k_new ? params.vnew_batch_stride : 0));
+ #endif
+-    typename CollectiveMainloop::Arguments mainloop_args {
++    // One field authority for both real tile geometries in the tail experiment.
++    auto make_mainloop_args = [&](auto* collective) {
++    using Mainloop = std::remove_pointer_t<decltype(collective)>;
++    return typename Mainloop::Arguments {
+         static_cast<Element const*>(params.q_ptr),
+         {seqlen_q, params.d, params.h, batch_q},  // shape_Q
+         {params.q_row_stride, _1{}, params.q_head_stride, !is_varlen_q ? params.q_batch_stride : 0},  // stride_Q
+@@ -257,8 +273,12 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+         , static_cast<ElementS const*>(params.s_aux_ptr)
+ #endif
+     };
++    };
++    auto mainloop_args = make_mainloop_args(static_cast<CollectiveMainloop*>(nullptr));
+ 
+-    typename CollectiveEpilogue::Arguments epilogue_args {
++    auto make_epilogue_args = [&](auto* collective) {
++    using Epilogue = std::remove_pointer_t<decltype(collective)>;
++    return typename Epilogue::Arguments {
+         static_cast<ElementOut*>(params.o_ptr),
+         {seqlen_q, params.dv, params.h, batch_q, params.num_splits},  // shape_O
+         {params.o_row_stride, _1{}, params.o_head_stride, !is_varlen_q ? params.o_batch_stride : 0, 0}, // stride_O
+@@ -271,6 +291,8 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+         params.h_k,
+         params.cu_seqlens_q, params.seqused_q
+     };
++    };
++    auto epilogue_args = make_epilogue_args(static_cast<CollectiveEpilogue*>(nullptr));
+ 
+     int qhead_per_khead = !PackGQA ? 1 : cutlass::ceil_div(params.h, params.h_k);
+ #ifdef USE_PPU
+@@ -279,11 +301,12 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+     int num_blocks_m = cutlass::ceil_div(params.seqlen_q * qhead_per_khead, get<0>(TileShape_MNK{}));
+ #endif
+     num_blocks_m = cutlass::round_up(num_blocks_m, size<0>(ClusterShape{}));
+-    typename flash::TileSchedulerArguments scheduler_args {
++    auto make_scheduler_args = [&](int blocks_m) {
++    return flash::TileSchedulerArguments {
+ #ifdef USE_PPU
+         params.is_varlen_q /* varlen_q */, params.total_q / params.b < 0.5 * params.seqlen_q /* extreme_varlen_q */,
+ #endif
+-        num_blocks_m, !PackGQA ? params.h : params.h_k, params.b, params.num_splits,
++        blocks_m, !PackGQA ? params.h : params.h_k, params.b, params.num_splits,
+         params.h / params.h_k,
+         params.seqlen_q,
+         params.seqlen_k, params.d, params.dv, sizeof(Element),
+@@ -291,6 +314,8 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+         // params.num_m_blocks_ptr,
+         params.num_splits_dynamic_ptr,
+     };
++    };
++    auto scheduler_args = make_scheduler_args(num_blocks_m);
+ 
+     if (Varlen && params.num_splits_dynamic_ptr && !params.skip_scheduler_metadata_computation) {
+         prepare_varlen_num_blocks(params, stream, PackGQA, kBlockM, kBlockN, Arch >= 90 /*enable_pdl*/);
+@@ -299,9 +324,22 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
+ 
+     int device;
+     CHECK_CUDA(flash::runtime::get_device(&device));
+-    typename AttnKernel::Params kernel_params = AttnKernel::to_underlying_arguments({
+-        mainloop_args, epilogue_args, {device, params.num_sm}, scheduler_args
+-    });
++    typename AttnKernel::Params kernel_params = [&] {
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 2
++        if constexpr (TailQSplit) {
++            const auto half_scheduler_args = make_scheduler_args(flash::Ppu17TailQSplitPlan::HalfBlocksPerHead);
++            return AttnKernel::to_underlying_arguments({
++                {mainloop_args, epilogue_args, {device, params.num_sm}, scheduler_args},
++                {make_mainloop_args(static_cast<typename AttnKernel::HalfMainloop*>(nullptr)),
++                 make_epilogue_args(static_cast<typename AttnKernel::HalfEpilogue*>(nullptr)),
++                 {device, params.num_sm}, half_scheduler_args}});
++        } else
++#endif
++        {
++            return AttnKernel::to_underlying_arguments({
++                mainloop_args, epilogue_args, {device, params.num_sm}, scheduler_args});
++        }
++    }();
+ 
+     dim3 grid_dims = AttnKernel::get_grid_shape(kernel_params);
+     dim3 block_dims = AttnKernel::get_block_shape();
+diff --git a/hopper/tile_scheduler.hpp b/hopper/tile_scheduler.hpp
+index 3973fc7..e9e5cbf 100644
+--- a/hopper/tile_scheduler.hpp
++++ b/hopper/tile_scheduler.hpp
+@@ -356,13 +356,13 @@ public:
+     struct WorkTileInfo {
+         int tile_idx;
+ 
+-        CUTLASS_DEVICE
++        CUTLASS_HOST_DEVICE
+         bool
+         is_valid(Params const& params) const {
+             return tile_idx < params.total_blocks;
+         }
+ 
+-        CUTLASS_DEVICE
++        CUTLASS_HOST_DEVICE
+         cute::tuple<int32_t, int32_t, int32_t, int32_t>
+         get_block_coord(Params const& params) const {
+             int block, bidh, bidb;
+diff --git a/hopper/tile_size.h b/hopper/tile_size.h
+index 35c87c7..59c6b0e 100644
+--- a/hopper/tile_size.h
++++ b/hopper/tile_size.h
+@@ -7,6 +7,15 @@
+ 
+ #include <tuple>
+ 
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE)
++#if !defined(FLASHATTN_PPU17) || !defined(FLASHATTN_PPU17_KV_TILE128) || !FLASHATTN_PPU17_KV_TILE128
++#error "Q-tail experiment requires explicit PPU1.7 and KV128"
++#endif
++#if FLASHATTN_PPU17_Q_TAIL_MODE != 1 && FLASHATTN_PPU17_Q_TAIL_MODE != 2
++#error "Q-tail mode must be1 (uniform M64 preflight) or2 (hybrid tail)"
++#endif
++#endif
++
+ #if defined(FLASHATTN_PPU17_KV_TILE128)
+ #if !defined(FLASHATTN_PPU17) || (FLASHATTN_PPU17_KV_TILE128 != 0 && FLASHATTN_PPU17_KV_TILE128 != 1)
+ #error "FLASHATTN_PPU17_KV_TILE128 requires explicit PPU1.7 and a value of 0 or 1"
+@@ -45,6 +54,9 @@ constexpr std::tuple<int, int, bool, bool> tile_size_fwd_sm90(
+             // unchanged, including causal, local, paged and unequal Dv.
+             if (headdim == 128 && headdim_v == 128 && !is_causal && !is_local
+                 && !v_colmajor && !paged_kv_non_TMA && !softcap) {
++#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 1
++                return {64, 128, true, true};
++#endif
+                 return {128, 128, true, true};
+             }
+ #endif
+diff --git a/tests/test_ppu17_standalone.py b/tests/test_ppu17_standalone.py
+index 5759bb3..fca3061 100644
+--- a/tests/test_ppu17_standalone.py
++++ b/tests/test_ppu17_standalone.py
+@@ -61,6 +61,8 @@ class StandaloneContracts(unittest.TestCase):
+                         batch_stride_elements=7340032, num_splits=1, logical_flops=30064771072)
+         build_record = json.loads((Path(exe).parent / "build.json").read_text())
+         expected["tile_n"] = build_record.get("kv_tile", 176)
++        if build_record.get("q_tail_mode") == "m64":
++            expected["tile_m"] = 64
+         self.assertIn(expected["tile_n"], (128, 176))
+         self.assertEqual({key: record[key] for key in expected}, expected)
+         self.assertIn("device=NOT_RUN", subprocess.check_output([exe, "--host-self-test"], text=True))
+diff --git a/tools/build_ppu17_standalone.py b/tools/build_ppu17_standalone.py
+index a1ea5c0..2be42d0 100644
+--- a/tools/build_ppu17_standalone.py
++++ b/tools/build_ppu17_standalone.py
+@@ -48,9 +48,13 @@ def main():
+                         help="opt-in PPU1.7 S1024 softmax/PV overlap experiment; default is unchanged control")
+     parser.add_argument("--kv-tile128", action="store_true",
+                         help="opt-in C07 KV tile128; original softmax and pipeline, no forced overlap")
++    parser.add_argument("--q-tail-mode", choices=("m64", "hybrid"),
++                        help="separate Q-tail experiment; requires --kv-tile128, unchanged exp")
+     args = parser.parse_args()
+     if args.kv_tile128 and args.softmax_overlap:
+         parser.error("KV tile experiment must not be composed with forced softmax overlap")
++    if args.q_tail_mode and not args.kv_tile128:
++        parser.error("Q-tail experiment requires --kv-tile128")
+     print(f"[FA17 standalone build] validating CUTLASS root: {args.cutlass}", flush=True)
+     backend = build.cutlass_root(args.cutlass)
+     cuda = Path(args.cuda_home).resolve()
+@@ -72,6 +76,8 @@ def main():
+         flags += ["-DFLASHATTN_PPU17_SOFTMAX_OVERLAP=1"]
+     if args.kv_tile128:
+         flags += ["-DFLASHATTN_PPU17_KV_TILE128=1"]
++    if args.q_tail_mode:
++        flags += [f"-DFLASHATTN_PPU17_Q_TAIL_MODE={1 if args.q_tail_mode == 'm64' else 2}"]
+     exe = out / "flash_attn_ppu17_s1024_fp16"
+     generated, app = out / "shipping_fp16_d128.o", out / "standalone.o"
+     ptx = out / "shipping_fp16_d128.ptx"
+@@ -122,6 +128,7 @@ def main():
+         "device_numerics": "NOT_RUN", "performance": "NOT_RUN",
+         "softmax_overlap": "row-sum-token" if args.softmax_overlap else "control",
+         "kv_tile": 128 if args.kv_tile128 else 176,
++        "q_tail_mode": args.q_tail_mode or "control",
+     }
+     (out / "build.json").write_text(json.dumps(record, indent=2) + "\n")
+     print(f"[FA17 standalone build] PASS: {exe}\nsha256={record['sha256']}\n"
+diff --git a/hopper/ppu17_tail_qsplit.hpp b/hopper/ppu17_tail_qsplit.hpp
+new file mode 100644
+--- /dev/null
++++ b/hopper/ppu17_tail_qsplit.hpp
+@@ -0,0 +1,130 @@
++#pragma once
++
++#include <cstddef>
++#include <stdexcept>
++#include <type_traits>
++#include "ppu17_tail_qsplit_plan.hpp"
++#include "tile_scheduler.hpp"
++#include "flash_fwd_kernel_sm90.h"
++#include "mainloop_fwd_sm90_tma_gmma_ws.hpp"
++#include "epilogue_fwd.hpp"
++
++namespace flash {
++
++// Same real divmod/coordinate implementation as the prefix, but each tail
++// worker owns exactly one half. No atomic queue or cross-CTA synchronization.
++struct Ppu17TailHalfScheduler : StaticPersistentTileScheduler<false> {
++    using Base = StaticPersistentTileScheduler<false>;
++    using Base::Base;
++    template<bool IsProducerWarp = false>
++    CUTLASS_DEVICE WorkTileInfo get_initial_work(Params const&) const {
++        return {Ppu17TailQSplitPlan::HalfStart + int(blockIdx.x)};
++    }
++    template<bool IsProducerWarp = false>
++    CUTLASS_DEVICE WorkTileInfo get_next_work(Params const& p, WorkTileInfo const&) const {
++        return {p.total_blocks};
++    }
++};
++
++template<class FullMainloop, class FullEpilogue, class Scheduler>
++struct Ppu17TailQSplitKernel {
++    using Plan = Ppu17TailQSplitPlan;
++    using ClusterShape = cute::Shape<cute::_1, cute::_1, cute::_1>;
++    using FullShape = cute::Shape<cute::_128, cute::_128, cute::_128>;
++    using HalfShape = cute::Shape<cute::_64, cute::_128, cute::_128>;
++    template<class Shape>
++    using Mainloop = CollectiveMainloopFwdSm90<2, ClusterShape, Shape, 128,
++        cutlass::half_t, float, cutlass::arch::Sm90,
++        false, false, false, false, false, false, false, true, true, false, false, false>;
++    using HalfMainloop = Mainloop<HalfShape>;
++    using HalfEpilogue = CollectiveEpilogueFwd<HalfShape, ClusterShape,
++        cutlass::half_t, cutlass::arch::Sm90, HalfMainloop::NumMmaThreads,
++        false, false, false, false>;
++    using ExpectedEpilogue = CollectiveEpilogueFwd<FullShape, ClusterShape,
++        cutlass::half_t, cutlass::arch::Sm90, FullMainloop::NumMmaThreads,
++        false, false, false, false>;
++    static_assert(std::is_same_v<FullMainloop, Mainloop<FullShape>>,
++                  "tail experiment requires the exact C07 collective");
++    static_assert(std::is_same_v<FullEpilogue, ExpectedEpilogue>);
++    static_assert(std::is_same_v<Scheduler, StaticPersistentTileScheduler<false>>);
++    using FullKernel = FlashAttnFwdSm90<FullMainloop, FullEpilogue, Scheduler>;
++    using HalfKernel = FlashAttnFwdSm90<HalfMainloop, HalfEpilogue, Ppu17TailHalfScheduler>;
++    using ArchTag = typename FullKernel::ArchTag;
++    static constexpr int MaxThreadsPerBlock = FullKernel::MaxThreadsPerBlock;
++    static constexpr int MinBlocksPerMultiprocessor = FullKernel::MinBlocksPerMultiprocessor;
++    static constexpr int SharedStorageSize = FullKernel::SharedStorageSize;
++    static constexpr int FullQueryEmptyCount = FullMainloop::NumMmaThreadsQK +
++                                               FullMainloop::NumProducerThreads;
++    static_assert(FullQueryEmptyCount == 288 && FullMainloop::NumProducerThreads == 32);
++    static_assert(MaxThreadsPerBlock == 384 && HalfKernel::MaxThreadsPerBlock == 256);
++    // The half pipeline is initialized in retired tensor storage, NOT over a
++    // previously initialized mbarrier. Both the old pipeline and TMA stores
++    // have drained before this region is reused.
++    static_assert(HalfKernel::SharedStorageSize <=
++                  offsetof(typename FullKernel::SharedStorage, pipelines),
++                  "half storage overlaps the old pipeline barriers");
++    static_assert(FullKernel::LoadRegisterRequirement == 24 &&
++                  FullKernel::MmaRegisterRequirement == 240 &&
++                  HalfKernel::LoadRegisterRequirement == 56 &&
++                  HalfKernel::MmaRegisterRequirement == 256);
++
++    struct Arguments {
++        typename FullKernel::Arguments full;
++        typename HalfKernel::Arguments half;
++    };
++    struct Params {
++        typename FullKernel::Params full;
++        typename HalfKernel::Params half;
++    };
++    static Params to_underlying_arguments(Arguments const& args) {
++        const auto& a = args.full;
++        if (!Plan::admits(cute::get<3>(a.mainloop.shape_Q),
++                         cute::get<0>(a.mainloop.shape_Q), cute::get<0>(a.mainloop.shape_K),
++                         cute::get<2>(a.mainloop.shape_Q), cute::get<2>(a.mainloop.shape_K),
++                         cute::get<1>(a.mainloop.shape_Q), a.mainloop.headdim_v,
++                         a.hw_info.sm_count) || a.scheduler.num_splits != 1 ||
++            a.scheduler.num_blocks != Plan::FullBlocksPerHead ||
++            args.half.scheduler.num_blocks != Plan::HalfBlocksPerHead) {
++            throw std::invalid_argument("tail Q split only admits B1/S1024/H56/D128/40SM");
++        }
++        Params p{FullKernel::to_underlying_arguments(a),
++                 HalfKernel::to_underlying_arguments(args.half)};
++        if (p.full.scheduler.total_blocks != Plan::TotalFull ||
++            p.half.scheduler.total_blocks != Plan::HalfEnd)
++            throw std::invalid_argument("tail Q split scheduler denominator mismatch");
++        p.full.scheduler.total_blocks = Plan::Prefix;
++        return p;
++    }
++    static dim3 get_grid_shape(Params const& p) { return FullKernel::get_grid_shape(p.full); }
++    static dim3 get_block_shape() { return FullKernel::get_block_shape(); }
++
++    CUTLASS_DEVICE void operator()(Params const& p, char* storage) {
++        FullKernel{}(p.full, storage);
++        // mma() releases Q for a possible NEXT tile even on its final tile.
++        // load_tail() drains TMA/O, but does not consume that final release.
++        // Complete the old 256-consumer +32-producer barrier phase BEFORE
++        // changing QueryEmpty's expected count to128+32 for the M64 path.
++        if (threadIdx.x < FullMainloop::NumProducerThreads) {
++            cutlass::arch::NamedBarrier::sync(FullQueryEmptyCount,
++                static_cast<uint32_t>(FwdNamedBarriers::QueryEmpty));
++        }
++        // FullKernel returns only after load_tail and epilogue.store_tail.
++        // Its unused producer warps return HERE, not out of this CTA. This
++        // full-CTA join makes retired tensor storage reusable locally.
++        __syncthreads();
++        if (int(blockIdx.x) >= Plan::TailHalves) return;
++        if (threadIdx.x >= HalfKernel::MaxThreadsPerBlock) {
++            cutlass::arch::warpgroup_reg_dealloc<24>();
++            return;
++        }
++        if (threadIdx.x < 128) {
++            // Full producer ended at24. Restore an initialization budget
++            // before the half collective redistributes it to56/256. The
++            // retired second math WG relinquishes240->24 first as needed.
++            cutlass::arch::warpgroup_reg_alloc<168>();
++        }
++        HalfKernel{}.template operator()<HalfKernel::MaxThreadsPerBlock>(p.half, storage);
++    }
++};
++
++} // namespace flash
+diff --git a/hopper/ppu17_tail_qsplit_plan.hpp b/hopper/ppu17_tail_qsplit_plan.hpp
+new file mode 100644
+--- /dev/null
++++ b/hopper/ppu17_tail_qsplit_plan.hpp
+@@ -0,0 +1,33 @@
++#pragma once
++
++namespace flash {
++
++// Bounded noncausal experiment, NOT a general scheduler/selector. The whole
++// prefix retains the existing static scheduler and K order. Only the final
++// head's eight M128 tiles become sixteen disjoint M64 tiles.
++struct Ppu17TailQSplitPlan {
++    static constexpr int Grid = 40;
++    static constexpr int Heads = 56;
++    static constexpr int Sequence = 1024;
++    static constexpr int Dim = 128;
++    static constexpr int FullM = 128;
++    static constexpr int HalfM = 64;
++    static constexpr int FullBlocksPerHead = Sequence / FullM;
++    static constexpr int HalfBlocksPerHead = Sequence / HalfM;
++    static constexpr int TotalFull = Heads * FullBlocksPerHead;
++    static constexpr int Prefix = TotalFull / Grid * Grid;
++    static constexpr int TailHalves = (TotalFull - Prefix) * 2;
++    static constexpr int HalfStart = Prefix * 2;
++    static constexpr int HalfEnd = TotalFull * 2;
++    static_assert(Prefix == 440 && TailHalves == 16);
++    static_assert(Prefix % FullBlocksPerHead == 0);
++    static_assert(TailHalves <= Grid);
++
++    static constexpr bool admits(int batch, int q, int k, int heads,
++                                 int kv_heads, int dim, int dv, int sms) {
++        return batch == 1 && q == Sequence && k == Sequence && heads == Heads &&
++               kv_heads == Heads && dim == Dim && dv == Dim && sms == Grid;
++    }
++};
++
++} // namespace flash
+diff --git a/dev/ppu17/experiments/tail-qsplit/ownership.cu b/dev/ppu17/experiments/tail-qsplit/ownership.cu
+new file mode 100644
+--- /dev/null
++++ b/dev/ppu17/experiments/tail-qsplit/ownership.cu
+@@ -0,0 +1,101 @@
++// Actual collective accumulator layouts and actual scheduler divmods, executed
++// only on CPU. No launch, driver call or parallel reimplementation of GEMM.
++#include <cuda_runtime.h>
++#include "tile_scheduler.hpp"
++#include "ppu17_tail_qsplit.hpp"
++#include <algorithm>
++#include <iostream>
++#include <stdexcept>
++#include <string>
++#include <vector>
++
++using namespace cute;
++using Plan = flash::Ppu17TailQSplitPlan;
++using FullMain = flash::CollectiveMainloopFwdSm90<2, Shape<_1, _1, _1>,
++    Shape<_128, _128, _128>, 128, cutlass::half_t, float, cutlass::arch::Sm90,
++    false, false, false, false, false, false, false, true, true, false, false, false>;
++using FullEpi = flash::CollectiveEpilogueFwd<Shape<_128, _128, _128>, Shape<_1, _1, _1>,
++    cutlass::half_t, cutlass::arch::Sm90, 256, false, false, false, false>;
++using Hybrid = flash::Ppu17TailQSplitKernel<FullMain, FullEpi,
++    flash::StaticPersistentTileScheduler<false>>;
++
++void require(bool ok, const char* why) {
++    if (!ok) throw std::runtime_error(why);
++}
++
++template<class Mainloop>
++void visit(int tile, flash::StaticPersistentTileScheduler<false>::Params const& p,
++           std::vector<unsigned char>& counts, const std::string& plant, bool half) {
++    constexpr int M = Mainloop::kBlockM;
++    using Mma = typename Mainloop::TiledMmaPV;
++    const auto coord = flash::StaticPersistentTileScheduler<false>::WorkTileInfo{tile}.get_block_coord(p);
++    int block = get<0>(coord), head = get<1>(coord), batch = get<2>(coord);
++    require(batch == 0 && get<3>(coord) == 0, "unexpected batch/K split");
++    if (half && plant == "head") --head;
++    if (half && plant == "origin") block ^= 1;
++    require(head * 1024 + block * M == tile * M, "wrong head or row origin");
++    auto identity = make_identity_tensor(Shape<Int<M>, _128>{});
++    for (int tid = 0; tid < Mainloop::NumMmaThreads; ++tid) {
++        auto xy = Mma{}.get_slice(tid).partition_C(identity);
++        static_assert(size(xy) == 64);
++        for (int row = 0; row < 2; ++row) for (int col = 0; col < 32; ++col) {
++            // Iterate the real fragment linearly; the separate lane/warp
++            // anchor below knows only the public SM90 accumulator mapping.
++            const int index = (col / 2) * 4 + row * 2 + col % 2;
++            const auto mn = xy(index);
++            const int m = get<0>(mn), n = get<1>(mn);
++            const int want_m = 64 * (tid / 128) + 16 * ((tid % 128) / 32)
++                             + (tid % 32) / 4 + 8 * row;
++            const int want_n = 8 * (col / 2) + 2 * (tid % 4) + col % 2;
++            require(m == want_m && n == want_n, "actual accumulator layout differs from lane/warp anchor");
++            ++counts.at((head * 1024 + block * M + m) * 128 + n);
++        }
++    }
++}
++
++int main(int argc, char** argv) {
++    try {
++        const std::string plant = argc > 1 ? argv[1] : "none";
++        require(plant == "none" || plant == "duplicate" || plant == "omit" ||
++                plant == "head" || plant == "origin" || plant == "denominator", "unknown plant");
++        using S = flash::StaticPersistentTileScheduler<false>;
++        auto full = S::to_underlying_arguments({8, 56, 1, 1, 1, 1024, 1024, 128, 128, 2});
++        auto half = flash::Ppu17TailHalfScheduler::to_underlying_arguments(
++            {16, 56, 1, 1, 1, 1024, 1024, 128, 128, 2});
++        require(full.total_blocks == 448 && half.total_blocks == 896, "scheduler denominator");
++        full.total_blocks = Plan::Prefix;
++        std::vector<unsigned char> counts(56 * 1024 * 128);
++        int full_tasks = 0, half_tasks = 0;
++        for (int worker = 0; worker < Plan::Grid; ++worker) {
++            for (int tile = worker; tile < full.total_blocks; tile += Plan::Grid) {
++                visit<FullMain>(tile, full, counts, plant, false);
++                ++full_tasks;
++            }
++            if (worker < Plan::TailHalves) {
++                if (plant == "omit" && worker == 15) continue;
++                const int tile = Plan::HalfStart + (plant == "duplicate" && worker == 15 ? 14 : worker);
++                visit<Hybrid::HalfMainloop>(tile, half, counts, plant, true);
++                ++half_tasks;
++            }
++        }
++        require(full_tasks == 440 && half_tasks == 16, "task coverage denominator");
++        std::size_t checked = 0;
++        for (auto count : counts) { require(count == 1, "output not owned exactly once"); ++checked; }
++        if (plant == "denominator") --checked;
++        require(checked == 7340032, "output denominator must be 7340032");
++        require(Plan::admits(1, 1024, 1024, 56, 56, 128, 128, 40), "valid geometry refused");
++        for (int bad : {20, 39, 41, 72})
++            require(!Plan::admits(1, 1024, 1024, 56, 56, 128, 128, bad), "wrong SM count admitted");
++        require(!Plan::admits(1, 1024, 1024, 55, 56, 128, 128, 40), "wrong geometry admitted");
++        std::cout << "[tail ownership] PASS cells=" << checked << " rows=57344 prefix=440 halves=16"
++                  << " full_threads=" << Hybrid::MaxThreadsPerBlock
++                  << " half_threads=" << Hybrid::HalfKernel::MaxThreadsPerBlock
++                  << " full_smem=" << Hybrid::SharedStorageSize
++                  << " half_smem=" << Hybrid::HalfKernel::SharedStorageSize
++                  << " old_pipeline_offset=" << offsetof(Hybrid::FullKernel::SharedStorage, pipelines)
++                  << " numerical_kernel=NOT_RUN\n";
++    } catch (const std::exception& error) {
++        std::cerr << "[tail ownership] FAIL: " << error.what() << '\n';
++        return 1;
++    }
++}
+diff --git a/dev/ppu17/experiments/tail-qsplit/transition_negative.cu b/dev/ppu17/experiments/tail-qsplit/transition_negative.cu
+new file mode 100644
+--- /dev/null
++++ b/dev/ppu17/experiments/tail-qsplit/transition_negative.cu
+@@ -0,0 +1,14 @@
++// Compile-only negative control; never launched or linked into the application.
++#include "ownership.cu"
++#if defined(PLANT_INIT_THREADS)
++__global__ void init_cohort_probe(Hybrid::HalfKernel::Params p) {
++    extern __shared__ char storage[];
++    Hybrid::HalfKernel{}.template operator()<PLANT_INIT_THREADS>(p, storage);
++}
++#else
++// Enlarging the retired-storage consumer into the old pipeline must be red.
++static_assert((PLANT_STORAGE_OVERLAP ? Hybrid::FullKernel::SharedStorageSize :
++                                     Hybrid::HalfKernel::SharedStorageSize) <=
++              offsetof(Hybrid::FullKernel::SharedStorage, pipelines),
++              "half storage overlaps the old pipeline barriers");
++#endif

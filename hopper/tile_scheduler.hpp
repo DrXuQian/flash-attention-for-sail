@@ -356,13 +356,13 @@ public:
     struct WorkTileInfo {
         int tile_idx;
 
-        CUTLASS_DEVICE
+        CUTLASS_HOST_DEVICE
         bool
         is_valid(Params const& params) const {
             return tile_idx < params.total_blocks;
         }
 
-        CUTLASS_DEVICE
+        CUTLASS_HOST_DEVICE
         cute::tuple<int32_t, int32_t, int32_t, int32_t>
         get_block_coord(Params const& params) const {
             int block, bidh, bidb;

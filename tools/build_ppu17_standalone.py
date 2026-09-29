@@ -48,9 +48,13 @@ def main():
                         help="opt-in PPU1.7 S1024 softmax/PV overlap experiment; default is unchanged control")
     parser.add_argument("--kv-tile128", action="store_true",
                         help="opt-in C07 KV tile128; original softmax and pipeline, no forced overlap")
+    parser.add_argument("--q-tail-mode", choices=("m64",),
+                        help="separate Q-tail experiment; requires --kv-tile128, unchanged exp")
     args = parser.parse_args()
     if args.kv_tile128 and args.softmax_overlap:
         parser.error("KV tile experiment must not be composed with forced softmax overlap")
+    if args.q_tail_mode and not args.kv_tile128:
+        parser.error("Q-tail experiment requires --kv-tile128")
     print(f"[FA17 standalone build] validating CUTLASS root: {args.cutlass}", flush=True)
     backend = build.cutlass_root(args.cutlass)
     cuda = Path(args.cuda_home).resolve()
@@ -72,6 +76,8 @@ def main():
         flags += ["-DFLASHATTN_PPU17_SOFTMAX_OVERLAP=1"]
     if args.kv_tile128:
         flags += ["-DFLASHATTN_PPU17_KV_TILE128=1"]
+    if args.q_tail_mode:
+        flags += ["-DFLASHATTN_PPU17_Q_TAIL_MODE=1"]
     exe = out / "flash_attn_ppu17_s1024_fp16"
     generated, app = out / "shipping_fp16_d128.o", out / "standalone.o"
     ptx = out / "shipping_fp16_d128.ptx"
@@ -122,6 +128,7 @@ def main():
         "device_numerics": "NOT_RUN", "performance": "NOT_RUN",
         "softmax_overlap": "row-sum-token" if args.softmax_overlap else "control",
         "kv_tile": 128 if args.kv_tile128 else 176,
+        "q_tail_mode": args.q_tail_mode or "control",
     }
     (out / "build.json").write_text(json.dumps(record, indent=2) + "\n")
     print(f"[FA17 standalone build] PASS: {exe}\nsha256={record['sha256']}\n"

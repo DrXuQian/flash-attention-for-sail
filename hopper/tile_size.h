@@ -7,6 +7,15 @@
 
 #include <tuple>
 
+#if defined(FLASHATTN_PPU17_Q_TAIL_MODE)
+#if !defined(FLASHATTN_PPU17) || !defined(FLASHATTN_PPU17_KV_TILE128) || !FLASHATTN_PPU17_KV_TILE128
+#error "Q-tail experiment requires explicit PPU1.7 and KV128"
+#endif
+#if FLASHATTN_PPU17_Q_TAIL_MODE != 1
+#error "only Q-tail mode1 (M64) is admitted; hybrid was rejected for added spill"
+#endif
+#endif
+
 #if defined(FLASHATTN_PPU17_KV_TILE128)
 #if !defined(FLASHATTN_PPU17) || (FLASHATTN_PPU17_KV_TILE128 != 0 && FLASHATTN_PPU17_KV_TILE128 != 1)
 #error "FLASHATTN_PPU17_KV_TILE128 requires explicit PPU1.7 and a value of 0 or 1"
@@ -45,6 +54,9 @@ constexpr std::tuple<int, int, bool, bool> tile_size_fwd_sm90(
             // unchanged, including causal, local, paged and unequal Dv.
             if (headdim == 128 && headdim_v == 128 && !is_causal && !is_local
                 && !v_colmajor && !paged_kv_non_TMA && !softcap) {
+#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 1
+                return {64, 128, true, true};
+#endif
                 return {128, 128, true, true};
             }
 #endif

@@ -1,0 +1,351 @@
+{
+  "scope": "CUDA12.8 SM90a build + CPU only; no device invocation",
+  "source_manifest_sha256": "e19496e3c685d20db94926af3438e2d8458fc62445e89630868ca223edf2ced0",
+  "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+  "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+  "binaries": {
+    "control-kv176": "e22688edfc87ca19bec9cfec53c1d88208362f3628fd7ad96925b5df7189c9d0",
+    "m64-kv128": "24dc2a0e181b7fc9aa69a250a408a7b6466f582462bde9abb418ce62782af122",
+    "C07-kv128": "7eb547e049a4a414119bac3a322a96b31e579e9866e79164a01d4be893fbdde2",
+    "hybrid-kv128": "1f881cb0911c5fed2d42fcb544323b47a82fff87596258f4a4480e1193e3da5f"
+  },
+  "candidate_native": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 27,
+    "exp2_after_wait0": 39,
+    "wait_pcs": [
+      "0x13c0",
+      "0x3660",
+      "0x4110",
+      "0x56d0"
+    ],
+    "matrix_sites": {
+      "64x128x16": 32
+    },
+    "static_instructions": 2264,
+    "local_sites": {},
+    "old_P_words": 32,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "candidate_ptx": {
+    "layer": "PTX/source",
+    "waits": [
+      1434,
+      3339,
+      3764,
+      4693
+    ],
+    "exp2_before_wait0": 66,
+    "exp2_after_wait0": 0,
+    "matrix_sites": {
+      "m64n128k16": 32
+    }
+  },
+  "resources": {
+    "default": {
+      "noncausal": {
+        "stack_bytes": 8,
+        "spill_store_bytes": 12,
+        "spill_load_bytes": 12,
+        "registers": 168
+      },
+      "causal": {
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 168
+      }
+    },
+    "M64": {
+      "noncausal": {
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 255
+      },
+      "causal": {
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 168
+      }
+    },
+    "C07": {
+      "noncausal": {
+        "stack_bytes": 8,
+        "spill_store_bytes": 12,
+        "spill_load_bytes": 12,
+        "registers": 168
+      },
+      "causal": {
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 168
+      }
+    },
+    "rejected-hybrid": {
+      "noncausal": {
+        "stack_bytes": 16,
+        "spill_store_bytes": 32,
+        "spill_load_bytes": 32,
+        "registers": 168
+      },
+      "causal": {
+        "stack_bytes": 0,
+        "spill_store_bytes": 0,
+        "spill_load_bytes": 0,
+        "registers": 168
+      }
+    }
+  },
+  "default_encoded_bodies_unchanged": "2/2",
+  "causal_encoded_body_unchanged": true,
+  "unchanged_source": [
+    "hopper/softmax.h",
+    "hopper/mainloop_fwd_sm90_tma_gmma_ws.hpp",
+    "hopper/epilogue_fwd.hpp",
+    "hopper/flash_fwd_kernel_sm90.h",
+    "hopper/flash_fwd_launch_template.h"
+  ],
+  "ownership": "uniform896 and prefix440+half16:7340032cells each;5plants each EXPECTED_RED",
+  "ownership_source_sha256": "b8121d2227f9e8e1a8fdd29f355cbdc7ecbbae8409e5c3abdaf8f8201d22e488",
+  "ownership_exe_sha256": "278e382ccd6f90c46c8f7d9f77deed8078e3992c6b0381652a0fbdb018004314",
+  "ownership_compile": [
+    "/usr/local/cuda-12.8/bin/nvcc",
+    "-std=c++17",
+    "-O3",
+    "-DNDEBUG",
+    "-gencode=arch=compute_90a,code=sm_90a",
+    "--use_fast_math",
+    "--expt-relaxed-constexpr",
+    "--expt-extended-lambda",
+    "-lineinfo",
+    "-DFLASHATTN_PPU17=1",
+    "-DACOMPUTE_VERSION=10700",
+    "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+    "-DFLASHATTENTION_DISABLE_BACKWARD",
+    "-DFLASHATTENTION_DISABLE_SPLIT",
+    "-DFLASHATTENTION_DISABLE_PAGEDKV",
+    "-DFLASHATTENTION_DISABLE_APPENDKV",
+    "-DFLASHATTENTION_DISABLE_LOCAL",
+    "-DFLASHATTENTION_DISABLE_SOFTCAP",
+    "-DFLASHATTENTION_DISABLE_PACKGQA",
+    "-DFLASHATTENTION_DISABLE_FP8",
+    "-DFLASHATTENTION_DISABLE_VARLEN",
+    "-DFLASHATTENTION_DISABLE_CLUSTER",
+    "-DFLASHATTENTION_DISABLE_HDIM96",
+    "-DFLASHATTENTION_DISABLE_HDIM192",
+    "-DFLASHATTENTION_DISABLE_SM8x",
+    "-DFLASHATTENTION_DISABLE_SM86",
+    "-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION=430",
+    "-I/workspace/flash-attn-ppu17-tail-qsplit-source/hopper",
+    "-I/workspace/cutlass4-nvfp4-20260928/cutlass3-v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6/include",
+    "-DFLASHATTN_PPU17_KV_TILE128=1",
+    "-DFLASHATTN_PPU17_Q_TAIL_MODE=1",
+    "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/ownership.cu",
+    "-o",
+    "/workspace/fa17-tail-qsplit-20260929/validation/owners"
+  ],
+  "transition_negatives": [
+    {
+      "name": "init-good",
+      "command": [
+        "/usr/local/cuda-12.8/bin/nvcc",
+        "-std=c++17",
+        "-O3",
+        "-DNDEBUG",
+        "-gencode=arch=compute_90a,code=sm_90a",
+        "--use_fast_math",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+        "-lineinfo",
+        "-DFLASHATTN_PPU17=1",
+        "-DACOMPUTE_VERSION=10700",
+        "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+        "-DFLASHATTENTION_DISABLE_BACKWARD",
+        "-DFLASHATTENTION_DISABLE_SPLIT",
+        "-DFLASHATTENTION_DISABLE_PAGEDKV",
+        "-DFLASHATTENTION_DISABLE_APPENDKV",
+        "-DFLASHATTENTION_DISABLE_LOCAL",
+        "-DFLASHATTENTION_DISABLE_SOFTCAP",
+        "-DFLASHATTENTION_DISABLE_PACKGQA",
+        "-DFLASHATTENTION_DISABLE_FP8",
+        "-DFLASHATTENTION_DISABLE_VARLEN",
+        "-DFLASHATTENTION_DISABLE_CLUSTER",
+        "-DFLASHATTENTION_DISABLE_HDIM96",
+        "-DFLASHATTENTION_DISABLE_HDIM192",
+        "-DFLASHATTENTION_DISABLE_SM8x",
+        "-DFLASHATTENTION_DISABLE_SM86",
+        "-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION=430",
+        "-I/workspace/flash-attn-ppu17-tail-qsplit-source/hopper",
+        "-I/workspace/cutlass4-nvfp4-20260928/cutlass3-v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6/include",
+        "-DFLASHATTN_PPU17_KV_TILE128=1",
+        "-DFLASHATTN_PPU17_Q_TAIL_MODE=2",
+        "-DPLANT_INIT_THREADS=256",
+        "--ptx",
+        "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu",
+        "-o",
+        "/workspace/fa17-tail-qsplit-20260929/transition-negatives/init-good.ptx"
+      ],
+      "rc": 0,
+      "expected_red": false,
+      "contract_pass": true,
+      "diagnostic": ""
+    },
+    {
+      "name": "init-bad",
+      "command": [
+        "/usr/local/cuda-12.8/bin/nvcc",
+        "-std=c++17",
+        "-O3",
+        "-DNDEBUG",
+        "-gencode=arch=compute_90a,code=sm_90a",
+        "--use_fast_math",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+        "-lineinfo",
+        "-DFLASHATTN_PPU17=1",
+        "-DACOMPUTE_VERSION=10700",
+        "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+        "-DFLASHATTENTION_DISABLE_BACKWARD",
+        "-DFLASHATTENTION_DISABLE_SPLIT",
+        "-DFLASHATTENTION_DISABLE_PAGEDKV",
+        "-DFLASHATTENTION_DISABLE_APPENDKV",
+        "-DFLASHATTENTION_DISABLE_LOCAL",
+        "-DFLASHATTENTION_DISABLE_SOFTCAP",
+        "-DFLASHATTENTION_DISABLE_PACKGQA",
+        "-DFLASHATTENTION_DISABLE_FP8",
+        "-DFLASHATTENTION_DISABLE_VARLEN",
+        "-DFLASHATTENTION_DISABLE_CLUSTER",
+        "-DFLASHATTENTION_DISABLE_HDIM96",
+        "-DFLASHATTENTION_DISABLE_HDIM192",
+        "-DFLASHATTENTION_DISABLE_SM8x",
+        "-DFLASHATTENTION_DISABLE_SM86",
+        "-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION=430",
+        "-I/workspace/flash-attn-ppu17-tail-qsplit-source/hopper",
+        "-I/workspace/cutlass4-nvfp4-20260928/cutlass3-v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6/include",
+        "-DFLASHATTN_PPU17_KV_TILE128=1",
+        "-DFLASHATTN_PPU17_Q_TAIL_MODE=2",
+        "-DPLANT_INIT_THREADS=128",
+        "--ptx",
+        "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu",
+        "-o",
+        "/workspace/fa17-tail-qsplit-20260929/transition-negatives/init-bad.ptx"
+      ],
+      "rc": 1,
+      "expected_red": true,
+      "contract_pass": true,
+      "diagnostic": "/workspace/flash-attn-ppu17-tail-qsplit-source/hopper/flash_fwd_kernel_sm90.h(190): error: static assertion failed with \"initialization cohort must equal the real collective CTA\"\n          static_assert(InitializationThreads == 0 ||\n          ^\n          detected during instantiation of \"void flash::FlashAttnFwdSm90<CollectiveMainloop_, CollectiveEpilogue_, TileScheduler_>::operator()(const flash::FlashAttnFwdSm90<CollectiveMainloop_, CollectiveEpilogue_, TileScheduler_>::Params &, char *) [with CollectiveMainloop_=flash::CollectiveMainloopFwdSm90<2, cute::tuple<cute::_1, cute::_1, cute::_1>, cute::tuple<cute::_64, cute::_128, cute::_128>, 128, cutlass::half_t, float, cutlass::arch::Sm90, false, false, false, false, false, false, false, true, true, false, false, false>, CollectiveEpilogue_=flash::CollectiveEpilogueFwd<cute::tuple<cute::_64, cute::_128, cute::_128>, cute::tuple<cute::_1, cute::_1, cute::_1>, cutlass::half_t, cutlass::arch::Sm90, 128, false, false, false, false, false, flash::QsaConfig>, TileScheduler_=flash::Ppu17TailHalfScheduler, InitializationThreads=128]\" at line 6 of /workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu\n\n1 error detected in the compilation of \"/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu\".\n"
+    },
+    {
+      "name": "storage-good",
+      "command": [
+        "/usr/local/cuda-12.8/bin/nvcc",
+        "-std=c++17",
+        "-O3",
+        "-DNDEBUG",
+        "-gencode=arch=compute_90a,code=sm_90a",
+        "--use_fast_math",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+        "-lineinfo",
+        "-DFLASHATTN_PPU17=1",
+        "-DACOMPUTE_VERSION=10700",
+        "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+        "-DFLASHATTENTION_DISABLE_BACKWARD",
+        "-DFLASHATTENTION_DISABLE_SPLIT",
+        "-DFLASHATTENTION_DISABLE_PAGEDKV",
+        "-DFLASHATTENTION_DISABLE_APPENDKV",
+        "-DFLASHATTENTION_DISABLE_LOCAL",
+        "-DFLASHATTENTION_DISABLE_SOFTCAP",
+        "-DFLASHATTENTION_DISABLE_PACKGQA",
+        "-DFLASHATTENTION_DISABLE_FP8",
+        "-DFLASHATTENTION_DISABLE_VARLEN",
+        "-DFLASHATTENTION_DISABLE_CLUSTER",
+        "-DFLASHATTENTION_DISABLE_HDIM96",
+        "-DFLASHATTENTION_DISABLE_HDIM192",
+        "-DFLASHATTENTION_DISABLE_SM8x",
+        "-DFLASHATTENTION_DISABLE_SM86",
+        "-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION=430",
+        "-I/workspace/flash-attn-ppu17-tail-qsplit-source/hopper",
+        "-I/workspace/cutlass4-nvfp4-20260928/cutlass3-v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6/include",
+        "-DFLASHATTN_PPU17_KV_TILE128=1",
+        "-DFLASHATTN_PPU17_Q_TAIL_MODE=2",
+        "-DPLANT_STORAGE_OVERLAP=0",
+        "--ptx",
+        "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu",
+        "-o",
+        "/workspace/fa17-tail-qsplit-20260929/transition-negatives/storage-good.ptx"
+      ],
+      "rc": 0,
+      "expected_red": false,
+      "contract_pass": true,
+      "diagnostic": ""
+    },
+    {
+      "name": "storage-bad",
+      "command": [
+        "/usr/local/cuda-12.8/bin/nvcc",
+        "-std=c++17",
+        "-O3",
+        "-DNDEBUG",
+        "-gencode=arch=compute_90a,code=sm_90a",
+        "--use_fast_math",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+        "-lineinfo",
+        "-DFLASHATTN_PPU17=1",
+        "-DACOMPUTE_VERSION=10700",
+        "-DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED",
+        "-DFLASHATTENTION_DISABLE_BACKWARD",
+        "-DFLASHATTENTION_DISABLE_SPLIT",
+        "-DFLASHATTENTION_DISABLE_PAGEDKV",
+        "-DFLASHATTENTION_DISABLE_APPENDKV",
+        "-DFLASHATTENTION_DISABLE_LOCAL",
+        "-DFLASHATTENTION_DISABLE_SOFTCAP",
+        "-DFLASHATTENTION_DISABLE_PACKGQA",
+        "-DFLASHATTENTION_DISABLE_FP8",
+        "-DFLASHATTENTION_DISABLE_VARLEN",
+        "-DFLASHATTENTION_DISABLE_CLUSTER",
+        "-DFLASHATTENTION_DISABLE_HDIM96",
+        "-DFLASHATTENTION_DISABLE_HDIM192",
+        "-DFLASHATTENTION_DISABLE_SM8x",
+        "-DFLASHATTENTION_DISABLE_SM86",
+        "-DFLASHATTN_PPU17_EXPECTED_CUTLASS_VERSION=430",
+        "-I/workspace/flash-attn-ppu17-tail-qsplit-source/hopper",
+        "-I/workspace/cutlass4-nvfp4-20260928/cutlass3-v4.3.0_ppu_dev-0eb6a3b218977892e2b6cd30d59880c440e54fd6/include",
+        "-DFLASHATTN_PPU17_KV_TILE128=1",
+        "-DFLASHATTN_PPU17_Q_TAIL_MODE=2",
+        "-DPLANT_STORAGE_OVERLAP=1",
+        "--ptx",
+        "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu",
+        "-o",
+        "/workspace/fa17-tail-qsplit-20260929/transition-negatives/storage-bad.ptx"
+      ],
+      "rc": 1,
+      "expected_red": true,
+      "contract_pass": true,
+      "diagnostic": "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu(10): error: static assertion failed with \"half storage overlaps the old pipeline barriers\"\n  static_assert((1 ? Hybrid::FullKernel::SharedStorageSize :\n  ^\n\n1 error detected in the compilation of \"/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu\".\n"
+    }
+  ],
+  "rejected_patch_sha256": "10133bb4e0286019275e3355c7a602632e812dba0ebce439cb62199ec8e6177e",
+  "local_tests": {
+    "pass": 68,
+    "skip": 4,
+    "fail": 0,
+    "skip_reasons": [
+      "Torch unavailable; independent standalone C++ CPU oracle tested separately",
+      "Torch unavailable; independent standalone C++ CPU oracle tested separately",
+      "Torch unavailable; independent standalone C++ CPU oracle tested separately",
+      "PPU baseline report not supplied"
+    ]
+  },
+  "M64_decision": "READY_FOR_SINGLE_SIMULATION; NOT A PERFORMANCE WIN",
+  "hybrid_decision": "REJECTED_BEFORE_SIMULATION;32/32B spill exceeds12/12B",
+  "native_ppu_codegen": "NOT_AVAILABLE",
+  "candidate_numerics": "NOT_RUN",
+  "candidate_performance": "NOT_RUN",
+  "default_promotion": false
+}
