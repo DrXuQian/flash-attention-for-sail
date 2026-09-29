@@ -11,26 +11,39 @@ sys.path.insert(0, str(ROOT / "tools"))
 import check_ppu17_softmax_overlap as gate
 
 
-def sass_fixture(before=90):
+def sass_fixture(before=90, kv_tile=176):
     # One known algorithmic denominator: 8 QK prologue, 8 QK+11 PV steady,
     # 11 PV drain; only the steady window placement changes.
     inst = []
     def qk():
-        inst.extend(["HGMMA.64x176x16.F32 R24, gdesc[UR8], R24 ;"] * 8)
+        inst.extend([f"HGMMA.64x{kv_tile}x16.F32 R24, gdesc[UR8], R24 ;"] * 8)
     def pv():
         inst.extend(f"HGMMA.64x128x16.F32 R112, R{176 + 4 * i}, gdesc[UR8].tnspB, R112 ;"
-                    for i in range(11))
+                    for i in range(kv_tile // 16))
     qk(); inst.append("WARPGROUP.DEPBAR.LE gsb0, 0x0 ;")
     qk(); pv(); inst.append("WARPGROUP.DEPBAR.LE gsb0, 0x1 ;")
     inst.extend(["MUFU.EX2 R24, R24 ;"] * before)
     inst.append("WARPGROUP.DEPBAR.LE gsb0, 0x0 ;")
-    inst.extend(["MUFU.EX2 R24, R24 ;"] * (90 - before))
+    inst.extend(["MUFU.EX2 R24, R24 ;"] * (kv_tile // 2 + 2 - before))
     pv(); inst.append("WARPGROUP.DEPBAR.LE gsb0, 0x0 ;")
     return "Function : test_StaticPersistentTileScheduler\n" + "\n".join(
         f"/*{16 * i:04x}*/ {op} /* 0x0000000000000000 */" for i, op in enumerate(inst))
 
 
 class SoftmaxOverlapGate(unittest.TestCase):
+    def test_kv128_geometry_and_wrong_denominator_negatives(self):
+        text = sass_fixture(before=20, kv_tile=128)
+        result = gate.inspect_sass(text, kv_tile=128)
+        self.assertEqual(result["matrix_sites"], {"64x128x16": 32})
+        self.assertEqual(result["old_P_words"], 32)
+        self.assertEqual(result["exp2_before_wait0"] + result["exp2_after_wait0"], 66)
+        for bad in (text.replace("MUFU.EX2 R24, R24 ;", "NOP ;", 1),
+                    text.replace("HGMMA.64x128x16.F32 R24, gdesc[UR8], R24 ;", "NOP ;", 1)):
+            with self.assertRaisesRegex(ValueError, "denominator"):
+                gate.inspect_sass(bad, kv_tile=128)
+        with self.assertRaisesRegex(ValueError, "denominator"):
+            gate.inspect_sass(text, kv_tile=176)
+
     def test_whole_window_positive(self):
         r = gate.inspect_sass(sass_fixture())
         self.assertEqual(r["exp2_before_wait0"], 90)

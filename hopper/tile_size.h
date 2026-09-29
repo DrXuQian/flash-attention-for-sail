@@ -7,6 +7,15 @@
 
 #include <tuple>
 
+#if defined(FLASHATTN_PPU17_KV_TILE128)
+#if !defined(FLASHATTN_PPU17) || (FLASHATTN_PPU17_KV_TILE128 != 0 && FLASHATTN_PPU17_KV_TILE128 != 1)
+#error "FLASHATTN_PPU17_KV_TILE128 requires explicit PPU1.7 and a value of 0 or 1"
+#endif
+#if defined(FLASHATTN_PPU17_SOFTMAX_OVERLAP) && FLASHATTN_PPU17_SOFTMAX_OVERLAP
+#error "KV tile experiment must not be composed with forced softmax overlap"
+#endif
+#endif
+
 // Return {kBlockM, kBlockN, MmaPV_is_RS, IntraWGOverlap}
 constexpr std::tuple<int, int, bool, bool> tile_size_fwd_sm90(
         int headdim, int headdim_v, bool is_causal, bool is_local, int element_size=2,
@@ -30,6 +39,15 @@ constexpr std::tuple<int, int, bool, bool> tile_size_fwd_sm90(
         } else if (headdim <= 96) {
             return {192, is_local || paged_kv_non_TMA ? 128 : 144, false, true};
         } else if (headdim <= 128) {
+#if defined(FLASHATTN_PPU17_KV_TILE128) && FLASHATTN_PPU17_KV_TILE128
+            // C07: independent geometry experiment, not a default heuristic.
+            // The standalone compiles only FP16/D128; all other selectors stay
+            // unchanged, including causal, local, paged and unequal Dv.
+            if (headdim == 128 && headdim_v == 128 && !is_causal && !is_local
+                && !v_colmajor && !paged_kv_non_TMA && !softcap) {
+                return {128, 128, true, true};
+            }
+#endif
             return {128, is_causal || is_local || paged_kv_non_TMA ? 128 : 176, true, true};
             // {128, 192, false, false} and {192, 128, false, true} are quite good too
             // 128 x 192 hits the limit of smem if MmaPV_is_RS, 128 x 144 hits the limit if !MmaPV_is_RS

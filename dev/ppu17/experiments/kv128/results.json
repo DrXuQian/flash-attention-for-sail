@@ -1,0 +1,130 @@
+{
+  "scope": "CUDA12.8 SM90a compile and host checks only; no device invocation",
+  "source_manifest_sha256": "969c92aa56b4aee9e4d4cdc72ab09d76705ffefe305aab4cb2d3b4ad5c6548df",
+  "backend_include_sha256": "0ffbcea7b4c0367f81aa13fc1e0e14d9c4b83b4a71c6df5603246cedc1603847",
+  "compiler": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0\n",
+  "executable_sha256": {
+    "176": "791308f54eab274c6173fe168f0f830b1f2a8a657cef22ec7bd44b58e538779b",
+    "128": "7eb547e049a4a414119bac3a322a96b31e579e9866e79164a01d4be893fbdde2"
+  },
+  "artifacts_sha256": {
+    "176": {
+      "build.json": "24531524e5715990a7435359c3c5e62c0b88e6578d25b3a22e5eda189cfff629",
+      "executable.sass": "a8354549a431cac4ddbe8b9bce680e89b4c9510e4b0b66062dbdf577e7d9906d",
+      "shipping_fp16_d128.ptx": "4d272d7fc66490e401cecc35bbd42cb48c84712693245483ebcb057492a7e268",
+      "shipping-object.log": "9b53f7e35564e0e2e6b537b268ca414557beab5074875d7fb2f0c1b10c69b3f9"
+    },
+    "128": {
+      "build.json": "4f8fa6b27f4f5ffbb4769f71d5c4317f7fd2170c2e8b4ab8d75aebff5c781754",
+      "executable.sass": "d7559a1d3fc27e2dcef124a84eddb0f8fa4a754e8ec88c08613d09b5df6d50c2",
+      "shipping_fp16_d128.ptx": "98dda4d647c8a592ff75ee065da06b6a9be47d3cb9eac2c406bcb094c7a40f02",
+      "shipping-object.log": "aaa9adc918fa4733c98b6c3dc5661373fb4c72c83edbf85e7e7abe7c7f9053f0"
+    }
+  },
+  "parent_sass_sha256": "a8354549a431cac4ddbe8b9bce680e89b4c9510e4b0b66062dbdf577e7d9906d",
+  "native_control": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 19,
+    "exp2_after_wait0": 71,
+    "wait_pcs": [
+      "0x17f0",
+      "0x4350",
+      "0x4d70",
+      "0x6b80"
+    ],
+    "matrix_sites": {
+      "64x176x16": 16,
+      "64x128x16": 22
+    },
+    "static_instructions": 2624,
+    "local_sites": {
+      "STL": 3,
+      "LDL": 3
+    },
+    "old_P_words": 44,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "native_candidate": {
+    "layer": "NVIDIA-SASS/compile-control",
+    "exp2_before_wait0": 13,
+    "exp2_after_wait0": 53,
+    "wait_pcs": [
+      "0x15f0",
+      "0x3900",
+      "0x40b0",
+      "0x59a0"
+    ],
+    "matrix_sites": {
+      "64x128x16": 32
+    },
+    "static_instructions": 2344,
+    "local_sites": {
+      "STL": 3,
+      "LDL": 3
+    },
+    "old_P_words": 32,
+    "live_O_words": 64,
+    "early_old_P_or_O_writes": 0
+  },
+  "ptx_control": {
+    "layer": "PTX/source",
+    "waits": [
+      1622,
+      3946,
+      4485,
+      5538
+    ],
+    "exp2_before_wait0": 90,
+    "exp2_after_wait0": 0,
+    "matrix_sites": {
+      "m64n176k16": 16,
+      "m64n128k16": 22
+    }
+  },
+  "ptx_candidate": {
+    "layer": "PTX/source",
+    "waits": [
+      1512,
+      3445,
+      3864,
+      4792
+    ],
+    "exp2_before_wait0": 66,
+    "exp2_after_wait0": 0,
+    "matrix_sites": {
+      "m64n128k16": 32
+    }
+  },
+  "resources": {
+    "noncausal": {
+      "stack_bytes": 8,
+      "spill_store_bytes": 12,
+      "spill_load_bytes": 12,
+      "registers": 168
+    },
+    "causal": {
+      "stack_bytes": 0,
+      "spill_store_bytes": 0,
+      "spill_load_bytes": 0,
+      "registers": 168
+    }
+  },
+  "default_encoded_bodies_unchanged": "2/2",
+  "opt_in_causal_body_unchanged": true,
+  "local_tests": {
+    "pass": 63,
+    "skip": 4,
+    "fail": 0,
+    "skip_reasons": [
+      "Torch unavailable; independent standalone C++ CPU oracle runs separately",
+      "Torch unavailable; independent standalone C++ CPU oracle runs separately",
+      "Torch unavailable; independent standalone C++ CPU oracle runs separately",
+      "PPU baseline report not supplied"
+    ]
+  },
+  "candidate_numerics": "NOT_RUN; host oracle tests do not execute the GPU body",
+  "candidate_performance": "NOT_RUN",
+  "native_ppu_lowering": "NOT_RUN",
+  "default_promotion": false
+}

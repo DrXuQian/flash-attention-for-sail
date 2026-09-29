@@ -1,15 +1,27 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 03:06:05 UTC
-    working-on: C04/C05/C06 rejected locally; live implementation edits removed, replay evidence retained
+    updated-at: 2026-09-29 03:21:01 UTC
+    working-on: C07 KV128 local gates complete; preparing single-invocation simulation handoff
     blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
-    last-commit: fc4947d (parent of this partial-overlap evidence checkpoint)
+    last-commit: 454298e (partial-overlap rejection and clean-source checkpoint)
     branch: ppu17-softmax-overlap
     workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: current uploaded run 40 SM; historical 20-SM model is not this run
 
-Current experiment: dev/ppu17/experiments/softmax-overlap/docs/plan.md.
+Current experiment: dev/ppu17/experiments/kv128/docs/plan.md.
+C07 changes only opt-in KV176->128 on the original pipeline/softmax. Local
+63 PASS /4 SKIP /0 FAIL;3missing-Torch Python oracles,1overwritten baseline
+raw report. Real default encoded bodies unchanged2/2, opt-in causal unchanged.
+Exact generated FP16/D128 body links; CUDA noncausal168regs,8Bstack,12/12Bspill
+unchanged; static body2624->2344, oldP32/O64 early-overwrite negatives red.
+Selector1536combinations: exactly1changes; wrong target/value/mixed experiment
+and wrong denominator plants reject. Source/backend/compiler/ELF hashes bound
+in kv128/results.json. PPU lowering, CPU-oracle kernel verdict and performance
+NOT_RUN; no default promotion. Fewer padded matrix operations3.03%, but KV
+iterations6->8: full modeled cycles must decide, not static instruction count.
+
+Previous experiment: dev/ppu17/experiments/softmax-overlap/docs/plan.md.
 Partial-overlap follow-up: C04/C05 native75/15 and76/14 fail45/45; C06 hits
 45/45 but spills12->40B, rejected before simulation. Real layout22528cells
 and512private words exact-once,3plants red. Default encoded streams2/2 match;

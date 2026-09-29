@@ -17,7 +17,7 @@ def require(ok, message):
         raise ValueError(message)
 
 
-def window(rows, wait_pattern, exp_pattern):
+def window(rows, wait_pattern, exp_pattern, exponent_count=90):
     waits = [(i, int(m[1])) for i, row in enumerate(rows)
              if (m := re.search(wait_pattern, row))]
     require([n for _, n in waits] == [0, 1, 0, 0],
@@ -25,22 +25,30 @@ def window(rows, wait_pattern, exp_pattern):
     start, end, drain = waits[1][0], waits[2][0], waits[3][0]
     inside = [i for i in range(start + 1, end) if re.search(exp_pattern, rows[i])]
     after = [i for i in range(end + 1, drain) if re.search(exp_pattern, rows[i])]
-    require(len(inside) + len(after) == 90,
-            f"steady softmax denominator changed: {len(inside)}+{len(after)} != 90")
+    require(len(inside) + len(after) == exponent_count,
+            f"steady softmax denominator changed: {len(inside)}+{len(after)} != {exponent_count}")
     return {"waits": [i for i, _ in waits], "exp2_before_wait0": len(inside),
             "exp2_after_wait0": len(after)}, inside, after
 
 
-def inspect_ptx(text):
+def matrix_sites(kv_tile, prefix):
+    require(kv_tile in (128, 176), "only registered KV tile128/176 geometries are supported")
+    counts = collections.Counter({f"{prefix}{kv_tile}x16": 16})
+    counts[f"{prefix}128x16"] += 2 * (kv_tile // 16)
+    return counts
+
+
+def inspect_ptx(text, kv_tile=176):
     entries = re.split(r"(?m)(?=^(?:(?:\.visible|\.weak)\s+)?\.entry\s)", text)
     selected = [s for s in entries if s.lstrip().startswith((".entry", ".visible .entry", ".weak .entry"))
                 and "StaticPersistentTileScheduler" in s.splitlines()[0]]
     require(len(selected) == 1, "expected exactly one noncausal StaticPersistent PTX body")
     body = selected[0]
     rows = [s.split("//", 1)[0].strip() for s in body.splitlines()]
-    result, _, _ = window(rows, r"wgmma\.wait_group\.sync\.aligned\s+([0-7]);", r"\bex2\.approx")
+    result, _, _ = window(rows, r"wgmma\.wait_group\.sync\.aligned\s+([0-7]);", r"\bex2\.approx", kv_tile // 2 + 2)
     counts = collections.Counter(re.findall(r"wgmma\.mma_async\.[^\s]*\.(m64n\d+k16)\.", body))
-    require(counts == {"m64n176k16": 16, "m64n128k16": 22}, f"PTX matrix denominator changed: {counts}")
+    wanted = {k.replace("x16", "k16"): n for k, n in matrix_sites(kv_tile, "m64n").items()}
+    require(counts == wanted, f"PTX matrix denominator changed: {counts}")
     require(not re.search(r"\b(?:ld|st)\.local", body), "PTX local memory introduced")
     return {"layer": "PTX/source", **result, "matrix_sites": dict(counts)}
 
@@ -58,12 +66,12 @@ def sass_body(text):
     return rows
 
 
-def inspect_sass(text):
+def inspect_sass(text, kv_tile=176):
     rows = sass_body(text)
     inst = [s for _, s in rows]
-    result, _, _ = window(inst, r"WARPGROUP\.DEPBAR\.LE\s+gsb0,\s*0x([0-7])", r"\bMUFU\.EX2\b")
+    result, _, _ = window(inst, r"WARPGROUP\.DEPBAR\.LE\s+gsb0,\s*0x([0-7])", r"\bMUFU\.EX2\b", kv_tile // 2 + 2)
     counts = collections.Counter(re.findall(r"\bHGMMA\.(64x\d+x16)\.", "\n".join(inst)))
-    require(counts == {"64x176x16": 16, "64x128x16": 22}, f"SASS matrix denominator changed: {counts}")
+    require(counts == matrix_sites(kv_tile, "64x"), f"SASS matrix denominator changed: {counts}")
     # Existing parent already has local accesses: report them, compare to the
     # parent, and inspect ptxas frame/spill bytes. Never invent a zero baseline.
     local = collections.Counter(re.findall(r"\b(LDL|STL)\b", "\n".join(inst)))
@@ -73,10 +81,10 @@ def inspect_sass(text):
         match = re.search(r"HGMMA\.64x128x16\.F32\s+R(\d+),\s*R(\d+),", op)
         if match:
             pv.append((index, int(match[1]), int(match[2])))
-    require(len(pv) == 11, "expected eleven steady PV register operand groups")
+    require(len(pv) == kv_tile // 16, "wrong steady PV register operand group count")
     p_words = {reg for _, _, base in pv for reg in range(base, base + 4)}
     o_words = {reg for _, base, _ in pv for reg in range(base, base + 64)}
-    require(len(p_words) == 44 and len(o_words) == 64 and not (p_words & o_words),
+    require(len(p_words) == kv_tile // 4 and len(o_words) == 64 and not (p_words & o_words),
             "unexpected steady P/O register map")
     for pc, op in rows[pv[0][0] + 1:wait0]:
         # Matrix issue may consume register operands asynchronously. No scalar
@@ -98,7 +106,8 @@ def inspect_sass(text):
             "early_old_P_or_O_writes": 0}
 
 
-def inspect_report(report):
+def inspect_report(report, kv_tile=176):
+    require(kv_tile in (128, 176), "only registered KV tile128/176 geometries are supported")
     require(len(report["ppu"]) == 1, "expected one PPU report")
     p = report["ppu"][0]
     require(p["scheduler_statistics"]["kernel_num"] == 1, "not a single-kernel simulation")
@@ -110,18 +119,22 @@ def inspect_report(report):
             == p["instruction_statistics"]["executed_instructions"],
             "opcode instruction denominator does not close")
     inst = [r["inst"] for r in rows]
-    result, before, after = window(inst, r"s\.wait\s+gmma_commit_grp\(([0-7])\)", r"\bv\.exp2\.f32\b")
+    result, before, after = window(inst, r"s\.wait\s+gmma_commit_grp\(([0-7])\)", r"\bv\.exp2\.f32\b", kv_tile // 2 + 2)
     waits = result.pop("waits")
-    require([rows[i]["executed"] for i in waits] == [3584, 17920, 17920, 3584],
+    kv_steps = (1024 + kv_tile - 1) // kv_tile
+    steady_visits = 3584 * (kv_steps - 1)
+    require([rows[i]["executed"] for i in waits] == [3584, steady_visits, steady_visits, 3584],
             "wrong prologue/steady/drain execution counts")
-    require(all(rows[i]["executed"] == 17920 for i in before + after),
+    require(all(rows[i]["executed"] == steady_visits for i in before + after),
             "some steady EX2 PCs are not executed by the full cohort")
     counts = collections.Counter()
     for row in rows:
         m = re.search(r"v\.mm[a]?\.g\.f32\.f16\.(m64n\d+k16)", row["inst"])
         if m:
             counts[m[1]] += row["executed"]
-    require(counts == {"m64n176k16": 172032, "m64n128k16": 236544},
+    wanted = collections.Counter({f"m64n{kv_tile}k16": 3584 * kv_steps * 8})
+    wanted["m64n128k16"] += 3584 * kv_steps * (kv_tile // 16)
+    require(counts == wanted,
             f"executed matrix denominator changed: {counts}")
     result["wait_pcs"] = [rows[i]["pc"] for i in waits]
     result["wait_sync_warp_cycles"] = [rows[i]["stall_reasons"]["sync"] for i in waits]
@@ -169,14 +182,16 @@ def main():
     p.add_argument("kind", choices=("ptx", "sass", "report"))
     p.add_argument("input", type=Path)
     p.add_argument("--require-before", type=int, help="explicit static EX2 count required before wait0")
+    p.add_argument("--kv-tile", type=int, choices=(128, 176), default=176,
+                   help="registered geometry; work and lifetime denominators are derived from it")
     p.add_argument("--max-private-bytes", type=int,
                    help="PPU report only: explicit read+write budget from its measured control")
     a = p.parse_args()
     raw = a.input.read_bytes()
     if a.kind == "report":
-        result = inspect_report(json.loads(raw))
+        result = inspect_report(json.loads(raw), a.kv_tile)
     else:
-        result = (inspect_ptx if a.kind == "ptx" else inspect_sass)(raw.decode("utf-8", "backslashreplace"))
+        result = (inspect_ptx if a.kind == "ptx" else inspect_sass)(raw.decode("utf-8", "backslashreplace"), a.kv_tile)
     result["input_sha256"] = hashlib.sha256(raw).hexdigest()
     if a.require_before is not None:
         require(result["exp2_before_wait0"] == a.require_before,

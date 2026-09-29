@@ -59,6 +59,9 @@ class StandaloneContracts(unittest.TestCase):
                         dim=128, dtype="fp16", causal=False, layout="BSHD", tile_m=128, tile_n=176,
                         row_stride_elements=7168, head_stride_elements=128,
                         batch_stride_elements=7340032, num_splits=1, logical_flops=30064771072)
+        build_record = json.loads((Path(exe).parent / "build.json").read_text())
+        expected["tile_n"] = build_record.get("kv_tile", 176)
+        self.assertIn(expected["tile_n"], (128, 176))
         self.assertEqual({key: record[key] for key in expected}, expected)
         self.assertIn("device=NOT_RUN", subprocess.check_output([exe, "--host-self-test"], text=True))
         # A repeated-launch switch cannot silently turn simulation into a benchmark.

@@ -1,0 +1,3 @@
+candidate,evidence,compute_cycles,useful_mfu_percent,numerics,decision
+KV176-control,historical-user-perfstatistics,247267,74.211601,not_in_uploaded_report,BASELINE
+C07-kv128,CUDA12.8-compile-and-host,,,NOT_RUN,LOCAL-GATES-PASS-NOT-A-PERFORMANCE-WIN
