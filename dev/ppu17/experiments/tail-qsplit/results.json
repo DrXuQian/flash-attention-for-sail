@@ -330,7 +330,7 @@
       "diagnostic": "/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu(10): error: static assertion failed with \"half storage overlaps the old pipeline barriers\"\n  static_assert((1 ? Hybrid::FullKernel::SharedStorageSize :\n  ^\n\n1 error detected in the compilation of \"/workspace/flash-attn-ppu17-tail-qsplit-source/dev/ppu17/experiments/tail-qsplit/transition_negative.cu\".\n"
     }
   ],
-  "rejected_patch_sha256": "10133bb4e0286019275e3355c7a602632e812dba0ebce439cb62199ec8e6177e",
+  "rejected_patch_sha256": "36a3fa2566205f67b453b9d7227b9b97954e594788362d39098103a5d3e26ce1",
   "local_tests": {
     "pass": 68,
     "skip": 4,

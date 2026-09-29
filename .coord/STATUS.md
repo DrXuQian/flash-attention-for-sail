@@ -1,15 +1,31 @@
 # PPU1.7 Hopper source integration
 
-    updated-at: 2026-09-29 03:24:06 UTC
-    working-on: C07 KV128 committed, single-invocation simulation handoff ready
+    updated-at: 2026-09-29 05:22:20 UTC
+    working-on: tail experiment local complete:68 PASS/4 SKIP/0 FAIL; T01 single-invocation handoff ready
     blocked-on: native PPU1.7 lowering/model not available locally; report gates remain required
-    last-commit: 536d86c (C07 implementation and complete local evidence; this checkpoint is documentation-only)
-    branch: ppu17-softmax-overlap
-    workspace: /workspace/flash-attn-ppu17-softmax-overlap-source
+    last-commit: 7e41b5de4726ce36e5b30428331946734b86562f (tested implementation; subsequent checkpoint is documentation/archive formatting only)
+    branch: ppu17-tail-qsplit
+    workspace: /workspace/flash-attn-ppu17-tail-qsplit-source
     scope: FP16/BF16 fixed forward, D64/128/256, causal/noncausal, GQA
     model-target: current uploaded run 40 SM; historical 20-SM model is not this run
 
-Current experiment: dev/ppu17/experiments/kv128/docs/plan.md.
+Current experiment: dev/ppu17/experiments/tail-qsplit/docs/plan.md.
+User requires tail and exp optimization independently. Exp/softmax untouched.
+C07 user reports240412cycles; full report/CPU result/identity not yet uploaded.
+Actual `/root/perfstatistics.json` is still the old266011cycle C03 loser.
+T01 final ELF24dc2a0e: actual M64 collective,255regs/0stack/0spill on CUDA.
+T02 corrected440full+16half ELF1f881cb0:32/32B spill >12/12B budget, rejected
+before simulation. Its live wrapper/launcher/phase edits removed; exact replay
+patch retained. Both actual transition compile negatives have matching green
+controls. Final source leaves exp, mainloop, epilogue and kernel unchanged.
+M64 is a scaling control with doubled K/V task fills, not a claimed speedup.
+Complete final tier68PASS/4SKIP/0FAIL (3missing Torch;1old raw report missing).
+Default encoded bodies2/2 unchanged; opt-in causal unchanged; actual7340032
+output cells exact-once for each inventory and5plants per inventory red.
+No device or model execution. Final replay/results and single-call commands:
+dev/ppu17/experiments/tail-qsplit/README.md.
+
+Previous experiment: dev/ppu17/experiments/kv128/docs/plan.md.
 C07 changes only opt-in KV176->128 on the original pipeline/softmax. Local
 63 PASS /4 SKIP /0 FAIL;3missing-Torch Python oracles,1overwritten baseline
 raw report. Real default encoded bodies unchanged2/2, opt-in causal unchanged.

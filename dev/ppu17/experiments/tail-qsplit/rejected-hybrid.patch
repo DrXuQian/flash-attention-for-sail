@@ -11,7 +11,7 @@ index d6fad02..7507aea 100644
 +#else
 +constexpr char kTailVariant[] = "control";
 +#endif
- 
+
  void check(cudaError_t status, char const* operation) {
      if (status != cudaSuccess)
 @@ -96,6 +101,7 @@ void describe() {
@@ -29,12 +29,12 @@ index dc15b2d..d4b9112 100644
 @@ -182,10 +182,15 @@ public:
          return dim3(MaxThreadsPerBlock, 1, 1);
      }
- 
+
 +    template<int InitializationThreads = 0>
      CUTLASS_DEVICE
      void
      operator()(Params const& params, char* smem_buf) {
- 
+
 +        static_assert(InitializationThreads == 0 ||
 +                      InitializationThreads == MaxThreadsPerBlock,
 +                      "initialization cohort must equal the real collective CTA");
@@ -65,9 +65,9 @@ index 6683de7..038db4d 100644
 +#if defined(FLASHATTN_PPU17_Q_TAIL_MODE) && FLASHATTN_PPU17_Q_TAIL_MODE == 2
 +#include "ppu17_tail_qsplit.hpp"
 +#endif
- 
+
  using namespace cute;
- 
+
 @@ -159,7 +162,17 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
      static constexpr bool UsePersistentScheduler = Arch >= 90 ? !(Split && !Varlen) : ((Is_causal && !Varlen) || (Varlen && Split));
      using Scheduler = std::conditional_t<!UsePersistentScheduler, SchedulerSingleTile, SchedulerPersistent>;
@@ -104,7 +104,7 @@ index 6683de7..038db4d 100644
      };
 +    };
 +    auto mainloop_args = make_mainloop_args(static_cast<CollectiveMainloop*>(nullptr));
- 
+
 -    typename CollectiveEpilogue::Arguments epilogue_args {
 +    auto make_epilogue_args = [&](auto* collective) {
 +    using Epilogue = std::remove_pointer_t<decltype(collective)>;
@@ -118,7 +118,7 @@ index 6683de7..038db4d 100644
      };
 +    };
 +    auto epilogue_args = make_epilogue_args(static_cast<CollectiveEpilogue*>(nullptr));
- 
+
      int qhead_per_khead = !PackGQA ? 1 : cutlass::ceil_div(params.h, params.h_k);
  #ifdef USE_PPU
 @@ -279,11 +301,12 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
@@ -142,11 +142,11 @@ index 6683de7..038db4d 100644
      };
 +    };
 +    auto scheduler_args = make_scheduler_args(num_blocks_m);
- 
+
      if (Varlen && params.num_splits_dynamic_ptr && !params.skip_scheduler_metadata_computation) {
          prepare_varlen_num_blocks(params, stream, PackGQA, kBlockM, kBlockN, Arch >= 90 /*enable_pdl*/);
 @@ -299,9 +324,22 @@ void run_flash_fwd(Flash_fwd_params &params, FlashStream stream) {
- 
+
      int device;
      CHECK_CUDA(flash::runtime::get_device(&device));
 -    typename AttnKernel::Params kernel_params = AttnKernel::to_underlying_arguments({
@@ -168,7 +168,7 @@ index 6683de7..038db4d 100644
 +                mainloop_args, epilogue_args, {device, params.num_sm}, scheduler_args});
 +        }
 +    }();
- 
+
      dim3 grid_dims = AttnKernel::get_grid_shape(kernel_params);
      dim3 block_dims = AttnKernel::get_block_shape();
 diff --git a/hopper/tile_scheduler.hpp b/hopper/tile_scheduler.hpp
@@ -178,14 +178,14 @@ index 3973fc7..e9e5cbf 100644
 @@ -356,13 +356,13 @@ public:
      struct WorkTileInfo {
          int tile_idx;
- 
+
 -        CUTLASS_DEVICE
 +        CUTLASS_HOST_DEVICE
          bool
          is_valid(Params const& params) const {
              return tile_idx < params.total_blocks;
          }
- 
+
 -        CUTLASS_DEVICE
 +        CUTLASS_HOST_DEVICE
          cute::tuple<int32_t, int32_t, int32_t, int32_t>
@@ -196,9 +196,9 @@ index 35c87c7..59c6b0e 100644
 --- a/hopper/tile_size.h
 +++ b/hopper/tile_size.h
 @@ -7,6 +7,15 @@
- 
+
  #include <tuple>
- 
+
 +#if defined(FLASHATTN_PPU17_Q_TAIL_MODE)
 +#if !defined(FLASHATTN_PPU17) || !defined(FLASHATTN_PPU17_KV_TILE128) || !FLASHATTN_PPU17_KV_TILE128
 +#error "Q-tail experiment requires explicit PPU1.7 and KV128"

@@ -1,6 +1,7 @@
 # Tail Q split resume
 
-- updated-at: 2026-09-29 05:19:03 UTC
+- updated-at: 2026-09-29 05:22:20 UTC
+- last-commit: 7e41b5de4726ce36e5b30428331946734b86562f (implementation)
 - branch: ppu17-tail-qsplit
 - parent: d19d27a
 - working-on: local complete; T01 ready for one simulator invocation; T02 rejected and removed from live source
