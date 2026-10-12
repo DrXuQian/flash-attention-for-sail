@@ -4,7 +4,13 @@
  ******************************************************************************/
 
 // Include these 2 headers instead of torch/extension.h since we don't need all of the torch headers.
+#ifndef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
 #include <torch/python.h>
+#endif
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+#include <limits>
+#include <algorithm>
+#endif
 #include <torch/nn/functional.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
@@ -24,6 +30,10 @@
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 
 namespace FLASH_NAMESPACE {
+
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+#include "holmes_workspace.h"
+#endif
 
 void set_params_fprop(Flash_fwd_params &params,
                       // sizes
@@ -298,12 +308,17 @@ inline int num_splits_heuristic(int batch_nheads_mblocks, int num_SMs, int num_n
     return 1;
 }
 
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+#include "holmes_splitkv.h"
+#endif
+
 std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, const int batch_size,
     const int num_heads, const int head_size, const int max_seqlen_k, const int max_seqlen_q,
     const int head_size_rounded, const float p_dropout,
     const int num_splits, const int num_sm, struct c10::TensorOptions opts) {
 
     // This needs to match with run_mha_fwd_splitkv_dispatch
+#ifndef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
 #ifdef USE_PPU
     int block_m, block_n;
     if (params.seqlenq_ngroups_swapped) {
@@ -323,18 +338,38 @@ std::tuple<at::Tensor, at::Tensor> set_params_splitkv(Flash_fwd_params &params, 
     // In any case we don't expect seqlen_q to be larger than 64 for inference.
     const int num_m_blocks = (max_seqlen_q + 64 - 1) / 64;
 #endif
+#endif // !FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
     params.num_splits = num_splits;
     at::Tensor softmax_lse_accum;
     at::Tensor out_accum;
 
     if (p_dropout == 0.0f) {  // SplitKV is not implemented for dropout
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+        TORCH_CHECK(holmes_workspace != nullptr, "Holmes FA2 requires an active workspace scope");
+        const size_t rows = holmes_checked_mul(
+            holmes_checked_mul(size_t(batch_size), size_t(num_heads)), size_t(max_seqlen_q));
+        const int max_splits = holmes_max_splits(rows, size_t(head_size_rounded),
+                                                holmes_workspace->size);
+        params.num_splits = holmes_select_splits(batch_size, num_heads, max_seqlen_q,
+            max_seqlen_k, head_size, params.seqlenq_ngroups_swapped, num_sm,
+            num_splits, max_splits);
+#else
         if (num_splits < 1) {
             // We multiply number of SMs by 2 to hard-code the fact that we're using 128 threads per block.
             params.num_splits = num_splits_heuristic(batch_size * num_heads * num_m_blocks, num_sm * 2, num_n_blocks, 128);
         }
+#endif
         if (params.num_splits > 1) {
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+            softmax_lse_accum = holmes_empty({params.num_splits, batch_size, num_heads, max_seqlen_q}, opts.dtype(at::kFloat));
+#else
             softmax_lse_accum = torch::empty({params.num_splits, batch_size, num_heads, max_seqlen_q}, opts.dtype(at::kFloat));
+#endif
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+            out_accum = holmes_empty({params.num_splits, batch_size, num_heads, max_seqlen_q, head_size_rounded}, opts.dtype(at::kFloat));
+#else
             out_accum = torch::empty({params.num_splits, batch_size, num_heads, max_seqlen_q, head_size_rounded}, opts.dtype(at::kFloat));
+#endif
             params.softmax_lseaccum_ptr = softmax_lse_accum.data_ptr();
             params.oaccum_ptr = out_accum.data_ptr();
         }
@@ -444,8 +479,17 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
             out = out.reshape({batch_size, num_heads_k, ngroups, head_size}).transpose(1, 2);
         }
     } else {
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+        TORCH_CHECK(false, "Holmes FA2 requires a caller-owned output tensor");
+#else
         out = torch::empty_like(q);
+#endif
     }
+
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+    // No graph kernel or temporary storage is needed for an empty query.
+    if (seqlen_q == 0) return {out, at::Tensor(), at::Tensor(), at::Tensor()};
+#endif
 
     auto round_multiple = [](int x, int m) { return (x + m - 1) / m * m; };
     const int head_size_rounded = round_multiple(head_size, head_size <= 128 ? 32 : 64);
@@ -454,15 +498,27 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
 
     auto opts = q.options();
 
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+    auto softmax_lse = holmes_empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
+#else
     auto softmax_lse = torch::empty({batch_size, num_heads, seqlen_q}, opts.dtype(at::kFloat));
+#endif
     at::Tensor p;
     // Only return softmax if there's dropout to reduce compilation time
     if (return_softmax) {
         TORCH_CHECK(p_dropout > 0.0f, "return_softmax is only supported when p_dropout > 0.0");
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+        p = holmes_empty({ batch_size, num_heads, seqlen_q_rounded, seqlen_k_rounded }, opts);
+#else
         p = torch::empty({ batch_size, num_heads, seqlen_q_rounded, seqlen_k_rounded }, opts);
+#endif
     }
     else {
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+        p = holmes_empty({ 0 }, opts);
+#else
         p = torch::empty({ 0 }, opts);
+#endif
     }
 
     Flash_fwd_params params;
@@ -496,7 +552,11 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
     // We use a custom RNG that increases the offset by batch_size * nheads * 32.
     int64_t counter_offset = params.b * params.h * 32;
     auto options = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+    auto rng_state = holmes_empty({2}, options.dtype(torch::kInt64));
+#else
     auto rng_state = torch::empty({2}, options.dtype(torch::kInt64));
+#endif
     // Forward kernel will populate memory with the seed and offset.
     params.rng_state = reinterpret_cast<uint64_t*>(rng_state.data_ptr());
 
@@ -547,6 +607,7 @@ mha_fwd(at::Tensor &q,         // batch_size x seqlen_q x num_heads x round_mult
     return {out, softmax_lse, p, rng_state};
 }
 
+#ifndef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
 std::vector<at::Tensor>
 mha_varlen_fwd(at::Tensor &q,  // total_q x num_heads x head_size, total_q := \sum_{i=0}^{b} s_i
                const at::Tensor &k,  // total_k x num_heads_k x head_size, total_k := \sum_{i=0}^{b} s_i or num_blocks x page_block_size x num_heads_k x head_size if there's a block_table.
@@ -1595,8 +1656,10 @@ mha_fwd_kvcache(at::Tensor &q,                 // batch_size x seqlen_q x num_he
     }
     return {out, softmax_lse};
 }
+#endif // !FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
 } // namespace FLASH_NAMESPACE
 
+#ifndef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "FlashAttention";
     m.def("fwd", &FLASH_NAMESPACE::mha_fwd, "Forward pass");
@@ -1605,3 +1668,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("varlen_bwd", &FLASH_NAMESPACE::mha_varlen_bwd, "Backward pass (variable length)");
     m.def("fwd_kvcache", &FLASH_NAMESPACE::mha_fwd_kvcache, "Forward pass, with KV-cache");
 }
+
+#else
+#include "holmes_api.h"
+#endif

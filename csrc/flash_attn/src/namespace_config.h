@@ -54,7 +54,11 @@
 
 // Set default namespace to flash
 #ifndef FLASH_NAMESPACE
+#ifdef FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES
+#define FLASH_NAMESPACE holmes_mha
+#else
 #define FLASH_NAMESPACE flash
+#endif
 #endif
 
 #define FLASH_NAMESPACE_ALIAS(name) FLASH_NAMESPACE::name
