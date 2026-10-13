@@ -44,7 +44,7 @@ The PPU version includes targeted optimizations around data movement, TSM layout
 
 **Requirements:**
 - PPU SDK
-- ZW 610 / 610E / 810 / 810E / M530 / M890
+- Zhenwu 610 / 610E / 810 / 810E / M530 / M890
 - PyTorch 1.12 or higher (recommended to use Docker image matching the PPU SDK version)
 - `packaging` Python package (`pip install packaging`)
 - `psutil` Python package (`pip install psutil`)
@@ -81,7 +81,6 @@ python setup.py bdist_wheel
 ```python
 # FlashAttention-2 (installed as the `flash_attn` package)
 import flash_attn
-flash_attn.flash_attn_func()
 
 # Or import the functions directly:
 from flash_attn import (
@@ -99,7 +98,6 @@ from flash_attn import (
 # FlashAttention-3 (installed as the `flash_attn_3` package, exposing the
 # top-level `flash_attn_interface` module)
 import flash_attn_interface
-flash_attn_interface.flash_attn_func()
 
 # Or import the functions directly:
 from flash_attn_interface import (
