@@ -27,7 +27,12 @@ SKIP_CUDA_BUILD = os.getenv("FLASH_ATTENTION_SKIP_CUDA_BUILD", "FALSE") == "TRUE
 
 SKIP_KERNEL_BUILD = os.getenv("FLASH_ATTENTION_SKIP_KERNEL_BUILD", "FALSE") == "TRUE"
 
-FA3_HLLM_BUILD = os.getenv("FA3_HLLM_BUILD", "0") == "1"
+FA3_HOLMES_WHEEL = os.getenv("FA3_HOLMES_WHEEL", "0") == "1"
+if FA3_HOLMES_WHEEL:
+    PACKAGE_NAME = "flash_attn_3_holmes"
+
+# Holmes raw entry points call the HLLM implementation and require its build mode.
+FA3_HLLM_BUILD = FA3_HOLMES_WHEEL or os.getenv("FA3_HLLM_BUILD", "0") == "1"
 FA3_HLLM_USE_ADDR = os.getenv("FA3_HLLM_USE_ADDR", "0") == "1"
 
 DISABLE_BACKWARD = os.getenv("FLASH_ATTENTION_DISABLE_BACKWARD", "FALSE") == "TRUE"
@@ -134,6 +139,7 @@ if not SKIP_CUDA_BUILD:
         + (["-DFLASHATTENTION_DISABLE_SM90"] if DISABLE_SM90 else [])
         + (["-DFLASHATTENTION_ENABLE_VCOLMAJOR"] if ENABLE_VCOLMAJOR else [])
         + ["-DUSE_PPU", "-DUSE_AIU=1"]
+        + (["-DFA3_HOLMES_BUILD"] if FA3_HOLMES_WHEEL else [])
         + (["-DFA3_HLLM_BUILD"] if FA3_HLLM_BUILD else [])
         + (["-DFA3_HLLM_USE_ADDR"] if FA3_HLLM_USE_ADDR else [])
     )
@@ -301,7 +307,7 @@ setup(
     packages=find_packages(
         exclude=("build", "csrc", "include", "tests", "dist", "docs", "benchmarks")
     ),
-    py_modules=["flash_attn_interface"],
+    py_modules=[] if FA3_HOLMES_WHEEL else ["flash_attn_interface"],
     author="Tri Dao",
     author_email="tri@tridao.me",
     description="Flash Attention 3: Fast and Memory-Efficient Exact Attention",

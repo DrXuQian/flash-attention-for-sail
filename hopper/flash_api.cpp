@@ -12,6 +12,9 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <cutlass/numeric_types.h>
 #include "flash.h"
+#ifdef USE_PPU
+#include "qsa/dispatch.h"
+#endif
 #include "static_switch.h"
 #include "tile_size.h"
 #include "heuristics.h"
@@ -459,10 +462,6 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, hggcStream_t stream) {
         #endif
     }
 }
-
-#ifdef USE_PPU
-#include "qsa/dispatch.h"
-#endif
 
 #if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)
 // QSA is only verified for head dim 256 bf16/fp16, so only those kernels are instantiated.
