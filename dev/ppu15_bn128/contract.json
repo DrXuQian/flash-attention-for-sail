@@ -1,0 +1,25 @@
+{
+  "schema": "fa15-bn128-v1",
+  "source_base": "3b78b2f0522d32aebbfbf76129c0e3db99f4b876",
+  "actlize": "9771215b2119d19464c0663299885699d74985a8",
+  "target": "ppu_15",
+  "shape": {"batch": 1, "sequence": 8398, "heads": 56, "head_dim": 128},
+  "causal": false,
+  "dropout": 0.0,
+  "layouts": "contiguous BSHD; LSE=BHS",
+  "configs": [
+    {"id": 0, "name": "control", "bm": 128, "bn": 64, "warps": 4, "shared_bytes": 65536},
+    {"id": 1, "name": "bn128-w8", "bm": 128, "bn": 128, "warps": 8, "shared_bytes": 98304},
+    {"id": 2, "name": "bm64-bn128", "bm": 64, "bn": 128, "warps": 4, "shared_bytes": 81920}
+  ],
+  "numeric": {
+    "fp16": {"atol": 0.0005, "rtol": 0.005},
+    "bf16": {"atol": 0.004, "rtol": 0.03},
+    "lse_atol": 0.003,
+    "repeat_launches": 3,
+    "oracle": "CPU FP64 on the actually quantized Q/K/V; all K, sampled Q/head on S8398; full small tail cases",
+    "cross_bn_raw_equality_required": false
+  },
+  "timing": {"warmup": 5, "samples": 7, "launches": 20, "order": "rotating forward/reverse", "overlapping_envelopes": "UNRESOLVED"},
+  "admission": {"spill_bytes": 0, "required_mma": "native PPU1.5 matching input dtype", "promotion": "none"}
+}
