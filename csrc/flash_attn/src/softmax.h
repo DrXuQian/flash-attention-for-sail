@@ -13,6 +13,9 @@
 #include "namespace_config.h"
 #include "philox.cuh"
 #include "utils.h"
+#if defined(FLASHATTN_PPU15_SOFTMAX_ROW_INTERLEAVE)
+#include "softmax_row_schedule.h"
+#endif
 
 namespace FLASH_NAMESPACE {
 
@@ -59,7 +62,22 @@ __device__ __forceinline__ void reduce_max(Tensor<Engine0, Layout0> const& tenso
 template<bool zero_init=true, typename Engine0, typename Layout0, typename Engine1, typename Layout1>
 __device__ __forceinline__ void reduce_sum(Tensor<Engine0, Layout0> const& tensor, Tensor<Engine1, Layout1> &sum){
     SumOp<float> sum_op;
+#if defined(FLASHATTN_PPU15_SOFTMAX_ROW_INTERLEAVE)
+    // Independent query rows, unchanged left-to-right order within each row.
+    static_assert(decltype(size<0>(tensor))::value == 4 && decltype(size<1>(tensor))::value == 16,
+                  "the row-interleave experiment admits only the 4x16 score fragment");
+    #pragma unroll
+    for (int mi = 0; mi < size<0>(tensor); ++mi) {
+        sum(mi) = zero_init ? tensor(mi, 0) : sum_op(sum(mi), tensor(mi, 0));
+    }
+    detail::for_each_softmax_column<decltype(size<0>(tensor))::value,
+                                    decltype(size<1>(tensor))::value, 1>(
+        [&](int mi, int ni) {
+            sum(mi) = sum_op(sum(mi), tensor(mi, ni));
+        });
+#else
     thread_reduce_<zero_init>(tensor, sum, sum_op);
+#endif
 }
 
 // Apply the exp to all the elements.
@@ -68,6 +86,26 @@ __forceinline__ __device__ void scale_apply_exp2(Tensor<Engine0, Layout0> &tenso
     static_assert(Layout0::rank == 2, "Only support 2D Tensor");
     static_assert(Layout1::rank == 1, "Only support 1D Tensor");
     CUTE_STATIC_ASSERT_V(size<0>(max) == size<0>(tensor));
+#if defined(FLASHATTN_PPU15_SOFTMAX_ROW_INTERLEAVE)
+    // Only row scheduling changes: no score fragment copy, new exp
+    // approximation, different summation tree, or reduced precision.
+    static_assert(decltype(size<0>(tensor))::value == 4 && decltype(size<1>(tensor))::value == 16,
+                  "native row-trace denominator must match the real score fragment");
+    auto max_scaled = make_fragment_like(max);
+    #pragma unroll
+    for (int mi = 0; mi < size<0>(tensor); ++mi) {
+        max_scaled(mi) = max(mi) == -INFINITY ? 0.f : max(mi) * (Scale_max ? scale : float(M_LOG2E));
+    }
+    detail::for_each_softmax_column<decltype(size<0>(tensor))::value,
+                                    decltype(size<1>(tensor))::value>(
+        [&](int mi, int ni) {
+            #ifdef UNFUSE_FMA
+                tensor(mi, ni) = exp2f(__fmul_rn(tensor(mi, ni), scale) - max_scaled(mi));
+            #else
+                tensor(mi, ni) = exp2f(tensor(mi, ni) * scale - max_scaled(mi));
+            #endif
+        });
+#else
     #pragma unroll
     for (int mi = 0; mi < size<0>(tensor); ++mi) {
         // If max is -inf, then all elements must have been -inf (possibly due to masking).
@@ -89,6 +127,7 @@ __forceinline__ __device__ void scale_apply_exp2(Tensor<Engine0, Layout0> &tenso
             #endif
         }
     }
+#endif
 }
 
 // Apply the exp to all the elements.

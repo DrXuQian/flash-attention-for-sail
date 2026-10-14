@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile three isolated FA2 PPU1.5 geometries; never launch a device kernel."""
+"""Compile a registered, isolated FA2 PPU1.5 experiment; never run a kernel."""
 import argparse
 import ast
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +52,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--compile-only", action="store_true",
                         help="save/disassemble device-bearing objects; linking and device execution are NOT_RUN")
+    parser.add_argument("--contract", type=Path, default=HERE / "contract.json")
     args = parser.parse_args()
     if args.sdk is None:
         parser.error("set PPU_SDK or --sdk")
@@ -60,7 +61,9 @@ def main():
     if not os.access(compiler, os.X_OK) or not os.access(dumper, os.X_OK):
         print(f"[FA15 BN128 compile] SKIP: HGCC/native dumper unavailable at {sdk}")
         return 77
-    contract = json.loads((HERE / "contract.json").read_text())
+    contract_path = args.contract.resolve()
+    contract_path.relative_to(ROOT)  # contracts are versioned, not ad hoc external thresholds
+    contract = json.loads(contract_path.read_text())
     dependency = ROOT / "csrc/actlize"
     actual = subprocess.check_output(["git", "-C", dependency, "rev-parse", "HEAD"], text=True).strip()
     if actual != contract["actlize"]:
@@ -75,10 +78,13 @@ def main():
     includes = [ROOT / "csrc/flash_attn/src", dependency / "include",
                 sdk / "include", sdk / "targets/x86_64-linux/include"]
     sources = [ROOT / "setup.py", *HERE.glob("*.cu"), *sorted(HERE.glob("*.py")),
-               HERE / "contract.json", ROOT / "tools/run_ppu15_bn128_box.sh",
+               contract_path, ROOT / contract.get("runner", "tools/run_ppu15_bn128_box.sh"),
+               *sorted(contract_path.parent.glob("*.py")),
+               *sorted(contract_path.parent.glob("*.cpp")),
                *sorted((ROOT / "csrc/flash_attn/src").glob("*.h")),
                *sorted((ROOT / "csrc/flash_attn/src").glob("*.hpp"))]
     receipt = {"schema": contract["schema"], "target": contract["target"],
+               "contract_source": str(contract_path.relative_to(ROOT)),
                "source_sha": subprocess.check_output(["git", "-C", ROOT, "rev-parse", "HEAD"], text=True).strip(),
                "source_diff_sha256": hashlib.sha256(subprocess.check_output(["git", "-C", ROOT, "diff", "HEAD"])).hexdigest(),
                "source_files": {str(p.relative_to(ROOT)): sha256(p) for p in sources},
@@ -93,7 +99,9 @@ def main():
         library = output / f"{name}.so"
         obj = output / f"{name}.o"
         compile_cmd = [compiler, *flags, *(f"-I{p}" for p in includes),
-                       f"-DFA15_CONFIG={config['id']}", "-c", HERE / "kernel.cu", "-o", obj]
+                       f"-DFA15_CONFIG={config.get('geometry_id', config['id'])}",
+                       *(f"-D{definition}" for definition in config.get("defines", [])),
+                       "-c", HERE / "kernel.cu", "-o", obj]
         command(compile_cmd, output / f"{name}.build.log", output)
         if not args.compile_only:
             command([compiler, "-shared", "-Xlinker", "--no-undefined", obj, "-o", library],
@@ -106,20 +114,26 @@ def main():
         native = inspect_native(config, (output / f"{name}.resources.txt").read_text(),
                                 (output / f"{name}.isa.txt").read_text())
         for dtype, info in native.items():
-            print(f"[FA15 BN128 native] {name}/{dtype} vregs={info['vector_registers']} "
+            print(f"[FA15 experiment native] {name}/{dtype} vregs={info['vector_registers']} "
                   f"stack={info['stack_bytes']} dynamic_shared={info['dynamic_shared_bytes']} "
                   f"static_sites={info['static_instruction_sites']} PASS", flush=True)
-        print(f"[FA15 BN128 compile] {name} built in {time.monotonic()-begin:.1f}s; {artifact}", flush=True)
+        print(f"[FA15 experiment compile] {name} built in {time.monotonic()-begin:.1f}s; {artifact}", flush=True)
         return {**config, "library": None if args.compile_only else library.name,
                 "artifact": artifact.name, "sha256": sha256(artifact),
                 "build_seconds": time.monotonic()-begin, "native": native}
 
     with ThreadPoolExecutor(max_workers=max(1, min(args.jobs, 3))) as pool:
         receipt["configs"] = list(pool.map(build, contract["configs"]))
+    if contract["schema"] == "fa15-softmax-row-interleave-v1":
+        sys.path.insert(0, str(contract_path.parent))
+        from native_schedule import check_build
+        check_build(output, contract_path)
+        receipt["native_schedule"] = {"status": "PASS", "file": "row-schedule.json",
+                                      "sha256": sha256(output / "row-schedule.json")}
     if not args.compile_only:
         receipt["link_status"] = "PASS"
     (output / "build.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print(f"[FA15 BN128 compile] built 3/3 geometries, FP16+BF16; "
+    print(f"[FA15 experiment compile] built {len(receipt['configs'])}/{len(contract['configs'])} arms, FP16+BF16; "
           f"link={receipt['link_status']} device=NOT_RUN; {output}")
     return 0
 

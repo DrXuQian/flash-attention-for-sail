@@ -1,0 +1,31 @@
+{
+  "schema": "fa15-softmax-row-interleave-v1",
+  "source_base": "b9fc4ca60ec7c0db8c4a5bbc8bf3f807793a5b80",
+  "actlize": "9771215b2119d19464c0663299885699d74985a8",
+  "target": "ppu_15",
+  "runner": "tools/run_ppu15_row_interleave_box.sh",
+  "shape": {"batch": 1, "sequence": 8398, "heads": 56, "head_dim": 128},
+  "causal": false,
+  "dropout": 0.0,
+  "layouts": "contiguous BSHD; LSE=BHS",
+  "configs": [
+    {"id": 0, "geometry_id": 0, "name": "control", "bm": 128, "bn": 64, "warps": 4, "shared_bytes": 65536},
+    {"id": 1, "geometry_id": 0, "name": "row-interleave", "bm": 128, "bn": 64, "warps": 4, "shared_bytes": 65536, "defines": ["FLASHATTN_PPU15_SOFTMAX_ROW_INTERLEAVE=1", "FLASH_NAMESPACE=flash_row_interleave"]}
+  ],
+  "numeric": {
+    "fp16": {"atol": 0.0005, "rtol": 0.005},
+    "bf16": {"atol": 0.004, "rtol": 0.03},
+    "lse_atol": 0.003,
+    "repeat_launches": 3,
+    "oracle": "Existing CPU FP64 on actual rounded Q/K/V, full small cases and all K/all heads/sampled Q on S8398",
+    "cross_control_raw_equality_required": true
+  },
+  "timing": {"warmup": 5, "samples": 7, "launches": 20, "order": "rotating forward/reverse", "overlapping_envelopes": "UNRESOLVED"},
+  "admission": {
+    "spill_bytes": 0,
+    "maximum_vector_registers": 256,
+    "required_mma": "same native PPU1.5 FP16/BF16 families as control",
+    "native_schedule": "independent-row EXP work must actually be interleaved; old native body is a negative",
+    "promotion": "none"
+  }
+}

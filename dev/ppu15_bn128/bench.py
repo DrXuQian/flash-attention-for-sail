@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Same-input, CPU-oracle, interleaved FA2 geometry comparison (no install)."""
+"""Same-input, CPU-oracle, interleaved FA2 experiment comparison (no install)."""
 import argparse
 import ctypes
 import hashlib
@@ -134,7 +134,7 @@ def oracle(cpu, seq):
 def validate(variants, cpu, device, dtype, seq):
     import torch
     rows, expected, lse_ref = oracle(cpu, seq)
-    control = None
+    control = control_lse = None
     for variant in variants:
         variant.prepare(*device)
         variant.o.fill_(float("nan")); variant.lse.fill_(float("nan"))
@@ -148,10 +148,15 @@ def validate(variants, cpu, device, dtype, seq):
             raise AssertionError(f"LSE mismatch {lse_error}")
         full_control_max_abs = 0.0
         if variant.entry["id"] == 0:
-            control = output
+            control, control_lse = output, lse
         else:
             if control is None:
                 raise AssertionError("the full-output control must be admitted first")
+            if CONTRACT["numeric"].get("cross_control_raw_equality_required", False):
+                if not torch.equal(output.view(torch.int16), control.view(torch.int16)):
+                    raise AssertionError("cross-row output is not RAW-BIT equal to control")
+                if not torch.equal(lse.view(torch.int32), control_lse.view(torch.int32)):
+                    raise AssertionError("cross-row LSE is not RAW-BIT equal to control")
             # Independent CPU samples anchor the control. Compare every output
             # against it as well; chunk host temporaries, not device computation.
             for begin in range(0, seq, 128):
@@ -164,20 +169,22 @@ def validate(variants, cpu, device, dtype, seq):
             if not torch.equal(lse.view(torch.int32), variant.lse.cpu().view(torch.int32)):
                 raise AssertionError("LSE replay is not RAW-BIT stable")
         variant.output_hash, variant.lse_hash = tensor_digest(output), tensor_digest(lse)
-        print("[FA15 BN128 numeric] " + json.dumps({"config": variant.entry["name"],
+        print("[FA15 experiment numeric] " + json.dumps({"config": variant.entry["name"],
               "dtype": dtype, "sequence": seq, "sampled_outputs": expected.numel(),
               "full_output_finite": True, "replay": "RAW-BIT/STABLE", "lse_max_abs": lse_error,
               "full_control_max_abs": full_control_max_abs, "output_sha256": variant.output_hash,
+              "cross_control_raw_required": CONTRACT["numeric"].get("cross_control_raw_equality_required", False),
               **result}), flush=True)
         variant.release()
 
 
 def main():
+    global CONTRACT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dtype", choices=("fp16", "bf16", "both"), default="both")
-    parser.add_argument("--profile", choices=[c["name"] for c in CONTRACT["configs"]])
+    parser.add_argument("--profile", help="one config name from the compiled contract")
     parser.add_argument("--warmup", type=int, default=CONTRACT["timing"]["warmup"])
     parser.add_argument("--samples", type=int, default=CONTRACT["timing"]["samples"])
     parser.add_argument("--launches", type=int, default=CONTRACT["timing"]["launches"])
@@ -195,27 +202,37 @@ def main():
     receipt = json.loads((build / "build.json").read_text())
     if receipt["link_status"] != "PASS":
         raise RuntimeError("compile-only receipt is not a runnable build; link on a complete PPU SDK")
-    if receipt["source_files"]["dev/ppu15_bn128/contract.json"] != digest(HERE / "contract.json"):
+    contract_source = receipt.get("contract_source", "dev/ppu15_bn128/contract.json")
+    contract_path = (HERE.parents[1] / contract_source).resolve()
+    contract_path.relative_to(HERE.parents[1])
+    if receipt["source_files"][contract_source] != digest(contract_path):
         raise RuntimeError("contract changed since compilation")
+    CONTRACT = json.loads(contract_path.read_text())
+    if CONTRACT["schema"] == "fa15-softmax-row-interleave-v1":
+        gate = receipt.get("native_schedule", {})
+        if gate.get("status") != "PASS" or digest(build / gate["file"]) != gate["sha256"]:
+            raise RuntimeError("missing/modified native row-schedule admission")
+    if args.profile and args.profile not in [c["name"] for c in CONTRACT["configs"]]:
+        parser.error("profile arm is absent from compiled contract")
     if receipt["target"] != CONTRACT["target"] or receipt["actlize"] != CONTRACT["actlize"]:
         raise RuntimeError("compiled target/dependency does not match contract")
     if [(c["id"], c["name"]) for c in receipt["configs"]] != [(c["id"], c["name"]) for c in CONTRACT["configs"]]:
-        raise RuntimeError("build candidate denominator differs from registered three configs")
+        raise RuntimeError("build candidate denominator differs from registered configs")
     props = torch.cuda.get_device_properties(torch.cuda.current_device())
-    output = {"build": receipt, "contract_sha256": digest(HERE / "contract.json"),
+    output = {"build": receipt, "contract_sha256": digest(contract_path),
               "torch": torch.__version__, "device": str(props), "samples": [],
               "timing_scope": "warm-prepared-forward device events, no profiler", "default_changed": False,
               "dtype_scope": ["fp16", "bf16"] if args.dtype == "both" else [args.dtype], "status": "INCOMPLETE"}
     if not args.profile:
         if args.output.exists():
             raise RuntimeError(f"result already exists: {args.output}")
-        print("[FA15 BN128 device] " + str(props), flush=True)
+        print("[FA15 experiment device] " + str(props), flush=True)
     for dtype in ("fp16", "bf16") if args.dtype == "both" else (args.dtype,):
         entries = [c for c in receipt["configs"] if not args.profile or c["name"] == args.profile]
         variants = [Variant(entry, build, dtype) for entry in entries]
         output["runtime_versions"] = variants[0].versions
         for variant in variants:
-            print("[FA15 BN128 resources] " + json.dumps({"config": variant.entry["name"],
+            print("[FA15 experiment resources] " + json.dumps({"config": variant.entry["name"],
                   "dtype": dtype, **variant.resources}), flush=True)
         seq = CONTRACT["shape"]["sequence"]
         if args.profile:
@@ -225,7 +242,7 @@ def main():
             variants[0].launch()  # exactly one attention launch; no timing/oracle launches
             torch.cuda.synchronize()
             variants[0].release()
-            print("[FA15 BN128 profile] attention_launches=1; not a correctness/performance verdict")
+            print("[FA15 experiment profile] attention_launches=1; not a correctness/performance verdict")
             return 0
         for small_seq in (1, 65, 129):
             cpu, device = fixture(small_seq, dtype)
@@ -266,13 +283,13 @@ def main():
                 row["mfu_percent"] = 100*tflops/args.peak_tflops
                 row["peak_denominator_tflops"] = args.peak_tflops
             output["samples"].append(row)
-            print("[FA15 BN128 result] " + json.dumps(row), flush=True)
+            print("[FA15 experiment result] " + json.dumps(row), flush=True)
             variant.release()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         if len(output["samples"]) == len(output["dtype_scope"])*len(CONTRACT["configs"]):
             output["status"] = "PASS"
         args.output.write_text(json.dumps(output, indent=2) + "\n")
-    print(f"[FA15 BN128] PASS: {args.output}; shipping selector unchanged")
+    print(f"[FA15 experiment] PASS: {args.output}; shipping selector unchanged")
     return 0
 
 
