@@ -7,6 +7,9 @@ struct QsaConfig {
     static constexpr int RowBytes = 0, KVStride = 0;
     static constexpr bool QRegs = false, TsmQ = false, TsmKV = false;
     static constexpr bool FixedGroup = false, DirectIndex = false, SingleTile = false;
+    static constexpr bool DirectGroupIndex = false;
+    static constexpr bool PredicatedQ = true;
+    static constexpr bool QueryFirst = false;
 };
 }
 
@@ -15,9 +18,18 @@ hggcError_t cached_occupancy(int device, int* result, const void* function,
                            int block, size_t smem, unsigned flags);
 }
 
+// Shape shared by the tuned split count, forward tile, and decode merge.
+// OpForge's 2048-token selector may produce a 2051-entry QSA table.
+inline bool qsa_small_decode_2048(Flash_fwd_params const& p) {
+    return p.is_qsa && p.is_bf16 && p.seqlen_q == 1
+        && !p.qsa_allow_aiu && p.is_causal && !p.is_local && p.softcap == 0.f
+        && p.total_q == p.b && p.seqlen_k >= 2048 && p.seqlen_k <= 2051
+        && p.d == 256 && p.dv == 256;
+}
+
 inline bool qsa_config_supported(Flash_fwd_params const& p) {
 #if defined(USE_PPU) && USE_AIU && !defined(FLASHATTENTION_DISABLE_SM8x) && !defined(FLASHATTENTION_DISABLE_HDIM256) && !defined(FLASHATTENTION_DISABLE_PAGEDKV) && !defined(FLASHATTENTION_DISABLE_PACKGQA) && !defined(FA3_HLLM_BUILD)
-    return p.is_qsa && !p.qsa_allow_aiu && p.arch == 89 && p.is_bf16 && p.d == 256 && p.dv == 256
+    return p.is_qsa && !p.qsa_allow_aiu && p.is_bf16 && p.d == 256 && p.dv == 256
         && p.h_k > 0 && p.page_size > 0
         && p.k_batch_stride == int64_t(p.page_size) * p.k_row_stride
         && p.v_batch_stride == int64_t(p.page_size) * p.v_row_stride
@@ -69,3 +81,6 @@ inline bool qsa_uses_single_tile(Flash_fwd_params const& p) {
 
 // Returns false without launching when this is not an eligible QSA request.
 bool run_qsa(Flash_fwd_params&, hggcStream_t);
+// A head-parallel SplitKV merge for short QSA decode. Returns false for
+// unsupported shapes so the generic combine kernel remains available.
+bool run_qsa_decode_combine(Flash_fwd_params const&, hggcStream_t);

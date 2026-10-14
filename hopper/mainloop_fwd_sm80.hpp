@@ -19,6 +19,9 @@
 #include "paged_kv.h"
 #include "rotary.h"
 #include "utils.h"
+#ifdef USE_PPU
+#include "qsa/mma_sm80_m8.h"
+#endif
 
 namespace flash {
 
@@ -76,6 +79,22 @@ struct CollectiveMainloopFwdSm80 {
     static constexpr bool Fp8VDirect = false;
 #endif
 
+    // N-split PV path. The PV GEMM warps split
+    // along N (kHeadDimV) instead of M, and P is all-gathered through the
+    // just-consumed K stage of smem_k. Every requirement is checked here so
+    // an unsupported config silently falls back to the V-direct path:
+    //   * kStages == 2: a dead K stage must exist during PV;
+    //   * kBlockM == 16*kNWarps: write_P_to_smem assumes the QK M-split of
+    //     exactly 16 rows per warp;
+    //   * kHeadDimV % (32*kNWarps) == 0: gemm_rs_sm80_pv_fp8_nsplit processes
+    //     B in 32-column pairs per warp (rules out hdim192 at kNWarps=4);
+    //   * !Split: packed partial-O direct stores do not support the larger
+    //     number of rows per thread in the N-split accumulator.
+    static constexpr bool Fp8PvNsplit = Fp8VDirect && (kStages == 2) && (kHeadDimV == 256)
+                                        && (int(get<0>(TileShape_MNK{})) == 16 * kNWarps)
+                                        && (kHeadDimV % (32 * kNWarps) == 0)
+                                        && (kNWarps > 1) && !Split;
+
     static_assert(ArchTag::kMinComputeCapability >= 80);
 
     static constexpr bool Has_cp_async = ArchTag::kMinComputeCapability >= 80;
@@ -85,7 +104,22 @@ struct CollectiveMainloopFwdSm80 {
     static constexpr int kHeadDim = get<2>(TileShape_MNK{});
 
 #ifdef USE_PPU
-    static constexpr bool FA4SkipRescaleO = !Is_FP8 && (   // determined by performance test.
+    // Each warp executes QK. Give every warp the same valid score
+    // tile, while PV continues to distribute its output columns across warps.
+    static constexpr bool QsaReplicateQK = Is_QSA && PackGQA && PagedKV
+        && QsaConfig::DirectIndex && QsaConfig::SingleTile
+        && std::is_same_v<Element, cutlass::bfloat16_t>
+        && (kNWarps == 4 || (ArchTag::kMinComputeCapability == 80 && kNWarps == 2))
+        && (kBlockM == 16 || (ArchTag::kMinComputeCapability == 80 && kBlockM == 8)) && kBlockN == 16
+        && kHeadDim == 256 && kHeadDimV == 256
+        && (!Q_in_regs || ArchTag::kMinComputeCapability == 80) && !PagedKVAiu && !AppendKV && !Is_local;
+#else
+    static constexpr bool QsaReplicateQK = false;
+#endif
+
+#ifdef USE_PPU
+    // Keep SM80 QSA on the standard online-softmax rescale path.
+    static constexpr bool FA4SkipRescaleO = !Is_FP8 && !(Is_QSA && ArchTag::kMinComputeCapability == 80) && (
         (kBlockM >  16 && (ArchTag::kMinComputeCapability >= 89 || (kHeadDim != 64 && kHeadDim != 192))) ||   // prefill
         (kBlockM == 16 && (ArchTag::kMinComputeCapability >= 89 && kHeadDim == 256))  // decode
     );
@@ -94,7 +128,7 @@ struct CollectiveMainloopFwdSm80 {
     using SeqlenInfo_t = flash::SeqlenInfoQKNewK<Varlen, AppendKV>;
     using BlockMN_t = flash::BlockMN<SeqlenInfo_t, kBlockM, kBlockN, Is_causal, Is_local, PackGQA, Split, Is_QSA>;
 
-    using MMA_Atom_Arch =
+    using MMA_Atom_Default =
 #ifdef USE_PPU
         std::conditional_t<
             ArchTag::kMinComputeCapability >= 89,
@@ -123,12 +157,22 @@ struct CollectiveMainloopFwdSm80 {
         MMA_Atom<PPU0010_16x16x16_F32F16F16F32_TN>
 #endif
     >;
+#ifdef USE_PPU
+    using MMA_Atom_Arch = std::conditional_t<Is_QSA && ArchTag::kMinComputeCapability == 80 && kBlockM == 8,
+        MMA_Atom<QsaSM80_8x16x16_F32BF16BF16F32_TN>, MMA_Atom_Default>;
+#else
+    using MMA_Atom_Arch = MMA_Atom_Default;
+#endif
     using TiledMma = TiledMMA<
         MMA_Atom_Arch,
-        Layout<Shape<Int<kNWarps>,_1,_1>>,  // 4x1x1 or 8x1x1 thread group
+        std::conditional_t<QsaReplicateQK,
+                           Layout<Shape<_1, Int<kNWarps>, _1>>,
+                           Layout<Shape<Int<kNWarps>,_1,_1>>>,
+        std::conditional_t<QsaReplicateQK,
+                           Tile<Int<kBlockM>, Int<16 * kNWarps>, _16>,
         std::conditional_t<std::is_same_v<Element, cutlass::float_e4m3_t>,
                            Tile<Int<16 * kNWarps>, _16, _32>,
-                           Tile<Int<16 * kNWarps>, _16, _16>>>;
+                           Tile<Int<16 * kNWarps>, _16, _16>>>>;
 
 #if defined(USE_PPU) && !defined(FLASHATTENTION_DISABLE_FP8)
     // Epilogue twin of TiledMma for the zero-shfl FP8 V-direct PV path
@@ -146,6 +190,25 @@ struct CollectiveMainloopFwdSm80 {
         TiledMma>;
 #else
     using TiledMmaOPerm = TiledMma;
+#endif
+
+#if defined(USE_PPU) && !defined(FLASHATTENTION_DISABLE_FP8)
+    // Output coordinates for N-split PV. EpiPerm handles pi_n inside each
+    // 16-column atom; PermutationN maps (atom_col, warp, atom_in_warp) to
+    // atom_col + warp * (kHeadDimV / kNWarps) + 16 * atom_in_warp.
+    // Thus each warp owns a contiguous column slab, matching the compact
+    // ((2,2,2), MMA_M, MMA_N) accumulator and the common epilogue copy.
+    // This is an output layout only; never execute MMA through it.
+    using PvNsplitPermutationN = Layout<
+        Shape<_16, Int<kNWarps>, Int<kHeadDimV / (16 * kNWarps)>>,
+        Stride<_1, Int<kHeadDimV / kNWarps>, _16>>;
+    using TiledMmaOPerm_Nsplit = std::conditional_t<Fp8PvNsplit,
+        TiledMMA<MMA_Atom<cute::PPU0015_16x16x32_F32E4M3E4M3F32_TN_EpiPerm>,
+                 Layout<Shape<_1, Int<kNWarps>, _1>>,
+                 Tile<Int<kBlockM>, PvNsplitPermutationN, _32>>,
+        TiledMmaOPerm>;
+#else
+    using TiledMmaOPerm_Nsplit = TiledMmaOPerm;
 #endif
 
     static constexpr int NumMmaThreads = size(TiledMma{});
@@ -230,7 +293,7 @@ struct CollectiveMainloopFwdSm80 {
     // TSM reads shared memory only; global QSA K/V loads remain cp.async.
     static constexpr bool QsaTsmQ = QsaConfig::TsmQ && Is_QSA && PackGQA;
     static constexpr bool QsaTsmKV = QsaConfig::TsmKV && Is_QSA && !PagedKVAiu;
-    using SmemCopyAtomQ = std::conditional_t<!PackGQA || QsaTsmQ, Copy_Atom<SmemCopyOpQ, Element>, SmemCopyAtom>;
+    using SmemCopyAtomQ = std::conditional_t<!PackGQA || QsaTsmQ, Copy_Atom<SmemCopyOpQ, Element>, std::conditional_t<QsaReplicateQK && kBlockM == 8, Copy_Atom<PPU_U32x2_LDSM_N, Element>, SmemCopyAtom>>;
     using SmemCopyAtomK = std::conditional_t<!PagedKV || PagedKVAiu || QsaTsmKV, Copy_Atom<SmemCopyOpK, Element>, SmemCopyAtom>;
     using SmemCopyAtomKVt = std::conditional_t<!PagedKV || PagedKVAiu || QsaTsmKV, Copy_Atom<SmemCopyOpKVt, Element>, SmemCopyAtomTransposed>;
 #else
@@ -592,9 +655,11 @@ struct CollectiveMainloopFwdSm80 {
 
         TiledMma tiled_mma;
         auto thr_mma = tiled_mma.get_slice(thread_idx);
+        int const qk_thread_idx = QsaReplicateQK ? (thread_idx & 31) : thread_idx;
+        auto thr_mma_qk = tiled_mma.get_slice(qk_thread_idx);
 
         // Allocate "fragments/descriptors"
-        Tensor tSrQ = thr_mma.partition_fragment_A(sQ);
+        Tensor tSrQ = thr_mma_qk.partition_fragment_A(sQ);
 
 #if defined(USE_PPU) && USE_AIU
         if constexpr (ArchTag::kMinComputeCapability >= 89) {
@@ -618,20 +683,23 @@ struct CollectiveMainloopFwdSm80 {
             gmem_tiled_copy_V.desc_ = AiuDesc{nullptr, seqlen_info.seqlen_k, get<0>(params.stride_V), kBlockN, kBlockKGmem, aiu_offset_v};
         }
         const int warp_idx = __ppu_read_firstlane(threadIdx.x / 32);
+        [[maybe_unused]] const int lane = threadIdx.x % 32;  // P3 only
         const int tid_thread_slice = warp_idx * 32;
 #else
         const int tid_thread_slice = thread_idx;
 #endif
+        // TSM uses a warp-uniform descriptor; LDSM uses lane-local addresses.
+        int const qk_tid_thread_slice = QsaReplicateQK ? 0 : tid_thread_slice;
         // Copy Atom retiling
         auto smem_tiled_copy_Q = make_tiled_copy_A(SmemCopyAtomQ{}, tiled_mma);
-        auto smem_thr_copy_Q = !PackGQA || QsaTsmQ ? smem_tiled_copy_Q.get_thread_slice(tid_thread_slice) : smem_tiled_copy_Q.get_thread_slice(thread_idx);
+        auto smem_thr_copy_Q = !PackGQA || QsaTsmQ ? smem_tiled_copy_Q.get_thread_slice(qk_tid_thread_slice) : smem_tiled_copy_Q.get_thread_slice(qk_thread_idx);
         auto smem_tiled_copy_K = make_tiled_copy_B(SmemCopyAtomK{}, tiled_mma);
         auto smem_tiled_copy_V = make_tiled_copy_B(SmemCopyAtomKVt{}, tiled_mma);
 #if defined(USE_PPU) && USE_AIU
-        auto smem_thr_copy_K = !PagedKV || PagedKVAiu || QsaTsmKV ? smem_tiled_copy_K.get_thread_slice(tid_thread_slice) : smem_tiled_copy_K.get_thread_slice(thread_idx);
+        auto smem_thr_copy_K = !PagedKV || PagedKVAiu || QsaTsmKV ? smem_tiled_copy_K.get_thread_slice(qk_tid_thread_slice) : smem_tiled_copy_K.get_thread_slice(qk_thread_idx);
         auto smem_thr_copy_V = (!PagedKV || PagedKVAiu || QsaTsmKV) ? smem_tiled_copy_V.get_thread_slice(tid_thread_slice) : smem_tiled_copy_V.get_thread_slice(thread_idx);
 #else
-        auto smem_thr_copy_K = smem_tiled_copy_K.get_thread_slice(thread_idx);
+        auto smem_thr_copy_K = smem_tiled_copy_K.get_thread_slice(qk_thread_idx);
         auto smem_thr_copy_V = smem_tiled_copy_V.get_thread_slice(thread_idx);
 #endif
         Tensor tSsQ = [&]() -> auto {
@@ -951,7 +1019,7 @@ struct CollectiveMainloopFwdSm80 {
         if constexpr (!Share_QV_Smem) { preprocess_Q(); }
 
         flash::Mask<kBlockM, kBlockN, PackGQA, TiledMma, false, Is_QSA> mask(
-            thread_idx, seqlen_q, seqlen_k, params.window_size_left, params.window_size_right, 0 /*sink_token_length*/,
+            qk_thread_idx, seqlen_q, seqlen_k, params.window_size_left, params.window_size_right, 0 /*sink_token_length*/,
             params.attention_chunk_divmod, params.qhead_per_khead_divmod
         );
 
@@ -995,8 +1063,8 @@ struct CollectiveMainloopFwdSm80 {
                 }
                 cute::cp_async_fence();
             };
-            Tensor tSrQ_cur = cute::conditional_return<Q_in_regs>(tSrQ, thr_mma.partition_fragment_A(sQ));
-            Tensor tSrK = thr_mma.partition_fragment_B(sK(_, _, _0{}));
+            Tensor tSrQ_cur = cute::conditional_return<Q_in_regs>(tSrQ, thr_mma_qk.partition_fragment_A(sQ));
+            Tensor tSrK = thr_mma_qk.partition_fragment_B(sK(_, _, _0{}));
 #ifdef USE_PPU
             if constexpr (PagedKVAiu && (kBlockN != kBlockNPagedPerAiuLoad)) {
                 flash::gemm_sm80_kv_paged_aiu<kBlockN, kBlockNPagedPerAiuLoad, kHeadDim, kBlockKGmem, Q_in_regs>(
@@ -1052,9 +1120,35 @@ struct CollectiveMainloopFwdSm80 {
 #else
             Tensor scores_scale = softmax.template max_get_scale</*Is_first=*/Is_first_iter, Check_inf>(tSrS);
 #endif
-            softmax.template online_softmax</*Is_first=*/Is_first_iter, Check_inf>(tSrS);
+#if defined(USE_PPU) && USE_AIU
+            // broadcast the per-row scales into the dead read-stage K
+            // buffer immediately after they are computed. so that
+            // online_softmax and rescale_o_nsplit below share a single
+            // barrier-free region and the compiler can interleave the O
+            // multiplies with the exp2f/FMA latency gaps of softmax.
+            if constexpr (Fp8PvNsplit) {
+                __syncthreads();  // K safety: all warps done reading the read-stage K
+                char* bcast_base = reinterpret_cast<char*>(shared_storage.tensors.mainloop.smem_k.data())
+                                 + (kStages > 1 ? smem_pipe_read : 0) * (kBlockN * kHeadDim * sizeof(Element));
+                float* scale_ptr = reinterpret_cast<float*>(bcast_base + kBlockM * kBlockN);
+                flash::write_scale_to_smem<kBlockM>(
+                    reinterpret_cast<char*>(scale_ptr), scores_scale(0), scores_scale(1), warp_idx, lane);
+                __syncthreads();  // scale visible to all warps
+            }
+#endif
+#if defined(USE_PPU) && USE_AIU
+            if constexpr (Fp8PvNsplit && !Is_first_iter) {
+                char* bcast_base = reinterpret_cast<char*>(shared_storage.tensors.mainloop.smem_k.data())
+                                 + (kStages > 1 ? smem_pipe_read : 0) * (kBlockN * kHeadDim * sizeof(Element));
+                const float* scale_ptr = reinterpret_cast<const float*>(bcast_base + kBlockM * kBlockN);
+                softmax.template online_softmax_rescale_o_nsplit<Check_inf>(tSrS, tOrO, scale_ptr);
+            } else
+#endif
+            {
+                softmax.template online_softmax</*Is_first=*/Is_first_iter, Check_inf>(tSrS);
+            }
 #ifdef USE_PPU
-            if constexpr (FA4SkipRescaleO) {
+            if constexpr (FA4SkipRescaleO && !Fp8PvNsplit) {
                 if (softmax.need_rescale) {
                     softmax.rescale_o(tOrO, scores_scale);   // move rescale here to make mma in PV gemm interleave with exp2/add/fma
                 }
@@ -1069,7 +1163,8 @@ struct CollectiveMainloopFwdSm80 {
                 if constexpr (ArchTag::kMinComputeCapability >= 89) {
                     return make_tensor(tSrS.data(), flash::convert_layout_acc_Aregs<TiledMma>(tSrS.layout()));
                 } else {
-                    return flash::convert_acc<Element>(tSrS);
+                    if constexpr (Is_QSA && ArchTag::kMinComputeCapability == 80 && kBlockM == 8) { return cute::qsa_convert_m8<Element>(tSrS); }
+                    else { return flash::convert_acc<Element>(tSrS); }
                 }
             }();
             Tensor tOrP = [&]() -> auto {
@@ -1086,28 +1181,53 @@ struct CollectiveMainloopFwdSm80 {
             convert_type_out(tOrP_acc, tOrP);
 #endif
 #ifdef USE_PPU
-            if constexpr ((!Is_first_iter) && (!FA4SkipRescaleO)) { softmax.rescale_o(tOrO, scores_scale); }
+            if constexpr (!Fp8PvNsplit) {
+                if constexpr ((!Is_first_iter) && (!FA4SkipRescaleO)) { softmax.rescale_o(tOrO, scores_scale); }
+            }
 #else
             if constexpr (!Is_first_iter) { softmax.rescale_o(tOrO, scores_scale); }
 #endif
-            // Fp8VDirect: the V-wait sync is moved to here (right before the PV
-            // gemm) from its old position just after online_softmax. Everything
-            // in between is register-only (permute_Cregs_fp8, acc->Aregs view,
-            // convert_type_out, rescale_o): no cp.async is issued and no new
-            // cp_async_fence is committed, so the cp_async_wait<kStages*2-2>
-            // group accounting is position-invariant and this still waits for
-            // the current read stage's V g2s. All V smem reads happen inside
-            // gemm_rs_sm80_pv_fp8_vdirect, so one sync here is sufficient and
-            // the next-stage V g2s now overlaps softmax+convert. BF16 and
-            // non-PPU paths are unchanged: they already synced at this point.
-            if constexpr (kStages > 1) { sync(); }
+            // Fp8PvNsplit defer this sync
+            if constexpr (!Fp8PvNsplit) {
+                if constexpr (kStages > 1) { sync(); }
+            }
             Tensor tOrV = thr_mma.partition_fragment_B(sVt(_, _, _0{}));
 #ifdef USE_PPU
             // Move the waiting of load_V_next to the point before PV gemm for better performance.
             if constexpr (kStages == 1 && (kHeadDim <= 96 || (kHeadDim <= 128 && PagedKV))) { flash::cp_async_wait<kStages * 2 - 1>(); __syncthreads(); }
+#if USE_AIU
+            if constexpr (Fp8PvNsplit) {
+                // === N-split PV path (fp8_pv_nsplit_design.md) ===
+                // The dead read-stage K buffer serves as the P/scale
+                // broadcast region; K safety was established by the barrier
+                // right after max_get_scale. 
+                static_assert(kBlockM * kBlockN + kBlockM * int(sizeof(float)) <= kBlockN * kHeadDim * int(sizeof(Element)),
+                              "P + scale broadcast region must fit in one K stage");
+                char* bcast_base = reinterpret_cast<char*>(shared_storage.tensors.mainloop.smem_k.data())
+                                 + (kStages > 1 ? smem_pipe_read : 0) * (kBlockN * kHeadDim * sizeof(Element));
+                // All-gather P into the K stage.
+                flash::write_P_to_smem<kBlockM, kBlockN>(bcast_base, tOrP, warp_idx);
+                // One merged barrier for P visibility and V readiness. 
+                flash::cp_async_wait<kStages * 2 - 2>();
+                __syncthreads();  // P visible to all warps + read-stage V g2s complete
+                // N-split PV: warp w accumulates its own contiguous column
+                // slab { w*COLS + 16*ni + [0,16) | ni in [0, COLS/16) } with
+                // COLS = kHeadDimV/kNWarps (the gemm's B smem reads select
+                // this slab via j0 = warp_idx*COLS_PER_WARP + 32*np). The
+                // epilogue writes the accumulator back through a matching
+                // per-warp slab partition: a multi-warp cute TiledMMA
+                // partition_C cannot express contiguous per-warp column
+                // slabs (AtomLayoutN interleaves 16-column atom blocks).
+                flash::gemm_rs_sm80_pv_fp8_nsplit<kBlockM, kBlockN, kHeadDimV, kBlockKGmem, kNWarps,
+                                                  (!PagedKV || PagedKVAiu), SmemLayoutV>(
+                    tOrO, bcast_base, shared_storage.tensors.mainloop.smem_v.data(),
+                    kStages > 1 ? smem_pipe_read : 0, warp_idx, tiled_mma);
+                __syncthreads();  // barrier C: all P reads done, safe for load_K_next to refill this K stage
+            } else
+#endif
             if constexpr (PagedKVAiu && (kBlockN != kBlockNPagedPerAiuLoad) && (!Is_FP8)) {
                 flash::gemm_rs_sm80_kv_paged_aiu<kBlockN, kBlockNPagedPerAiuLoad, kHeadDimV, kBlockKGmem>(tOrO, tOrP, tOrV, tOsVt(_, _, _, kStages > 1 ? smem_pipe_read : 0), tiled_mma, smem_tiled_copy_V, smem_thr_copy_V);
-            } else if constexpr (Fp8VDirect) {
+            } else if constexpr (Fp8VDirect && !Fp8PvNsplit) {
                 // UseTsmLd = (!PagedKV || PagedKVAiu): TSM on the AIU
                 // cube-blocked tile; else plain LDSM_T on the raw swizzled
                 // row layout (for paged non-AIU FP8, SmemLayoutV is that raw
@@ -1128,9 +1248,9 @@ struct CollectiveMainloopFwdSm80 {
         };
 
         auto first_iter_mask_fn = [&](auto& tSrS, int n_block) {
-            if constexpr (Is_QSA && Is_causal) {
+            if constexpr (Is_QSA && (Is_causal || QsaConfig::DirectIndex)) {
                 flash::Mask<kBlockM, kBlockN, PackGQA, TiledMma, false, Is_QSA> topk_mask(
-                    thread_idx, seqlen_q, int(get<1>(params.shape_pagetable)), params.window_size_left, params.window_size_right, 0,
+                    qk_thread_idx, seqlen_q, int(get<1>(params.shape_pagetable)), params.window_size_left, params.window_size_right, 0,
                     params.attention_chunk_divmod, params.qhead_per_khead_divmod);
                 topk_mask.template apply<true, false, false>(tSrS, m_block, n_block);
             }
@@ -1166,7 +1286,20 @@ struct CollectiveMainloopFwdSm80 {
         }
         float const v_descale = !Is_FP8 || params.ptr_v_descale == nullptr ? 1.0f : params.ptr_v_descale[bidb * get<0>(params.stride_v_descale) + bidh_kv * get<1>(params.stride_v_descale)];
         Tensor scores_scale = softmax_finalize_dispatch(v_descale);
-        softmax.rescale_o(tOrO, scores_scale);
+#if defined(USE_PPU) && USE_AIU
+        if constexpr (Fp8PvNsplit) {
+            // all-gather the final per-row scales through the K buffer,
+            // then rescale the N-split O accumulator. 
+            char* bcast_base = reinterpret_cast<char*>(shared_storage.tensors.mainloop.smem_k.data());
+            float* scale_ptr = reinterpret_cast<float*>(bcast_base + kBlockM * kBlockN);
+            softmax.write_scales_to_smem(scale_ptr, warp_idx, scores_scale);
+            __syncthreads();
+            flash::rescale_o_nsplit(tOrO, scale_ptr);
+        } else
+#endif
+        {
+            softmax.rescale_o(tOrO, scores_scale);
+        }
         if constexpr (Fp8VDirect) {
             // Fp8VDirect: undo the lane-local part of pi_n (d1<->d4, d3<->d6).
             // The remaining cross-lane part is resolved by the epilogue

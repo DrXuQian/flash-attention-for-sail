@@ -3,7 +3,7 @@
 #include "../tile_scheduler.hpp"
 
 namespace flash {
-template<bool Varlen, bool Split>
+template<bool Varlen, bool Split, bool QueryFirst=false, bool FlattenBatch=false>
 class QsaSingleTileScheduler : public SingleTileScheduler<Varlen, Split> {
     using Base = SingleTileScheduler<Varlen, Split>;
 
@@ -22,12 +22,35 @@ public:
                 args.num_splits_dynamic_ptr};
     }
 
+    static dim3
+    get_grid_shape(Params const& params, int num_sm) {
+        if constexpr (FlattenBatch) {
+            // SM80 uses this scheduler for all QSA, including more than 65535
+            // single-query batches. Keep batch out of the limited y/z axes.
+            return {uint32_t(params.num_blocks) * uint32_t(params.num_batch),
+                    uint32_t(params.num_head), uint32_t(!Split ? 1 : params.num_splits)};
+        } else if constexpr (QueryFirst) {
+            // Keep the packed (split, KV head) coordinate intact, while
+            // neighboring CTAs advance through queries first.
+            return {uint32_t(params.num_blocks), uint32_t(params.num_batch),
+                    uint32_t((!Split ? 1 : params.num_splits) * params.num_head)};
+        } else {
+            return Base::get_grid_shape(params, num_sm);
+        }
+    }
+
     template<bool IsProducerWarp=false>
     CUTLASS_DEVICE
     WorkTileInfo
     get_initial_work(Params const& params) const {
-        WorkTileInfo work_info {int(blockIdx.x), int(blockIdx.y), int(blockIdx.z), 0};
-        if constexpr (Split) {
+        WorkTileInfo work_info {int(blockIdx.x),
+            int(QueryFirst ? blockIdx.z : blockIdx.y),
+            int(QueryFirst ? blockIdx.y : blockIdx.z), 0};
+        if constexpr (FlattenBatch) {
+            work_info.block_idx = int(blockIdx.x) % params.num_blocks;
+            work_info.bidb = int(blockIdx.x) / params.num_blocks;
+            work_info.split_idx = !Split ? 0 : int(blockIdx.z);
+        } else if constexpr (Split) {
             int const packed = work_info.bidh;
             work_info.split_idx = params.nsplits_divmod.divmod(work_info.bidh, packed);
         }

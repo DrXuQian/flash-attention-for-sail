@@ -12,6 +12,9 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <cutlass/numeric_types.h>
 #include "flash.h"
+#ifdef USE_PPU
+#include "qsa/dispatch.h"
+#endif
 #include "static_switch.h"
 #include "tile_size.h"
 #include "heuristics.h"
@@ -467,17 +470,13 @@ void run_mha_fwd_constexpr(Flash_fwd_params &params, hggcStream_t stream) {
 }
 
 #if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)
-#include "qsa/dispatch.h"
-#endif
-
-#if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)
 // QSA is only verified for head dim 256 bf16/fp16, so only those kernels are instantiated.
 template <int Arch, int Split, bool PagedKVNonTMA, bool PackGQA, bool Has_softcap>
 void run_mha_fwd_qsa(Flash_fwd_params &params, hggcStream_t stream) {
 #ifndef FLASHATTENTION_DISABLE_HDIM256
     TORCH_CHECK(params.d == 256 && params.dv == 256, "QSA only supports head dim 256");
 #if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)
-    if constexpr (Arch == 89 && PagedKVNonTMA && PackGQA && !Has_softcap) {
+    if constexpr (PagedKVNonTMA && PackGQA && !Has_softcap) {
         if (run_qsa(params, stream)) { return; }
     }
 #endif
@@ -531,6 +530,9 @@ void run_mha_fwd(Flash_fwd_params &params, hggcStream_t stream) {
 
 void run_mha_fwd_combine(Flash_fwd_params &params, hggcStream_t stream, bool enable_pdl=false) {
     #ifndef FLASHATTENTION_DISABLE_SPLIT
+#if defined(USE_PPU) && defined(FLASHATTENTION_ENABLE_QSA)
+    if (params.is_qsa && run_qsa_decode_combine(params, stream)) { return; }
+#endif
     // If hdim is 96 or 192, it's faster to round them to 128 or 256 respectively
     // so that kBlockM is smaller and we have more parallelism.
     if (params.is_fp32) {
@@ -605,17 +607,91 @@ inline bool get_pack_gqa(Flash_fwd_params const& params) {
     #endif
 }
 
+#ifdef USE_PPU
+inline int get_qsa_num_splits(Flash_fwd_params const& params, int num_n_blocks, int occ) {
+    if (qsa_small_decode_2048(params)) {
+        if (params.arch == 80 && params.h_k * params.total_q <= 64
+            && (params.h == 3 * params.h_k || params.h == 6 * params.h_k
+                || params.h == 12 * params.h_k)
+            && (params.k_row_stride == 256 || params.k_row_stride == 512)
+            && params.k_row_stride == params.v_row_stride) {
+            int const work = params.h_k * params.total_q;
+            bool const group12 = params.h == 12 * params.h_k;
+            if (work <= 16) {
+                if (params.h_k == 1) {
+                    if (!group12) {
+                        if (params.b == 1) { return 128; }
+                        if (params.b <= 3) { return 64; }
+                    } else {
+                        if (params.b <= 2) { return 64; }
+                        if (params.b <= 6) { return 32; }
+                    }
+                } else if (params.b <= 2) { return params.b == 1 ? 64 : 32; }
+            }
+            // Match the split budget to the small-query tile; round to whole N tiles.
+            int const budget = work <= 16 ? (group12 ? 160 : 240) : 320;
+            int const splits = std::max(1, std::min(work <= 16 && !group12 ? 40 : 128, budget / work));
+            int const blocks_per_split = (num_n_blocks + splits - 1) / splits;
+            return (num_n_blocks + blocks_per_split - 1) / blocks_per_split;
+        }
+        // Four-warp group12 decode uses a head-parallel split merge.
+        if (params.h == 12 * params.h_k
+            && ((params.b <= 4 && params.h_k == 1 && params.k_row_stride == 256)
+                || (params.b <= 2 && params.h_k == 2 && params.k_row_stride == 512))
+            && params.k_row_stride == params.v_row_stride) {
+            return params.b * params.h_k == 4 ? 32 : 64;
+        }
+        // TP8/TP4 Q1 with one KV head have too few one-warp CTAs.
+        if (params.b <= (params.h == 3 ? 7 : 5)
+            && params.h_k == 1 && (params.h == 3 || params.h == 6)
+            && params.k_row_stride == 256 && params.v_row_stride == 256) {
+            if (params.h == 3 && params.b >= 4) { return params.b == 7 ? 16 : 32; }
+            return params.b == 1 ? 128 : 64;
+        }
+    }
+    int const qsa_mblocks = std::max(1, params.h_k * params.total_q);
+    int const slots = std::max(1, params.num_sm * occ);
+    // Fill complete waves for long GQA8 gathers.
+    bool const long_gqa8 = params.arch == 89 && params.is_bf16
+        && params.d == 256 && params.dv == 256 && params.h == 8 * params.h_k
+        && params.k_row_stride == 512 && params.v_row_stride == 512
+        && (params.seqlen_k >= 8192 || (params.seqlen_q == 1 && params.seqlen_k >= 2048
+            && int64_t(params.num_pages) * params.page_size * params.k_row_stride * 2
+               >= int64_t(params.b) * 128 * 1024 * 1024));
+    int const target_mblocks = long_gqa8 ? slots : (params.h / params.h_k <= 16 ? 512 : 256);
+    if (params.seqlen_q <= 16 && qsa_mblocks < target_mblocks) {
+        int const splits = long_gqa8 ? std::min(128, target_mblocks / qsa_mblocks)
+                                   : (target_mblocks + qsa_mblocks / 2) / qsa_mblocks;
+        return std::min(splits, std::max(1, num_n_blocks / 4));
+    }
+    if (params.seqlen_q > 16 && slots / qsa_mblocks > 1) { return std::min(128, slots / qsa_mblocks); }
+    if (qsa_mblocks <= slots) { return 1; }
+    // The combine pass costs an fp32 O write plus read per valid row; past 16 heads, no split pays.
+    if (params.h / params.h_k > 16) { return 1; }
+    // Wave integrality eff(s) = w / ceil(w), with w = qsa_mblocks * s / slots.
+    auto near_integral = [&](int s, int pct) {
+        long long const n = 1LL * qsa_mblocks * s;
+        long long const waves_up = (n + slots - 1) / slots;
+        return 100 * n >= 1LL * pct * slots * waves_up;
+    };
+    if (near_integral(1, 93)) { return 1; }
+    for (int s = 2; s <= 4; ++s) {
+        if (near_integral(s, 97)) { return std::max(1, std::min(s, num_n_blocks)); }
+    }
+    return 1;
+}
+#endif
+
 inline int get_num_splits(Flash_fwd_params const& params) {
     #ifdef FLASHATTENTION_DISABLE_SPLIT
     return 1;
     #else
 #ifdef USE_PPU
-    int block_m = std::max(params.seqlen_q * params.h / params.h_k, 64) / 64;
-    float waves = 1.0 * params.b * params.h_k * block_m / params.num_sm;
-    // QSA sets seqlen_k to topk, so this wave/seqlen_k heuristic reads it as already
-    // saturating the SMs and denies split-KV that the same-FLOP dense shape does get.
-    if ((!params.is_qsa) && (!params.use_kblockm_16) && ((params.seqlen_q > 16) ||
-        ((params.seqlen_q <= 16) && (waves > 1) && (params.seqlen_k < 3660 * waves)))) { return 1; }
+    if (!params.is_qsa && !params.use_kblockm_16) {
+        int const block_m = std::max(params.seqlen_q * params.h / params.h_k, 64) / 64;
+        float const waves = 1.0 * params.b * params.h_k * block_m / params.num_sm;
+        if (params.seqlen_q > 16 || (waves > 1 && params.seqlen_k < 3660 * waves)) { return 1; }
+    }
 #endif
     // Always enable PackGQA for Split
     // params.page_table must already be set
@@ -632,12 +708,19 @@ inline int get_num_splits(Flash_fwd_params const& params) {
 #endif
     int const kBlockM = params.arch >= 90 ? std::get<0>(kBlockMN_kernel_args_sm90) : std::get<0>(kBlockMN_kernel_args_sm8x);
     int const kBlockN = params.arch >= 90 ? std::get<1>(kBlockMN_kernel_args_sm90) : std::get<1>(kBlockMN_kernel_args_sm8x);
-    int seqlen_q_packgqa = params.seqlen_q * (params.h / params.h_k);
     // If is_local, we're not going to load all of seqlen_k
     int const seqlen_k_loaded = !params.is_local
         ? params.seqlen_k
         : std::max(0, std::min(params.seqlen_k, params.window_size_right + params.window_size_left + 1 + kBlockM));
     int const num_n_blocks = (seqlen_k_loaded + kBlockN - 1) / kBlockN;
+#ifdef USE_PPU
+    // We only use Split in kBlockM == 16 scenario, hence we can get exact occ for corresponding tiling.
+    int const occ = params.use_kblockn_16 ? (params.d_rounded <= 64 && params.dv_rounded > 256 ? 14 : 16) :
+        (params.d_rounded <= 64 ? (params.dv_rounded <= 64 ? 8 : (params.dv_rounded <= 256 ? 6 : 14)) : (params.d_rounded <= 96 ? 10 : (params.d_rounded <= 128 ? 8 : (params.d_rounded <= 192 ? 5 : 16))));
+    // QSA schedules one m_block per query token; the dense M-axis heuristic under-counts it.
+    if (params.is_qsa) { return get_qsa_num_splits(params, num_n_blocks, occ); }
+#endif
+    int const seqlen_q_packgqa = params.seqlen_q * (params.h / params.h_k);
     int const num_m_blocks = (seqlen_q_packgqa + kBlockM - 1) / kBlockM;
     int const size_one_kv_head = params.seqlen_k * (params.d + params.dv) * (params.is_e4m3 ? 1 : 2);
 #ifdef USE_PPU
@@ -646,45 +729,6 @@ inline int get_num_splits(Flash_fwd_params const& params) {
     // So we use the upperbound 16 for params.seqlen_q.
     int min_mblocks = (params.num_splits_dynamic_ptr ? 1 : params.b) * params.h_k *
         (((params.num_splits_dynamic_ptr ? std::min(params.seqlen_q, 16) : params.seqlen_q) * (params.h / params.h_k) + kBlockM - 1) / kBlockM);
-    // We only use Split in kBlockM == 16 scenario, hence we can get exact occ for corresponding tiling.
-    int const occ = params.use_kblockn_16 ? (params.d_rounded <= 64 && params.dv_rounded > 256 ? 14 : 16) :
-        (params.d_rounded <= 64 ? (params.dv_rounded <= 64 ? 8 : (params.dv_rounded <= 256 ? 6 : 14)) : (params.d_rounded <= 96 ? 10 : (params.d_rounded <= 128 ? 8 : (params.d_rounded <= 192 ? 5 : 16))));
-    // QSA maps one m_block to one query token, so total_mblocks above under-counts it by
-    // kBlockM / qhead_per_khead and the generic heuristic below sizes the wrong M axis.
-    if (params.is_qsa) {
-        int const qsa_mblocks = std::max(1, params.h_k * params.total_q);
-        int const slots = std::max(1, params.num_sm * occ);
-        // Long GQA8 gathers benefit from two-stage loading. Fill complete waves using
-        // the device's CU count, rounding down so a small remainder does not add a wave.
-        bool const long_gqa8 = params.arch == 89 && params.is_bf16
-            && params.d == 256 && params.dv == 256 && params.h == 8 * params.h_k
-            && params.k_row_stride == 512 && params.v_row_stride == 512
-            && (params.seqlen_k >= 8192 || (params.seqlen_q == 1 && params.seqlen_k >= 2048
-                && int64_t(params.num_pages) * params.page_size * params.k_row_stride * 2
-                   >= int64_t(params.b) * 128 * 1024 * 1024));
-        int const target_mblocks = long_gqa8 ? slots : (params.h / params.h_k <= 16 ? 512 : 256);
-        if (params.seqlen_q <= 16 && qsa_mblocks < target_mblocks) {
-            int const splits = long_gqa8 ? std::min(128, target_mblocks / qsa_mblocks)
-                                       : (target_mblocks + qsa_mblocks / 2) / qsa_mblocks;
-            return std::min(splits, std::max(1, num_n_blocks / 4));
-        }
-        if (params.seqlen_q > 16 && slots / qsa_mblocks > 1) { return std::min(128, slots / qsa_mblocks); }
-        if (qsa_mblocks <= slots) { return 1; }
-        // The combine pass costs an fp32 O write plus read per valid row, so its price scales
-        // with qhead_per_khead; past the 16-wide tile no split pays for itself.
-        if (params.h / params.h_k > 16) { return 1; }
-        // Wave integrality eff(s) = w / ceil(w) with w = qsa_mblocks * s / slots, as integers.
-        auto near_integral = [&](int s, int pct) {
-            long long const n = 1LL * qsa_mblocks * s;
-            long long const waves_up = (n + slots - 1) / slots;
-            return 100 * n >= 1LL * pct * slots * waves_up;
-        };
-        if (near_integral(1, 93)) { return 1; }
-        for (int s = 2; s <= 4; ++s) {
-            if (near_integral(s, 97)) { return std::max(1, std::min(s, num_n_blocks)); }
-        }
-        return 1;
-    }
 #ifndef FA3_HLLM_BUILD
     int num_splits_average = num_splits_heuristic(total_mblocks, params.num_sm, occ, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);
     int num_splits_uppper_bound = num_splits_heuristic(min_mblocks, params.num_sm, occ, num_n_blocks, num_m_blocks, size_one_kv_head, params.is_causal || params.is_local, 128);

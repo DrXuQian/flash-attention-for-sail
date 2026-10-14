@@ -238,7 +238,7 @@ struct CollectiveEpilogueFwd {
 #endif
     }
 
-    template <typename SharedStorage, typename FrgTensorO, typename FrgTensorLSE, typename TiledMma>
+    template <typename SharedStorage, typename FrgTensorO, typename FrgTensorLSE, typename TiledMma, typename TiledMmaLSE = TiledMma>
     CUTLASS_DEVICE void
     store(Params const& params,
           FrgTensorO& tOrO,
@@ -246,7 +246,8 @@ struct CollectiveEpilogueFwd {
           SharedStorage& shared_storage,
           TiledMma tiled_mma,
           int thread_idx,
-          cute::tuple<int32_t, int32_t, int32_t, int32_t> const& block_coord
+          cute::tuple<int32_t, int32_t, int32_t, int32_t> const& block_coord,
+          TiledMmaLSE tiled_mma_lse = {}
           ) {
 
         auto [m_block, bidh, bidb, split_idx] = block_coord;
@@ -267,7 +268,10 @@ struct CollectiveEpilogueFwd {
         // Otherwise we can permute after conversion.
         if constexpr (NeedFP8Permute && Split) { flash::permute_output_fp8_Vcolmajor(tOrO); }
         Tensor tOrO_out = make_tensor_like<Element>(tOrO);
-        flash::convert_type_out(tOrO, tOrO_out);
+        // SplitKV stores FP32 partials directly; the BF16 smem output is unused.
+        static constexpr bool QsaSplitStore = Is_QSA
+            && ArchTag::kMinComputeCapability == 80 && QsaConfig::SingleTile;
+        if (!QsaSplitStore || !is_split) { flash::convert_type_out(tOrO, tOrO_out); }
         if constexpr (NeedFP8Permute && !Split) { flash::permute_output_fp8_Vcolmajor(tOrO_out); }
 
         // Make sure all WGs have finished reading V
@@ -278,18 +282,20 @@ struct CollectiveEpilogueFwd {
 
         // Step 1: Write O from rmem -> smem
         if constexpr (Use_smem) {
-            auto smem_tiled_copy_O = make_tiled_copy_C(SmemCopyAtomO{}, tiled_mma);
-            auto smem_thr_copy_O = smem_tiled_copy_O.get_thread_slice(thread_idx);
-            Tensor taccOrO = smem_thr_copy_O.retile_S(tOrO_out);        // ((Atom,AtomNum), MMA_M, MMA_N)
-            Tensor taccOsO = smem_thr_copy_O.partition_D(sO);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
-            // Tensor taccOsO = smem_thr_copy_O.partition_D(sO_pi);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
-            cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
-            if constexpr (Use_TMA_O) {
-                cutlass::arch::fence_view_async_shared(); // ensure smem writes are visible to TMA
-                cutlass::arch::NamedBarrier::arrive(NumEpilogueThreads + cutlass::NumThreadsPerWarp,
-                                                    cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
-            } else {
-                flash::named_barrier_sync(NumEpilogueThreads, cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
+            if (!QsaSplitStore || !is_split) {
+                auto smem_tiled_copy_O = make_tiled_copy_C(SmemCopyAtomO{}, tiled_mma);
+                auto smem_thr_copy_O = smem_tiled_copy_O.get_thread_slice(thread_idx);
+                Tensor taccOrO = smem_thr_copy_O.retile_S(tOrO_out);        // ((Atom,AtomNum), MMA_M, MMA_N)
+                Tensor taccOsO = smem_thr_copy_O.partition_D(sO);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
+                // Tensor taccOsO = smem_thr_copy_O.partition_D(sO_pi);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
+                cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
+                if constexpr (Use_TMA_O) {
+                    cutlass::arch::fence_view_async_shared(); // ensure smem writes are visible to TMA
+                    cutlass::arch::NamedBarrier::arrive(NumEpilogueThreads + cutlass::NumThreadsPerWarp,
+                                                        cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
+                } else {
+                    flash::named_barrier_sync(NumEpilogueThreads, cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
+                }
             }
         } else {
             if constexpr (ArchTag::kMinComputeCapability >= 90) {
@@ -315,10 +321,17 @@ struct CollectiveEpilogueFwd {
 #else
         static_assert(decltype(size<0, 0>(taccOcO))::value == 2);
 #endif
-        static_assert(decltype(size<0, 1>(taccOcO))::value == 2);
+        static_assert(decltype(size<0, 1>(taccOcO))::value == (Is_QSA && ArchTag::kMinComputeCapability == 80 && kBlockM == 8 ? 1 : 2));
         Tensor taccOcO_rowcol = make_tensor(taccOcO.data(), flash::convert_layout_acc_rowcol(taccOcO.layout()));
         Tensor taccOcO_row = taccOcO_rowcol(_, _0{});
-        CUTE_STATIC_ASSERT_V(size(lse) == size(taccOcO_row));                     // MMA_M
+        // lse is produced on the QK M-split layout (2 rows/lane), which
+        // differs from tiled_mma on the FP8 PV N-split path. Use
+        // tiled_mma_lse (the M-split mainloop TiledMma) for LSE coordinates
+        auto thread_mma_lse = tiled_mma_lse.get_thread_slice(thread_idx);
+        Tensor taccOcO_lse = thread_mma_lse.partition_C(cute::make_identity_tensor(select<0, 1>(TileShape_MNK_PV{})));
+        Tensor taccOcO_lse_rowcol = make_tensor(taccOcO_lse.data(), flash::convert_layout_acc_rowcol(taccOcO_lse.layout()));
+        Tensor taccOcO_lse_row = taccOcO_lse_rowcol(_, _0{});
+        CUTE_STATIC_ASSERT_V(size(lse) == size(taccOcO_lse_row));               // MMA_M
 
         using PackGQA_t = flash::PackGQAManager<get<0>(TileShape_MNK_PV{}), get<1>(TileShape_MNK_PV{}), NumEpilogueThreads, Element, Is_QSA
             , QsaConfig
@@ -335,11 +348,11 @@ struct CollectiveEpilogueFwd {
             if constexpr (!PackGQA) {
                 #pragma unroll
                 for (int mi = 0; mi < size(lse); ++mi) {
-                    int const row = m_block * kBlockM + get<0>(taccOcO_row(mi));
-                    if (get<1>(taccOcO_row(_0{})) == 0 && row < seqlen_o) { mLSE(row) = lse(mi); }
+                    int const row = m_block * kBlockM + get<0>(taccOcO_lse_row(mi));
+                    if (get<1>(taccOcO_lse_row(_0{})) == 0 && row < seqlen_o) { mLSE(row) = lse(mi); }
                 }
             } else {
-                PackGQA_t::store_LSE(mLSE, lse, tiled_mma, params.qhead_per_khead_divmod, thread_idx, seqlen_o, m_block);
+                PackGQA_t::store_LSE(mLSE, lse, tiled_mma_lse, params.qhead_per_khead_divmod, thread_idx, seqlen_o, m_block);
             }
         }
 
@@ -405,7 +418,7 @@ struct CollectiveEpilogueFwd {
                     // If PackGQA, we split the work of compute O_ptr among threads in the same row
                     PackGQA_t::store_O(mO, tOrO, params.qhead_per_khead_divmod, thread_idx, seqlen_o, m_block);
                 }
-            } else {
+            } else if constexpr (Split) {
                 Tensor mOpartial = make_tensor(make_gmem_ptr(params.ptr_O_partial + offset_o * get<0>(params.stride_O_partial)), params.shape_O_packed, params.stride_O_partial_packed)(_, _, bidh, !is_varlen ? bidb : 0, split_idx);
                 Tensor gOpartial = local_tile(mOpartial, select<0, 1>(TileShape_MNK_PV{}), make_coord(m_block, _0{}));  // (M, K)
                 // We already arrived on barrier_O earlier if !Use_smem

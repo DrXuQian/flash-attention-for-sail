@@ -20,14 +20,40 @@ struct Gqa8Varlen : Gqa8Direct { static constexpr bool SingleTile = false; };
 // Qwen3.8 TP8/TP4/TP2/TP1 use groups 3/6/12/12 respectively.
 // Keep the 16-row MMA tile but avoid computing a runtime head divmod, and
 // address each selected token directly when the physical KV row stride fits.
+struct GqaSharedDirect256 : Gqa8Direct { static constexpr int KVStride = 256; static constexpr bool FixedGroup = false, DirectGroupIndex = true; };
+// Large unsplit query batches avoid predicated async copies for unused Q rows.
+struct GqaSharedLong256 : GqaSharedDirect256 { static constexpr int RowBytes = 256; static constexpr bool PredicatedQ = false; };
+struct GqaSharedVarlen256 : GqaSharedDirect256 { static constexpr bool SingleTile = false; };
+struct GqaSharedDirect512 : Gqa8Direct { static constexpr bool FixedGroup = false, DirectGroupIndex = true; };
+struct GqaSharedVarlen512 : GqaSharedDirect512 { static constexpr bool SingleTile = false; };
+struct GqaSharedWarpN : GqaSharedDirect256 {
+    static constexpr int Warps = 4, Stages = 2;
+    static constexpr bool QRegs = false;
+};
+// Single-query decode can share a noncausal instance across groups 3, 6, and 12.
+struct GqaSharedWarpNShort : GqaSharedWarpN { static constexpr int Stages = 1; };
+struct Sm80WarpN : GqaSharedWarpNShort {
+    static constexpr int KVStride = 0;
+    static constexpr bool QRegs = true, TsmQ = false;
+};
+struct Sm80WarpN2 : Sm80WarpN { static constexpr int Warps = 2; };
+struct Sm80WarpNM8 : Sm80WarpN2 { static constexpr int M = 8; };
 struct Gqa3Direct : Gqa8Direct { static constexpr int Group = 3, KVStride = 256; };
-struct Gqa6Direct : Gqa8Direct { static constexpr int Group = 6, KVStride = 256; };
+struct Gqa3WarpN : Gqa3Direct {
+    static constexpr int Warps = 4;
+    static constexpr int Stages = 2;
+    static constexpr bool QRegs = false;
+};
+struct Gqa3WarpNShort : Gqa3WarpN { static constexpr int Stages = 1; };
+struct Gqa3WarpNQueryFirst : Gqa3WarpNShort { static constexpr bool QueryFirst = true; };
 struct Gqa12Direct256 : Gqa8Direct { static constexpr int Group = 12, KVStride = 256; };
-struct Gqa12Direct512 : Gqa8Direct { static constexpr int Group = 12; };
-struct Gqa3Varlen : Gqa3Direct { static constexpr bool SingleTile = false; };
-struct Gqa6Varlen : Gqa6Direct { static constexpr bool SingleTile = false; };
-struct Gqa12Varlen256 : Gqa12Direct256 { static constexpr bool SingleTile = false; };
-struct Gqa12Varlen512 : Gqa12Direct512 { static constexpr bool SingleTile = false; };
+struct Gqa12WarpN : Gqa12Direct256 {
+    static constexpr int Warps = 4;
+    static constexpr int Stages = 2;
+    static constexpr bool QRegs = false;
+};
+struct Gqa12WarpNShort : Gqa12WarpN { static constexpr int Stages = 1; };
+struct Gqa12WarpN512 : Gqa12WarpNShort { static constexpr int KVStride = 512; };
 struct Gqa8Wide : Gqa8Varlen { static constexpr int RowBytes = 512; };
 struct Gqa8ShortWide : Gqa8Wide { static constexpr bool SingleTile = true; };
 struct Gqa8Long : Gqa8Direct { static constexpr int Stages = 2, RowBytes = 256; };
@@ -79,10 +105,10 @@ hggcError_t cached_occupancy(int device, int* result, const void* function, int 
     return status;
 }
 
-template<class Config, bool Split>
+template<class Config, bool Split, bool Causal=true, int Arch=89>
 void launch(Flash_fwd_params& p, hggcStream_t stream) {
-    run_flash_fwd<89, 256, 256, 1, cutlass::bfloat16_t, cutlass::bfloat16_t,
-        true, false, false, true, true, false, 16, false, false,
+    run_flash_fwd<Arch, 256, 256, 1, cutlass::bfloat16_t, cutlass::bfloat16_t,
+        Causal, false, false, true, true, false, 16, false, false,
         true, Split, false, false, false, false, true, Config>(p, stream);
 }
 template<class Config>
@@ -90,34 +116,254 @@ void launch(Flash_fwd_params& p, hggcStream_t stream) {
     if (p.num_splits > 1) { launch<Config, true>(p, stream); }
     else { launch<Config, false>(p, stream); }
 }
+
+// Each CTA merges a 64-element output slice of one query head. Its warps
+// read different SplitKV partitions, exposing parallelism in short decode.
+template<int FixedSplits, int Warps, bool PrefetchOutput=false>
+__global__ void decode_combine_kernel(Flash_fwd_params p) {
+    constexpr int DimTile = 64;
+    constexpr int ValuesPerLane = DimTile / 32;
+    static_assert(!PrefetchOutput || (FixedSplits == 128 && Warps == 16)
+                  || (FixedSplits == 64 && Warps == 8));
+    constexpr int PrefetchIters = PrefetchOutput ? (FixedSplits - 1) / (Warps - 1) : 8;
+    __shared__ float weights[128];
+    __shared__ float partial[Warps][DimTile];
+
+    int const lane = threadIdx.x & 31;
+    int const warp = threadIdx.x >> 5;
+    int const row = blockIdx.x;
+    int const head = blockIdx.y;
+    int const num_splits = FixedSplits > 0 ? FixedSplits :
+        (p.num_splits_dynamic_ptr ? p.num_splits_dynamic_ptr[row] : p.num_splits);
+    auto const* lse = static_cast<float const*>(p.softmax_lseaccum_ptr);
+    auto const* oaccum = static_cast<float const*>(p.oaccum_ptr);
+
+    // Warp 0 normalizes the split weights while the other warps fetch their
+    // full rounds of O partials. Remaining splits are read after the CTA barrier.
+    float prefetched[PrefetchIters][ValuesPerLane];
+    if constexpr (PrefetchOutput) {
+        if (warp != 0) {
+            #pragma unroll
+            for (int j = 0; j < PrefetchIters; ++j) {
+                int const split = warp - 1 + j * (Warps - 1);
+                auto const* src = oaccum + int64_t(split) * p.oaccum_split_stride
+                    + int64_t(head) * p.oaccum_head_stride + int64_t(row) * p.oaccum_row_stride
+                    + int64_t(blockIdx.z) * DimTile;
+                #pragma unroll
+                for (int i = 0; i < ValuesPerLane; ++i) {
+                    prefetched[j][i] = src[lane * ValuesPerLane + i];
+                }
+            }
+        }
+    }
+
+    // The first warp computes the normalized split weights once per head.
+    if (warp == 0) {
+        float lse_values[4];
+        float lse_max = -INFINITY;
+        #pragma unroll
+        for (int i = 0; i < 4; ++i) {
+            int const split = lane + i * 32;
+            lse_values[i] = split < num_splits
+                ? lse[int64_t(split) * p.lseaccum_split_stride + int64_t(head) * p.lseaccum_head_stride + row]
+                : -INFINITY;
+            lse_max = fmaxf(lse_max, lse_values[i]);
+        }
+        #pragma unroll
+        for (int offset = 16; offset > 0; offset >>= 1) {
+            lse_max = fmaxf(lse_max, __shfl_down_sync(0xffffffff, lse_max, offset));
+        }
+        lse_max = __shfl_sync(0xffffffff, lse_max, 0);
+        float weight_values[4];
+        float weight_sum = 0.f;
+        #pragma unroll
+        for (int i = 0; i < 4; ++i) {
+            weight_values[i] = lse_values[i] == -INFINITY ? 0.f : expf(lse_values[i] - lse_max);
+            weight_sum += weight_values[i];
+        }
+        #pragma unroll
+        for (int offset = 16; offset > 0; offset >>= 1) {
+            weight_sum += __shfl_down_sync(0xffffffff, weight_sum, offset);
+        }
+        weight_sum = __shfl_sync(0xffffffff, weight_sum, 0);
+        float const inv_sum = weight_sum > 0.f ? 1.f / weight_sum : 0.f;
+        #pragma unroll
+        for (int i = 0; i < 4; ++i) {
+            int const split = lane + i * 32;
+            if (split < num_splits) { weights[split] = weight_values[i] * inv_sum; }
+        }
+        if (lane == 0 && blockIdx.z == 0) {
+            static_cast<float*>(p.softmax_lse_ptr)[int64_t(head) * p.total_q + row] =
+                weight_sum > 0.f ? lse_max + logf(weight_sum) : -INFINITY;
+        }
+    }
+    __syncthreads();
+
+    float accum[ValuesPerLane] = {};
+    if constexpr (PrefetchOutput) {
+        if (warp != 0) {
+            #pragma unroll
+            for (int j = 0; j < PrefetchIters; ++j) {
+                int const split = warp - 1 + j * (Warps - 1);
+                float const weight = weights[split];
+                if (weight > 0.f) {
+                    #pragma unroll
+                    for (int i = 0; i < ValuesPerLane; ++i) {
+                        accum[i] = fmaf(weight, prefetched[j][i], accum[i]);
+                    }
+                }
+            }
+            #pragma unroll 2
+            for (int j = PrefetchIters; j < PrefetchIters + 1; ++j) {
+                int const split = warp - 1 + j * (Warps - 1);
+                if (split < num_splits) {
+                    float const weight = weights[split];
+                    if (weight > 0.f) {
+                        auto const* src = oaccum + int64_t(split) * p.oaccum_split_stride
+                            + int64_t(head) * p.oaccum_head_stride + int64_t(row) * p.oaccum_row_stride
+                            + int64_t(blockIdx.z) * DimTile;
+                        #pragma unroll
+                        for (int i = 0; i < ValuesPerLane; ++i) {
+                            accum[i] = fmaf(weight, src[lane * ValuesPerLane + i], accum[i]);
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        #pragma unroll 4
+        for (int split = warp; split < num_splits; split += Warps) {
+            float const weight = weights[split];
+            if (weight > 0.f) {
+                auto const* src = oaccum + int64_t(split) * p.oaccum_split_stride
+                    + int64_t(head) * p.oaccum_head_stride + int64_t(row) * p.oaccum_row_stride
+                    + int64_t(blockIdx.z) * DimTile;
+                #pragma unroll
+                for (int i = 0; i < ValuesPerLane; ++i) {
+                    accum[i] = fmaf(weight, src[lane * ValuesPerLane + i], accum[i]);
+                }
+            }
+        }
+    }
+    #pragma unroll
+    for (int i = 0; i < ValuesPerLane; ++i) { partial[warp][lane * ValuesPerLane + i] = accum[i]; }
+    __syncthreads();
+    if (warp == 0) {
+        auto* output = static_cast<cutlass::bfloat16_t*>(p.o_ptr)
+            + int64_t(row) * p.o_row_stride + int64_t(head) * p.o_head_stride
+            + int64_t(blockIdx.z) * DimTile;
+        #pragma unroll
+        for (int i = 0; i < ValuesPerLane; ++i) {
+            int const d = lane * ValuesPerLane + i;
+            float value = 0.f;
+            #pragma unroll
+            for (int w = 0; w < Warps; ++w) { value += partial[w][d]; }
+            output[d] = cutlass::bfloat16_t(value);
+        }
+    }
+}
 }  // namespace qsa
+
+bool run_qsa_decode_combine(Flash_fwd_params const& p, hggcStream_t stream) {
+    bool const small_decode_2048 = qsa_small_decode_2048(p);
+    bool const group12_small = p.h == 12 * p.h_k
+        && ((p.b <= 6 && p.h_k == 1 && p.k_row_stride == 256)
+            || (p.b <= 2 && p.h_k == 2 && p.k_row_stride == 512))
+        && p.k_row_stride == p.v_row_stride
+        && small_decode_2048
+        && (p.num_splits == 32 || p.num_splits == 64);
+    if (!qsa_config_supported(p) || p.d != 256 || p.dv != 256
+        || p.seqlen_q != 1 || p.total_q != p.b || p.b > 16
+        || p.num_splits <= 1 || p.num_splits > 128
+        || (!group12_small && (p.h_k != 1 || (p.h != 3 && p.h != 6)))
+        || p.o_head_stride != 256 || p.oaccum_row_stride != 256) { return false; }
+    dim3 grid(p.total_q, p.h, 256 / 64);
+    if (p.b == 1 && (p.h == 3 || p.h == 6) && small_decode_2048
+        && p.num_splits_dynamic_ptr == nullptr && p.num_splits == 128) {
+        qsa::decode_combine_kernel<128, 16, true><<<grid, 512, 0, stream>>>(p);
+    } else if (p.num_splits_dynamic_ptr == nullptr && p.num_splits == 128) {
+        qsa::decode_combine_kernel<128, 16><<<grid, 512, 0, stream>>>(p);
+    } else if (p.num_splits == 128) {
+        qsa::decode_combine_kernel<0, 16><<<grid, 512, 0, stream>>>(p);
+    } else if (((group12_small && ((p.arch == 80 && p.b <= 2) || (p.b == 1 && p.h_k == 1)))
+                || (p.h == 3 && p.h_k == 1 && p.b == 2
+                    && p.k_row_stride == 256 && p.v_row_stride == 256
+                    && small_decode_2048))
+               && p.num_splits_dynamic_ptr == nullptr && p.num_splits == 64) {
+        qsa::decode_combine_kernel<64, 8, true><<<grid, 256, 0, stream>>>(p);
+    } else if (p.num_splits_dynamic_ptr == nullptr && p.num_splits == 64) {
+        qsa::decode_combine_kernel<64, 8><<<grid, 256, 0, stream>>>(p);
+    } else if (p.num_splits == 64) {
+        qsa::decode_combine_kernel<0, 8><<<grid, 256, 0, stream>>>(p);
+    } else {
+        qsa::decode_combine_kernel<0, 4><<<grid, 128, 0, stream>>>(p);
+    }
+    CHECK_CUDA_KERNEL_LAUNCH();
+    return true;
+}
 
 bool run_qsa(Flash_fwd_params &p, hggcStream_t stream) {
     using namespace qsa;
     if (!qsa_config_supported(p)) { return false; }
+    if (p.arch == 80) {
+        if (p.num_splits <= 1 || int64_t(p.b) * p.h_k > 16 || !qsa_small_decode_2048(p)
+            || (p.h != 3 * p.h_k && p.h != 6 * p.h_k && p.h != 12 * p.h_k)
+            || (p.k_row_stride != 256 && p.k_row_stride != 512)
+            || p.k_row_stride != p.v_row_stride) { return false; }
+        if (p.h != 12 * p.h_k) {
+            launch<Sm80WarpNM8, true, true, 80>(p, stream);
+        } else if (p.b == 1 && p.h_k == 1) {
+            launch<Sm80WarpN, true, true, 80>(p, stream);
+        } else {
+            launch<Sm80WarpN2, true, true, 80>(p, stream);
+        }
+        return true;
+    }
     const bool split = p.num_splits > 1;
     const bool uniform_q = p.total_q == int64_t(p.b) * p.seqlen_q;
     const bool direct_grid = uniform_q && p.b <= 65535
         && int64_t(p.h_k) * p.num_splits <= 65535;
+    const bool small_decode_2048 = qsa_small_decode_2048(p);
     if (p.h == 3 * p.h_k && p.k_row_stride == 256 && p.v_row_stride == 256) {
-        if (direct_grid) { launch<Gqa3Direct>(p, stream); }
-        else { launch<Gqa3Varlen>(p, stream); }
+        if (direct_grid && split && p.b <= 7 && small_decode_2048) {
+            // Nearby query CTAs improve shared-KV reuse in short MTP groups.
+            if (p.b >= 3 && p.b <= 6) { launch<Gqa3WarpNQueryFirst, true>(p, stream); }
+            else if (p.b == 2) { launch<GqaSharedWarpNShort, true, false>(p, stream); }
+            else { launch<GqaSharedWarpN, true>(p, stream); }
+        } else if (direct_grid && !split && p.total_q > 2048) { launch<GqaSharedLong256, false>(p, stream); }
+        else if (direct_grid) { launch<GqaSharedDirect256>(p, stream); }
+        else { launch<GqaSharedVarlen256>(p, stream); }
         return true;
     }
     if (p.h == 6 * p.h_k && p.k_row_stride == 256 && p.v_row_stride == 256) {
-        if (direct_grid) { launch<Gqa6Direct>(p, stream); }
-        else { launch<Gqa6Varlen>(p, stream); }
+        // A single right-aligned query sees every selected KV position; the
+        // length and topk-width masks still handle the tail.
+        if (direct_grid && split && p.b <= 2 && small_decode_2048) {
+            launch<GqaSharedWarpNShort, true, false>(p, stream);
+        } else if (direct_grid && !split && p.total_q > 2048) { launch<GqaSharedLong256, false>(p, stream); }
+        else if (direct_grid) { launch<GqaSharedDirect256>(p, stream); }
+        else { launch<GqaSharedVarlen256>(p, stream); }
         return true;
     }
     if (p.h == 12 * p.h_k && p.k_row_stride == p.v_row_stride) {
         if (p.k_row_stride == 256) {
-            if (direct_grid) { launch<Gqa12Direct256>(p, stream); }
-            else { launch<Gqa12Varlen256>(p, stream); }
+            if (direct_grid && split && p.b <= 4 && small_decode_2048) {
+                if (p.b >= 2 && p.b <= 3) { launch<GqaSharedWarpNShort, true, false>(p, stream); }
+                else { launch<GqaSharedWarpN, true>(p, stream); }
+            } else if (direct_grid && !split && p.total_q <= 2048) {
+                // Small GQA12 prefill benefits from its fixed-group Q addressing.
+                launch<Gqa12Direct256, false>(p, stream);
+            } else if (direct_grid && !split && p.total_q > 2048) { launch<GqaSharedLong256, false>(p, stream); }
+            else if (direct_grid) { launch<GqaSharedDirect256>(p, stream); }
+            else { launch<GqaSharedVarlen256>(p, stream); }
             return true;
         }
         if (p.k_row_stride == 512) {
-            if (direct_grid) { launch<Gqa12Direct512>(p, stream); }
-            else { launch<Gqa12Varlen512>(p, stream); }
+            if (direct_grid && split && p.b <= 2 && p.h_k == 2
+                && small_decode_2048) {
+                launch<Gqa12WarpN512, true>(p, stream);
+            } else if (direct_grid) { launch<GqaSharedDirect512>(p, stream); }
+            else { launch<GqaSharedVarlen512>(p, stream); }
             return true;
         }
     }
@@ -131,9 +377,9 @@ bool run_qsa(Flash_fwd_params &p, hggcStream_t stream) {
         } else if (uniform_q && p.seqlen_k >= 2048) {
             launch<Gqa8Wide>(p, stream);
         } else if (p.seqlen_k >= 2048) {
-            launch<Gqa8Varlen>(p, stream);
+            launch<GqaSharedVarlen512>(p, stream);
         } else {
-            launch<Gqa8Direct>(p, stream);
+            launch<GqaSharedDirect512>(p, stream);
         }
         return true;
     }
@@ -165,4 +411,5 @@ bool run_qsa(Flash_fwd_params &p, hggcStream_t stream) {
 
 #else
 bool run_qsa(Flash_fwd_params&, hggcStream_t) { return false; }
+bool run_qsa_decode_combine(Flash_fwd_params const&, hggcStream_t) { return false; }
 #endif

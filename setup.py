@@ -17,7 +17,8 @@ from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
 import torch
 
-PACKAGE_NAME = "flash_attn"
+HOLMES_BUILD = os.getenv("FA_CPP_INFER_BUILD_FOR_HOLMES", "0") == "1"
+PACKAGE_NAME = "flash_attn_holmes" if HOLMES_BUILD else "flash_attn"
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
 USE_PPU = 'PPU_SDK' in os.environ.keys()
@@ -356,13 +357,36 @@ if not SKIP_KERNEL_BUILD:
     )
 
 
+if HOLMES_BUILD:
+    for extension in ext_modules:
+        extension.name = "flashattn2_holmes"
+        extension.sources = [s for s in extension.sources if "bwd" not in s]
+        extension.define_macros.append(("FLASH_ATTN_CPP_INFERENCE_FOR_HOLMES", "1"))
+        if USE_PPU:
+            extension.define_macros.append(("USE_PPU", "1"))
+        extension.libraries = [lib for lib in extension.libraries if lib != "torch_python"]
+        extension.extra_link_args = list(extension.extra_link_args or []) + [
+            "-Wl,-rpath," + str(Path(torch.__file__).parent / "lib")]
+    package = Path(this_dir) / "flash_attn_holmes"
+    package.mkdir(exist_ok=True)
+    (package / "__init__.py").write_text("from .version import __version__, git_version\n")
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=this_dir, text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = "unknown"
+    (package / "version.py").write_text(
+        f"__version__ = {get_package_version()!r}\ngit_version = {commit!r}\n")
+
+
 setup(
     name=PACKAGE_NAME,
     version=get_package_version(),
-    packages=find_packages(
+    packages=["flash_attn_holmes"] if HOLMES_BUILD else find_packages(
         exclude=(
             "build", "csrc", "include", "tests", "dist",
             "docs", "benchmarks", "flash_attn.egg-info",
+            "flash_attn_holmes", "flash_attn_holmes.*",
         )
     ),
     author="Tri Dao",
