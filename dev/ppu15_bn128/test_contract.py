@@ -72,6 +72,12 @@ class ContractTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "non-finite"):
             require_numeric(torch.full_like(want, float("nan")), want, "bf16")
 
+    def test_tolerance_is_independent_of_reference_storage(self):
+        for storage, dtype in ((torch.float16, "fp16"), (torch.bfloat16, "bf16")):
+            want = torch.tensor([0.125, 0.5, 1.0], dtype=storage)
+            got = want.double() + 0.0001
+            self.assertEqual(require_numeric(got, want, dtype), require_numeric(got, want.double(), dtype))
+
     def test_envelope_does_not_promote_noisy_median(self):
         self.assertEqual(envelope([10, 12, 14], [8, 9, 11]), "UNRESOLVED")
         self.assertEqual(envelope([10, 11, 12], [7, 8, 9]), "CANDIDATE-FASTER")

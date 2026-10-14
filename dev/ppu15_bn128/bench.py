@@ -26,6 +26,9 @@ def tensor_digest(tensor):
 def require_numeric(got, expected, dtype):
     import torch
     tol = CONTRACT["numeric"][dtype]
+    # Full-output control comparisons start from FP16/BF16 tensors too;
+    # the tolerance arithmetic must not be rounded back into that dtype.
+    expected = expected.double()
     if not torch.isfinite(got).all() or not torch.isfinite(expected).all():
         raise AssertionError("non-finite output/reference")
     error = (got.double() - expected).abs()
@@ -182,6 +185,8 @@ def main():
     args = parser.parse_args()
     if min(args.samples, args.launches) < 1 or args.warmup < 0:
         parser.error("invalid timing counts")
+    if args.peak_tflops is not None and (not math.isfinite(args.peak_tflops) or args.peak_tflops <= 0):
+        parser.error("peak-tflops must be finite and positive")
     if args.profile and args.dtype == "both":
         parser.error("profile one exact dtype at a time")
     import torch
